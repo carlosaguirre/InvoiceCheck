@@ -1,0 +1,12 @@
+/archivos
+/descargas
+/LOGS
+/recibos
+/tests
+/tmp
+/vendor
+*.pdf
+*.pdfx
+*.log
+*.xml
+*.zip
