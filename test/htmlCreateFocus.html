@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detectar cancelación y selección de archivo</title>
+    <script>
+        document.addEventListener('DOMContentLoaded', ()=>{
+            // Create the input element
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+
+            // Add an onfocus event listener
+            fileInput.onfocus = function() {
+                console.log('File input has been focused!');
+            };
+
+            // Append the input element to the body (or any other container)
+            document.body.appendChild(fileInput);
+
+            // Give focus to the input element
+            fileInput.focus();
+        });
+    </script>
+</head>
+<body>
+  <h1>Create and focus Tests</h1>
+</body>
+</html>

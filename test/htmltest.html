@@ -1,0 +1,25 @@
+<html>
+<head>
+<script type="text/javascript">
+  const arr=["cero","uno","dos","tres"];
+  function getValue(i) {
+    return arr[i];
+  }
+  function show() {
+    const val=document.getElementById("val").value;
+    const vv=getValue(val);
+    const res=document.getElementById("result");
+    const p1=document.createElement("P");
+    p1.textContent="Result = '"+vv+"'";
+    res.appendChild(p1);
+    const p2=document.createElement("P");
+    p2.textContent="Type = '"+(typeof vv)+"'";
+    res.appendChild(p2);
+  }
+</script>
+</head>
+<body>
+  <input type="text" id="val"><input type="button" value="GET" onclick="show();">
+  <div id="result" style="border:1px solid black; height: 22px;"></div>
+</body>
+</html>

@@ -1,0 +1,31 @@
+<html class="blank" lang="es-MX" xml:lang="es-MX" oncontextmenu="return false">
+  <head>
+    <base href="%base%">
+    <meta charset="utf-8">
+    <title>%title%</title>
+    <link href="css/general.php" rel="stylesheet" type="text/css">
+    <script src="scripts/contrarrecibos.js?ver=1.4c"></script>
+    %barcodescript%
+  </head>
+  <body class="contrarrecibo fontBig blank %watermark%%metodopago0%"><!-- CR -->
+    <span class="whiteshown"> </span>
+    <p class="hg26"><B>FOLIO</B>: %folio%<input type="hidden" id="folio" value="%folio%"></p>
+    <p class="hg26"><B>EMPRESA</B>: (%alias%) %razonSocial%</p>
+    <p class="hg26"><B>PROVEEDOR</B>: (%codigo%) %proveedor% &nbsp; &nbsp; <B class="creditDays">%credito%</B><span class="clear"></span></p>
+    <p class="hg26"><span class="vAlignCenter"><B>BANCO</B>: </span><span class="noFlow nooverfix ellipsis wid350px vAlignCenter">%banco%</span><span class="vAlignCenter">&nbsp;<B>CLABE</B>: %clabe%</span></p>
+    <p class="hg26 centered" id="title-cr" ondblclick="clearStorage();">CONTRA-RECIBO %watermark%</p>
+    <p class="hg26"><B>FECHA REVISION</B>: %fecha%</p>
+    <p><B>FACTURAS</B>:</p>
+    %facturas%
+    <p><b>TOTAL</b>: %total% <span class="fontImportant">%metodopago%</span></p>
+    %FIRMAS%
+    <br>
+    <span class="fontImportant">%fechaPago%</span>
+    <br>
+    <svg id="bcod" class="bgwhite7"></svg>
+    <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" onload="%loadFunc%window.onafterprint=function(){isPrinted(%id%,%uid%,'%watermark%','%metodopago0%');};">
+    <span id="cntRcpHeader">%timestamp%<br>%watermark%<br>%folio%<br>%codigo%<br>%fecharv%<br>%totalo%</span>
+    <div id="firstPageCover">%timestamp%%creator%</div>
+    <div id="payStamp">%paystamp%</div>
+  </body>
+</html>

@@ -1,0 +1,20 @@
+<html class="blank" lang="es-MX" xml:lang="es-MX" oncontextmenu="return false">
+  <head>
+    <base href="%BASE%">
+    <meta charset="utf-8">
+    <title>IMPRESIÓN DE VARIOS CONTRA RECIBOS</title>
+    <link href="css/general.php" rel="stylesheet" type="text/css">
+    <script src="scripts/contrarrecibos.js?ver=1.2a"></script>
+    <style type="text/css">
+      @media print {
+        @page {
+          size:  letter portrait;
+        }
+      }
+    </style>
+  </head>
+  <body class="contrarrecibo blank" onload="window.print();"><!-- CW -->
+    %CONTENIDO%
+    <IMG src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" onload="addExtraInfo();k(this);">
+  </body>
+</html>

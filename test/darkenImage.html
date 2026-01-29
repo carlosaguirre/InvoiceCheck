@@ -1,0 +1,64 @@
+<html>
+<head>
+    <style type="text/css">
+        div.darken {
+            background-color: black;
+        }
+        div.whitey {
+            background-color: white;
+        }
+    </style>
+    <script type="text/javascript">
+        function darkenTransparentImage(element) {
+            if (element.stop) return;
+            var colorArr = ["#eee","#ccc","#aaa","#888","#666","#444","#222"];
+            element.counter=0;
+            element.parentNode.className="whitey";
+            var i = setInterval(function() {
+                if (element.counter<colorArr.length) {
+                    element.style.backgroundColor = colorArr[element.counter];
+                    element.counter++;
+                } else {
+                    clearInterval(i);
+                    element.width=element.offsetWidth;
+                    element.height=element.offsetHeight;
+                    element.src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVQI12NgAAAAAgAB4iG8MwAAAABJRU5ErkJggg==";
+                    element.stop=true;
+                }
+            }, 250);
+        }
+        function darkenOpaqueImage(element) {
+            if (element.stop) return;
+            element.style.opacity=1;
+            element.parentNode.style.width=element.offsetWidth;
+            element.parentNode.style.height=element.offsetHeight;
+            element.parentNode.className="darken";
+            var i = setInterval(function() {
+                if (element.style.opacity>0) {
+                    element.style.opacity-=0.1;
+                } else {
+                    clearInterval(i);
+                    element.style.width=element.offsetWidth;
+                    element.style.height=element.offsetHeight;
+                    element.src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVQI12NgAAAAAgAB4iG8MwAAAABJRU5ErkJggg==";
+                    element.style.opacity=1;
+                    element.stop=true;
+                    element.parentNode.removeAttribute("class");
+                    element.parentNode.removeAttribute("style");
+                }
+            }, 250);
+        }
+    </script>
+</head>
+<body>
+
+<div>    
+    <img id="img" src="http://davidrhysthomas.co.uk/linked/astrid_avatar2.png" onload="darkenTransparentImage(this);" />
+</div>
+
+<div>    
+    <img id="img" src="../imagenes/diseno/fabricacionPapelCorrugado.jpg" onload="darkenOpaqueImage(this);" />
+</div>
+
+</body>
+</html>

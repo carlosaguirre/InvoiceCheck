@@ -1,0 +1,11 @@
+SELECT "GLAMA" empresa,codigoProveedor prov,fechaFactura fecha,uuid,folio,tipoComprobante tipo,total,moneda,estadoCFDI sat,status FROM invoice.facturas WHERE ciclo="2019" AND rfcGrupo="PGL891122778" ORDER BY codigoProveedor,fechaFactura; -- GLAMA
+SELECT "APSA" empresa,codigoProveedor prov,fechaFactura fecha,uuid,folio,tipoComprobante tipo,total,moneda,estadoCFDI sat,status FROM invoice.facturas WHERE ciclo="2019" AND rfcGrupo="APS7503114Q2" ORDER BY codigoProveedor,fechaFactura; -- APSA
+SELECT g.alias empresa,f.codigoProveedor prov,f.fechaFactura fecha,f.uuid,f.folio,f.tipoComprobante tipo,f.total,f.moneda,f.estadoCFDI sat,f.status FROM invoice.facturas f INNER JOIN invoice.grupo g ON f.rfcgrupo=g.rfc WHERE ciclo="2019" AND rfcGrupo IN ("LAI4802211H2","MPB520308IN1") ORDER BY f.rfcGrupo,f.codigoProveedor,f.fechaFactura; -- LAISA y BIDASOA
+SELECT g.alias empresa,f.codigoProveedor prov,f.fechaFactura fecha,f.uuid,f.folio,f.tipoComprobante tipo,f.total,f.moneda,f.estadoCFDI sat,f.status FROM invoice.facturas f INNER JOIN invoice.grupo g ON f.rfcgrupo=g.rfc WHERE ciclo="2019" AND rfcGrupo NOT IN ("PGL891122778","APS7503114Q2","LAI4802211H2","MPB520308IN1") ORDER BY f.rfcGrupo,f.codigoProveedor,f.fechaFactura; -- los demas
+---
+-- ubicacion en SVRW12 donde se copian los archivos generados por 'SELECT ... INTO' : C:\ProgramData\MySQL\MySQL Server 5.7\Data
+-- Para Valentina 22/08/2019
+-- Sept a Dic 2018 todas las empresas
+SELECT g.alias empresa,f.codigoProveedor prov,f.fechaFactura fecha,f.uuid,f.folio,f.tipoComprobante tipo,f.total,f.moneda,f.estadoCFDI sat,f.status FROM invoice.facturas f INNER JOIN invoice.grupo g ON f.rfcgrupo=g.rfc WHERE f.ciclo="2018" AND f.fechaFactura>"2018-09-01 00:00:00" ORDER BY f.rfcGrupo,f.codigoProveedor,f.fechaFactura INTO OUTFILE 'facturas18_09-12.csv'FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"' LINES TERMINATED BY '\n';
+-- Ene a Jul 2019 todas las empresas
+SELECT g.alias empresa,f.codigoProveedor prov,f.fechaFactura fecha,f.uuid,f.folio,f.tipoComprobante tipo,f.total,f.moneda,f.estadoCFDI sat,f.status FROM invoice.facturas f INNER JOIN invoice.grupo g ON f.rfcgrupo=g.rfc WHERE f.ciclo="2019" AND f.fechaFactura<"2019-08-01 00:00:00" ORDER BY f.rfcGrupo,f.codigoProveedor,f.fechaFactura INTO OUTFILE 'facturas19_01-07.csv'FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"' LINES TERMINATED BY '\n';

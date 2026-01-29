@@ -1,0 +1,47 @@
+<?php
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detectar cancelación y selección de archivo</title>
+    <script>
+        var clicked=false;
+        var delCancelTimeout=false;
+
+        document.addEventListener('DOMContentLoaded', ()=>{
+            var fileInput = document.getElementById('fileInput');
+
+            fileInput.addEventListener('focus', function() {
+                if (clicked) delCancelTimeout = setTimeout(el=>{
+                    clicked=false;
+                    if (el.files.length==0) cancelFile();
+                }, 250, this);
+            });
+
+            fileInput.addEventListener('change', function() {
+                clearTimeout(delCancelTimeout);
+                clicked=false;
+                if (this.files.length > 0) changeFile();
+            });
+
+            fileInput.addEventListener('click', function() {
+                this.value='';
+                clicked=true;
+            });
+        });
+        function cancelFile() {
+            console.log('Selección de archivo cancelada.');
+        }
+
+        function changeFile() {
+            console.log('Archivo seleccionado: ' + document.getElementById('fileInput').files[0].name);
+        }
+    </script>
+</head>
+<body>
+    <input type="file" id="fileInput">
+</body>
+</html>
+<?php

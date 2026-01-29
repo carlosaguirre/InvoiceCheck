@@ -1,0 +1,16 @@
+<?php
+require_once dirname(__DIR__)."/bootstrap.php";
+/*
+sessionInit();
+if(!hasUser()) {
+    die("Empty File");
+}
+*/
+header("Content-type: application/javascript; charset: UTF-8");
+clog2ini("scripts._blueprint");
+clog1seq(1);
+?>
+console.log("BLUEPRINT SCRIPT READY!!!");
+<?php
+clog1seq(-1);
+clog2end("scripts._blueprint");

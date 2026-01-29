@@ -1,0 +1,29 @@
+body { margin: 0px; background-color: #e0e0e0; }
+table.calendar_widget {
+    font-family: Tahoma, Arial, sans-serif; font-size: 12px;
+    border-collapse: collapse;
+}
+/* table.calendar_widget td.number:hover { background-color: #c0c0c0; } */
+table.calendar_widget span.weekend { background-color: transparent; }
+table.calendar_widget td { text-align: center; }
+table.calendar_widget td.button_display { text-align: none; width: 100%; }
+table.calendar_widget td.clear_button_display { text-align: left; }
+table.calendar_widget td.close_button_display { text-align: right; }
+table.calendar_widget td>span {
+    display:inline-block;
+    width: 27px;
+    height:14.4px;
+    cursor: pointer;
+    text-align: center;
+}
+table.calendar_widget td.weekday { background-color: #f0f0f0; }
+table.calendar_widget td.weekend { background-color: #b0b0b0; }
+table.calendar_widget td>span:hover { background-color: rgba(255,255,255,0.5);}
+table.calendar_widget td>span.today {
+    -webkit-box-shadow: inset 0px 0px 10px 10px rgba(200,255,200,0.5);
+    -moz-box-shadow: inset 0px 0px 10px 10px rgba(200,255,200,0.5);
+    box-shadow: inset 0px 0px 10px 10px rgba(200,255,200,0.5);
+}
+table.calendar_widget span:not(.current_selection) { border: 1px solid transparent !important; }
+table.calendar_widget span.current_selection { border: 1px dotted gray !important; }
+

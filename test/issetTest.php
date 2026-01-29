@@ -1,0 +1,22 @@
+<?php
+echo "NULL and ISSET Tests\n";
+$varnull=null;
+$varempty="";
+$varfalse=false;
+$varone="1";
+if (isset($varnull)) echo "VAR NULL IS SET\n";
+else echo "VAR NULL IS NOT SET\n";
+if (isset($varempty)) echo "VAR EMPTY IS SET\n";
+else echo "VAR EMPTY IS NOT SET\n";
+if (isset($varfalse)) echo "VAR FALSE IS SET\n";
+else echo "VAR FALSE IS NOT SET\n";
+if (isset($varone)) echo "VAR ONE IS SET\n";
+else echo "VAR ONE IS NOT SET\n";
+if (isset($varnull[0])) echo "VAR NULL[0] IS SET\n";
+else echo "VAR NULL[0] IS NOT SET\n";
+if (isset($varempty[0])) echo "VAR EMPTY[0] IS SET\n";
+else echo "VAR EMPTY[0] IS NOT SET\n";
+if (isset($varfalse[0])) echo "VAR FALSE[0] IS SET\n";
+else echo "VAR FALSE[0] IS NOT SET\n";
+if (isset($varone[0])) echo "VAR ONE[0] IS SET\n";
+else echo "VAR ONE[0] IS NOT SET\n";

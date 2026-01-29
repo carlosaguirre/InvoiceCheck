@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8">
+    <base href="http://invoicecheck.dyndns-web.com:81/invoice/" target="_blank">
+    <title>Validación de Facturas Electrónicas del Corporativo</title>
+    <script src="scripts/general.js?ver=4.3x"></script>
+  </head>
+  <body>
+    <div class="controls">
+      <input class="xhr success" type="button" name="xhr" value="Click to start XHR (success)" />
+      <input class="xhr error" type="button" name="xhr" value="Click to start XHR (error)" />
+      <input class="xhr abort" type="button" name="xhr" value="Click to start XHR (abort)" />
+    </div>
+    <textarea readonly class="event-log"></textarea>
+    <script>
+        const xhrButtonSuccess = document.querySelector('.xhr.success');
+        const xhrButtonError = document.querySelector('.xhr.error');
+        const xhrButtonAbort = document.querySelector('.xhr.abort');
+        const log = document.querySelector('.event-log');
+        function handleEvent(e) {
+            log.textContent = log.textContent + `${e.type}: ${e.loaded} bytes transferred / ${e.total} bytes total\n`;
+            console.log(e.type+": ["+e.target.readyState+"/"+e.target.status+"] '"+e.target.responseText+"'");
+        }
+        function addListeners(xhr) {
+            xhr.addEventListener('loadstart', handleEvent);
+            xhr.addEventListener('load', handleEvent);
+            xhr.addEventListener('loadend', handleEvent);
+            xhr.addEventListener('progress', handleEvent);
+            xhr.addEventListener('error', handleEvent);
+            xhr.addEventListener('abort', handleEvent);
+        }
+        function runXHR(url) {
+            log.textContent = '';
+            const xhr = new XMLHttpRequest();
+            addListeners(xhr);
+            xhr.open("GET", url);
+            xhr.send();
+            return xhr;
+        }
+        if (xhrButtonSuccess) xhrButtonSuccess.addEventListener('click', () => {
+            runXHR('http://invoicecheck.dyndns-web.com:81/invoice/imagenes/pt.png');
+        }); else console.log("No se identificó el botón de success");
+
+        if (xhrButtonError) xhrButtonError.addEventListener('click', () => {
+            runXHR('check.dyndns-web.com:81/cuentas/clases/algo.png');
+        }); else console.log("No se identificó el botón de error");
+
+        if (xhrButtonAbort) xhrButtonAbort.addEventListener('click', () => {
+            runXHR('imagenes/pt.png').abort();
+        }); else console.log("No se identificó el botón de abort");
+    </script>
+  </body>
+</html>

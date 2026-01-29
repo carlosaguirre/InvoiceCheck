@@ -1,0 +1,103 @@
+<html>
+<head>
+</head>
+<body>
+    <canvas id="mycanvas" width="1000" height="300" style="border:1px solid #000000;margin-right:7px;">
+    </canvas>
+    <script type="text/javascript">
+        var secondLength=2;
+        var timelineLeftGap=102.5;
+        var timelineRightGap=100.5;
+        var timelineLength=26*60;
+        var timelineRealEnd=timelineLeftGap+secondLength*timelineLength;
+        var canvasWidth=timelineRealEnd+timelineRightGap;
+
+        var c = document.getElementById("mycanvas");
+        c.width=canvasWidth;
+        var ctx = c.getContext("2d");
+        ctx.beginPath();
+        ctx.strokeStyle = "black";
+        ctx.moveTo(timelineLeftGap, 14.5);
+        ctx.lineTo(timelineLeftGap, 290.5);
+        ctx.stroke();
+        ctx.font = "12px Arial";
+        let lineSpace=20;
+        let textMidV=4;
+        let timelineMidV=0.5;
+        let data=[
+            {name:"Emerald",startH:50,duration:1.09,block:1.09,skip:0,shift:0,maxNum:10000},
+            {name:"Silicon",startH:50,duration:12.24,block:12.24,skip:0,shift:0,maxNum:10000},
+            {name:"Gold",startH:70,duration:1.92,block:1.92,skip:0,shift:0,maxNum:10000},
+            {name:"Ruby",startH:70,duration:2.9,block:2.9,skip:0,shift:0,maxNum:10000},
+            {name:"Coal",startH:76,duration:1.84,block:1.84,skip:0,shift:0,maxNum:125},
+            {name:"Graphite",startH:55,duration:5,block:5*1.84,skip:1,shift:0,maxNum:25},//9.2           : 5coal=>1graphite
+            {name:"Iron",startH:80,duration:7.23,block:7.23,skip:0,shift:0,maxNum:125},
+            {name:"Iron bar",startH:59,duration:15,block:5*7.23,skip:1,shift:0,maxNum:25},//36.15        : 5iron=>1ironbar
+            {name:"Steel bar",startH:52,duration:45,block:45,skip:1,shift:6.15, maxNum:25},//51.15     : 1ironbar+1graphite 
+            {name:"Steel Plate",startH:43,duration:120,block:5*45,skip:1,shift:51.15, maxNum:5},//255.75  : 5steelbar
+            {name:"Diamond",startH:52,duration:5.56,block:5.56,skip:0,shift:0, maxNum:125},
+            {name:"Polished Diamond",startH:3,duration:60,block:60,skip:0,shift:5*5.56, maxNum:25},//27.8 : 5diamond=>1polishd
+            {name:"Diamond Cutter",startH:16,duration:30,block:5*60,skip:1,shift:27.8, maxNum:5}//       : 5polishd+1steelbar
+        ];
+        let currentLine=20;
+        data.forEach(function(res) {
+            let textY=currentLine+textMidV;
+            let lineY=currentLine+timelineMidV;
+            ctx.fillText(res.name, res.startH, textY);
+            ctx.beginPath();
+            ctx.strokeStyle = "lightgray";
+            ctx.moveTo(timelineLeftGap, lineY);
+            ctx.lineTo(timelineRealEnd, lineY);
+            ctx.stroke();
+            let periodLength=secondLength*Math.max(res.duration,res.block);
+            let xVal=timelineLeftGap;
+            let i=0;
+            for (; xVal<timelineRealEnd; i++,xVal+=periodLength) {
+                let shft=secondLength*res.shift;
+                let iniX=xVal+shft;
+                if (iniX>timelineRealEnd) { i--; break; }
+                if (i>=res.skip) {
+                    let maxX=iniX+secondLength*res.duration;
+                    if (maxX>timelineRealEnd) maxX=timelineRealEnd;
+                    ctx.beginPath();
+                    if(i<=(res.maxNum+res.skip-1))
+                        ctx.strokeStyle = "blue";
+                    else
+                        ctx.strokeStyle = "red";
+                    ctx.moveTo(iniX, lineY);
+                    ctx.lineTo(maxX, lineY);
+                    ctx.stroke();
+
+                    if (maxX<timelineRealEnd) {
+                        let nip=2;
+                        let j=i+1-res.skip;
+                        if (j%5==0) nip+=2;
+                        if (j%10==0) nip+=2;
+                        ctx.beginPath();
+                        ctx.strokeStyle="green";
+                        ctx.moveTo(maxX, lineY-nip);
+                        ctx.lineTo(maxX, lineY+nip);
+                        ctx.stroke();
+                    }
+                }
+                /*
+                if (xVal>timelineLeftGap) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = "green";
+                    let nip=2;
+                    if (i>0&&i%5==0) nip+=2;
+                    ctx.moveTo(iniX, lineY-nip);
+                    ctx.lineTo(iniX, lineY+nip);
+                    ctx.stroke();
+                }*/
+            }
+            if (i<=(res.maxNum+res.skip)) {
+                ctx.fillText(""+(i-res.skip), timelineRealEnd+10, textY);
+            } else {
+                ctx.fillText(""+res.maxNum+" + extra "+(i-res.skip-res.maxNum), timelineRealEnd+10, textY);
+            }
+            currentLine+=lineSpace;
+        });
+    </script>
+</body>
+</html>
