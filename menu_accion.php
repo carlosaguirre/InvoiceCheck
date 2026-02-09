@@ -29,6 +29,9 @@
 $isMSIE = ($_browser==="Edge" || $_browser==="IE");
 require_once "templates/generalScript.php";
 //echo "<!-- MENU ACCION 3 ".($esPruebas?"STILL":"NOT")." TESTING -->\n";
+echo "<!-- WAIT IMG: $waitImgName -->\n";
+echo "<!-- BKGD IMG: $bkgdImgName -->\n";
+
 ?>
 <html lang="es" xmlns="http://www.w3.org/1999/xhtml">
   <head>

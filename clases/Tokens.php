@@ -103,7 +103,7 @@ class Tokens extends DBObject {
         doclog("eligeToken INI","token",["token"=>$token,"status"=>$status]);
         $hasResult=false;
         $this->errorMessage=null;
-        $hasAutoCommit=DBi::isAutocommit(DBi::$conn);
+        $hasAutoCommit=DBi::isAutocommit();
         doclog("eligeToken AutoCommit","token",["hasAutoCommit"=>$hasAutoCommit?"TRUE":"FALSE"]);
         if ($hasAutoCommit) DBi::autocommit(false);
         try {
@@ -127,7 +127,7 @@ class Tokens extends DBObject {
             $refData=$this->getData("refId={$this->data["refId"]}{$modulo}");
             $columns=[];
             doclog("eligeToken 3","token",["refCount"=>count($refData)]);
-            if (DBi::isAutocommit(DBi::$conn)) {
+            if (DBi::isAutocommit()) {
                 doclog("eligeToken ALERT ISAUTOCOMMIT","token");
             }
             foreach ($refData as $idx => $tokData) {
@@ -136,7 +136,7 @@ class Tokens extends DBObject {
                 $isThisToken=($tokData["token"]===$token);
                 if ($isThisToken) $fieldarray["status"]=$status;
                 else $fieldarray["status"]="cancelado";
-                if (DBi::isAutocommit(DBi::$conn)) {
+                if (DBi::isAutocommit()) {
                     doclog("eligeToken ALERT ISAUTOCOMMIT","token",["tokenIdx"=>$idx,"tokenId"=>$tokData["id"]]);
                 }
                 if (!$this->updateRecord($fieldarray)) {

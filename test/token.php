@@ -335,10 +335,10 @@ function eligeToken($token,$status="ocupado") {
     global $tokenReturn;
     $tokObj=new Tokens();
     if ($tokObj->eligeToken($token,$status)) {
-        if (!DBi::isAutocommit(DBi::$conn)) DBi::commit();
+        if (!DBi::isAutocommit()) DBi::commit();
         $tokenReturn["result"]="<p>Token Elegido: $token</p>";
     } else {
-        if (!DBi::isAutocommit(DBi::$conn)) DBi::rollback();
+        if (!DBi::isAutocommit()) DBi::rollback();
         if (!isset($tokenReturn["error"])) $tokenReturn["error"]="";
         $tokenReturn["error"].="<p>Token no elegido: $token</p>";
     }

@@ -105,7 +105,7 @@ function doAlta() {
             }
         }
         $numqry++;
-        $result=DBi::query($beginquery."(".$dataquery.")", new class extends DBObject { public function __construct() { $this->tablename = $tbnm; } });
+        $result=DBi::query($beginquery."(".$dataquery.")", DBObject::getByTable($tablename) );
         //$dataquery.=")";
         if ($result&&DBi::$affected_rows>0) {
             $inserted++;
@@ -214,7 +214,7 @@ function doAltaB() {
             }
         }
         $numqry++;
-        $result=DBi::query($beginquery."(".$dataquery.")", new class extends DBObject { public function __construct() { $this->tablename = $tbnm; } });
+        $result=DBi::query($beginquery."(".$dataquery.")", DBObject::getByTable($tablename));
         //$dataquery.=")";
         if ($result&&DBi::$affected_rows>0) {
             $inserted++;
@@ -331,7 +331,7 @@ function doAltaC() {
             }
         }
         $numqry++;
-        $result=DBi::query($beginquery."(".$dataquery.")", new class extends DBObject { public function __construct() { $this->tablename = $tbnm; } });
+        $result=DBi::query($beginquery."(".$dataquery.")", DBObject::getByTable($tablename));
         //$dataquery.=")";
         if ($result&&DBi::$affected_rows>0) {
             $inserted++;
@@ -448,7 +448,7 @@ function doAltaPrv() {
             }
         }
         $numqry++;
-        $result=DBi::query($beginquery."(".$dataquery.")", new class extends DBObject { public function __construct() { $this->tablename = $tbnm; } });
+        $result=DBi::query($beginquery."(".$dataquery.")",  DBObject::getByTable($tablename));
         //$dataquery.=")";
         if ($result&&DBi::$affected_rows>0) {
             $inserted++;
@@ -1010,7 +1010,7 @@ function doEliminaD() {
     }
     
     $query="DELETE FROM $tbnm WHERE$empQry fecha BETWEEN \"$ini\" AND \"$fin\" and id>0";
-    if (DBi::query($query, new class extends DBObject { public function __construct() { $this->tablename = $tbnm; } })) {
+    if (DBi::query($query,  DBObject::getByTable($tbnm))) {
         echo json_encode(["result"=>"exito","title"=>"Datos Eliminados","message"=>"Se eliminaron ".(DBi::$affected_rows??0)." registros","query"=>$query,"info"=>DBi::$query_info??"","affectedRows"=>DBi::$affected_rows??0,"errors"=>DBi::$errors,"warnCount"=>DBi::$warning_count,"warnings"=>DBi::$warnings??"","numRows"=>DBi::$num_rows]);
     } else echo json_encode(["result"=>"error","message"=>"Los datos no fueron eliminados","query"=>$query,"info"=>DBi::$query_info??"","affectedRows"=>DBi::$affected_rows??0,"errors"=>DBi::$errors,"warnCount"=>DBi::$warning_count,"warnings"=>DBi::$warnings??""]);
 }
@@ -1037,7 +1037,7 @@ function doEliminaPrv() {
     }
     
     $query="DELETE FROM $tbnm WHERE$empQry fecha BETWEEN \"$ini\" AND \"$fin\" and id>0";
-    if (DBi::query($query, new class extends DBObject { public function __construct() { $this->tablename = $tbnm; } })) {
+    if (DBi::query($query, DBObject::getByTable($tbnm))) {
         echo json_encode(["result"=>"exito","title"=>"Datos Eliminados","message"=>"Se eliminaron ".(DBi::$affected_rows??0)." registros","query"=>$query,"info"=>DBi::$query_info??"","affectedRows"=>DBi::$affected_rows??0,"errors"=>DBi::$errors,"warnCount"=>DBi::$warning_count,"warnings"=>DBi::$warnings??"","numRows"=>DBi::$num_rows]);
     } else echo json_encode(["result"=>"error","message"=>"Los datos no fueron eliminados","query"=>$query,"info"=>DBi::$query_info??"","affectedRows"=>DBi::$affected_rows??0,"errors"=>DBi::$errors,"warnCount"=>DBi::$warning_count,"warnings"=>DBi::$warnings??""]);
 }

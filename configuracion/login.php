@@ -14,7 +14,7 @@ if (!isValidBrowser()) {
     //global $ualog;
     //doclog("WRONG BROWSER","error",["browser"=>getBrowser("browser"),"useragent"=>getBrowser("ua")/*,"ualog"=>$ualog*/]);
 } else if (isset($_REQUEST["logout"]) && $hasUser) {
-    echo "<!-- BEGIN LOGOUT -->\n";
+    //echo "<!-- BEGIN LOGOUT -->\n";
     if ($habilitado) $prcObj->cambioSesion($userid, "Cierre", $username, "Logout: ".$user->persona);
     sessionEnds();
     clearTokenName();
@@ -196,7 +196,7 @@ if (!isValidBrowser()) {
             //global $query;
             //echo "<!-- NO STATUS. query: $query -->";
         }
-    } else {
+    } else if ($GLOBALS["_doDB"]) {
         global $usrObj;
         if (!isset($usrObj)) { require_once "clases/Usuarios.php"; $usrObj = new Usuarios(); }
         $usrData = $usrObj->getData("id=".$userid, 1, "banderas");

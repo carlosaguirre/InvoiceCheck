@@ -28,7 +28,7 @@ if (empty($rfc)) {
 }
 
 // Buscar en la base de datos usando los campos proporcionados
-$stmt = DBi::query("SELECT alias, rfc, conSitFis FROM grupo WHERE rfc = '$rfc' LIMIT 1",$dbKey);
+$stmt = DBi::query("SELECT alias, rfc, conSitFis FROM grupo WHERE rfc = '$rfc' LIMIT 1", DBObject::getByTable("grupo"), $dbKey);
 $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$resultado) {

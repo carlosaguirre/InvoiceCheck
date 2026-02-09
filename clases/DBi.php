@@ -88,7 +88,7 @@ class DBi {
         }
         try {
             if (!$dbSsl) {
-                $conn = new \mysqli_init();
+                $conn = \mysqli_init();
                 $conn->options(MYSQLI_OPT_SSL_VERIFY_SERVER_CERT, false);
                 $conn->real_connect($dbHost, $dbUsr, $dbPwd, $dbBase, 3306, null, MYSQLI_CLIENT_SSL_DONT_VERIFY_SERVER_CERT);
             } else $conn = new \mysqli($dbHost, $dbUsr, $dbPwd, $dbBase);
@@ -136,8 +136,13 @@ class DBi {
         return null;
     }
     public static function isConnected($connKey = null): bool {
+        global $_now;
         $conn = self::getConnection($connKey);
-        if (isset($GLOBALS['_now']) && isset($_now["now"]) && isset(self::$lastTest[$conn]) && self::$lastTest[$conn]===$_now["now"]) {
+        if (!is_null($conn) && ($conn === $connKey)) foreach (self::$connections as $key => $val) if ($conn === $val) {
+            $connKey = $key;
+            break;
+        }
+        if (isset($GLOBALS['_now']) && isset($_now["now"]) && ($conn !== $connKey) && isset(self::$lastTest[$connKey]) && self::$lastTest[$connKey]===$_now["now"]) {
             return true;
         }
         self::conlog("INI DBi::isConnected", ["key"=>$connKey??"null", "type"=>$connKey?gettype($connKey):"null"]);
@@ -150,8 +155,8 @@ class DBi {
                 } else {
                     $result->free();
                     $retVal=true;
-                    if (isset($GLOBALS['_now']) && isset($_now["now"])) {
-                        self::$lastTest[$conn] = $_now["now"];
+                    if (isset($GLOBALS['_now']) && isset($_now["now"]) && ($conn !== $connKey)) {
+                        self::$lastTest[$connKey] = $_now["now"];
                     }
                 }
             } catch (\Throwable $e) {
@@ -160,7 +165,7 @@ class DBi {
                 // cualquier excepción indica que la conexión no es válida
             }
         }
-        self::conlog("END DBi::isConnected",["arg"=>$connOrKey, "conn"=>$conn, "retVal"=>($retVal?"true":"false")]);
+        self::conlog("END DBi::isConnected",["arg"=>$connKey, "conn"=>$conn, "retVal"=>($retVal?"true":"false")]);
         return $retVal;
     }
     public static function close($connOrKey=null, $force=false) {
@@ -196,7 +201,7 @@ class DBi {
                 self::$refCounts[$key]--;
             }
             if ($force||!$key||self::$refCounts[$key]<=0) {
-                if (isset(self::$lastTest[$conn])) unset(self::$lastTest[$conn]);
+                if ($key && isset(self::$lastTest[$key])) unset(self::$lastTest[$key]);
                 $conn->close();
                 if ($key) {
                     $lastCount=self::$refCounts[$key];
@@ -261,12 +266,12 @@ class DBi {
             self::conlog("Rollback done");
         }
     }
-    public static function freeResult($connOrKey=null) {
-        $conn=self::getConnection($connOrKey);
-        if (self::isConnected($conn)) {
-            $conn->free_result();
-        }
-    }
+//    public static function freeResult($connOrKey=null) {
+//        $conn=self::getConnection($connOrKey);
+//        if (self::isConnected($conn)) {
+//            $conn->free_result();
+//        }
+//    }
     public static function nextResult($connOrKey=null) {
         $conn=self::getConnection($connOrKey);
         if (self::isConnected($conn)) {
@@ -346,8 +351,8 @@ class DBi {
         */
     }
     private static $noLogTables=["logs","proceso","replicationqueries","trace"];
-    public static function query($qryTxt, $connOrKey=null, $tableObj=null) { // tableObj requerido para replicar inserts
-        self::conlog("INI DBi::query",["qryTxt"=>$qryTxt, "connOrKey"=>$connOrKey, "tableObj"=>$tableObj]);
+    public static function query($qryTxt, $tableObj=null, $connOrKey=null) { // tableObj requerido para replicar inserts
+        self::conlog("INI DBi::query",["qryTxt"=>$qryTxt, "tableObj"=>$tableObj, "connOrKey"=>$connOrKey]);
         $conn=self::getConnection($connOrKey);
         $isLoggable=(!isset($tableObj) || !in_array($tableObj->tablename, self::$noLogTables));
         if (!self::isConnected($conn)) {

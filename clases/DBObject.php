@@ -32,6 +32,10 @@ abstract class DBObject {
         //doclog("DBObject::construct","test",["tablename"=>$this->tablename]);
     }
 
+    public static function getByTable($tablename): object {
+        return new class extends DBObject { public function __construct($tablename) { $this->tablename = $tablename; } };
+    }
+
     function clearFullMap() {
         unset($this->fullmap);
     }

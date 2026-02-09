@@ -3,7 +3,7 @@ require_once "bootstrap.php";
 $menu_accion = "";
 //echo "<!-- INDEX BEGIN -->\n";
 if ($hasUser) {
-    echo "<!-- HAS USER : TEST SET | NEW KEY SET -->\n";
+    //echo "<!-- HAS USER : TEST SET | NEW KEY SET -->\n";
     if ($_esPruebas) {
         ini_set('display_errors', 1);
         ini_set('display_startup_errors', 1);
@@ -17,11 +17,11 @@ if (!isset($menu_accion[0])) {
     if (isset($_POST["menu_accion"][0])) {
         $menu_accion = $_POST["menu_accion"];
         if ($hasUser) {
-            echo "<!-- MENU ACCION : POST & USER -->\n";
+            //echo "<!-- MENU ACCION : POST & USER -->\n";
             setcookie("menu_accion", $menu_accion, 0, "/invoice");
             doclog("POST: $menu_accion","action");
         } else {
-            echo "<!-- MENU ACCION : POST & NOT USER -->\n";
+            //echo "<!-- MENU ACCION : POST & NOT USER -->\n";
             $_SESSION["lastMenuAction"]=$menu_accion;
             doclog("POST noUser (last=$menu_accion)");
             $menu_accion="";
@@ -29,49 +29,49 @@ if (!isset($menu_accion[0])) {
     } else if (isset($_GET["menu_accion"][0])) {
         $menu_accion = $_GET["menu_accion"];
         if ($hasUser) {
-            echo "<!-- GET & USER -->\n";
+            //echo "<!-- GET & USER -->\n";
             setcookie("menu_accion", $menu_accion, 0, "/invoice");
-        } else echo "<!-- GET & NOT USER -->\n";
+        } //else echo "<!-- GET & NOT USER -->\n";
         doclog("GET: $menu_accion","action");
     } else if(isset($_REQUEST["menu_accion"][0])) {
         $menu_accion = $_REQUEST["menu_accion"];
         if ($hasUser) {
-            echo "<!-- REQUEST & USER -->\n";
+            //echo "<!-- REQUEST & USER -->\n";
             setcookie("menu_accion",$menu_accion, 0, "/invoice");
-        } else echo "<!-- REQUEST & NOT USER -->\n";
+        } //else echo "<!-- REQUEST & NOT USER -->\n";
         doclog("REQUEST: $menu_accion","action");
     } else if ($hasUser && isset($_SESSION["lastMenuAction"][0])) {
-        echo "<!-- USER && SESSION[lastMenuAction] -->\n";
+        //echo "<!-- USER && SESSION[lastMenuAction] -->\n";
         $menu_accion=$_SESSION["lastMenuAction"];
         unset($_SESSION["lastMenuAction"]);
         doclog("SESSION lastMenuAction: $menu_accion","action");
     } else if ($hasUser && isset($_COOKIE["menu_accion"])) {
-        echo "<!-- USER && COOKIE[menu_accion] -->\n";
+        //echo "<!-- USER && COOKIE[menu_accion] -->\n";
         $menu_accion = $_COOKIE["menu_accion"];
         doclog("COOKIE: $menu_accion","action");
     } else {
-        echo "<!-- OTHER, NO MENU ACCION -->\n";
+        //echo "<!-- OTHER, NO MENU ACCION -->\n";
         try {
             if (!isset($menu_accion)) {
-                echo "<!-- no menu accion -->\n";
+                //echo "<!-- no menu accion -->\n";
                 doclog("OTHER: no menu action","action");
             } else if (!isset($menu_accion[0])) {
-                echo "<!-- empty menu accion -->\n";
+                //echo "<!-- empty menu accion -->\n";
                 doclog("OTHER: empty menu action","action");
             } else {
-                echo "<!-- other menu accion -->\n";
+                //echo "<!-- other menu accion -->\n";
                 doclog("OTHER: no menu action: '$menu_accion'","action");
             }
         } catch (Exception $e) {
             echo "<!-- DocLog Exception: ".json_encode(getErrorData($e))." -->\n";
         }
     }
-    echo "<!-- SESSION[tmp] -->\n";
+    //echo "<!-- SESSION[tmp] -->\n";
     if (isset($_SESSION["tmp"])) {
         if ($_SESSION["tmp"]==="loggedin") {
-            echo "<!-- SESSION[tmp]=loggedin -->\n";
+            //echo "<!-- SESSION[tmp]=loggedin -->\n";
             if(($user->banderas & 2)>0) { // Tiene bandera 2
-                echo "<!-- USER && BANDERA 2 -->\n";
+                //echo "<!-- USER && BANDERA 2 -->\n";
                 $resultTitle="Solicitud de Pago";
                 $resultMessage="<P class='fontRelevant margin20 centered'>Se ha generado un pendiente en <b class=\"alink\" onclick=\"autoSubmit({menu_accion:'ListaSolPago',target:'_self'});\">Solicitud de Pago</b></P>";
                 if (!isset($usrObj)) {
@@ -83,7 +83,7 @@ if (!isset($menu_accion[0])) {
         }
         unset($_SESSION["tmp"]);
     }
-    echo "<!-- INV INIT  -->\n";
+    //echo "<!-- INV INIT  -->\n";
     if ((($_esSistemas??false)||($_esAdministrador??false)) && (!isset($_POST["menu_accion"])||$_POST["menu_accion"]==="Inicio")) {
         global $invObj, $query;
         if (!isset($invObj)) {
@@ -125,7 +125,7 @@ if (!isset($menu_accion[0])) {
                 "f.id", 
                 "f.idReciboPago is null or f.statusReciboPago is null or x.idCPagos is null or x.idCPagos like \"%,%\" or f.statusReciboPago<1 or f.saldoReciboPago>0");
 // group_concat([<c|d>pagoField] order by d.saldoInsoluto asc) => group_concat([<c|d>pagoField] order by d.idFactura desc, c.idCPago desc)
-            echo "<!-- $query -->\n";
+            //echo "<!-- $query -->\n";
             $ttn=$invObj->numrows;
             $d2d=0; // discarded to display
             $cnt=count($noCCPData);
@@ -512,6 +512,7 @@ switch ($menu_accion) {
         $urlAction = "eventos";
         $hasScriptAction=true;
         $hasConfigAction=true;
+        break;
     case "ExtraeDatos":
         $urlAction = "extraedatos";
         $hasScriptAction = true;

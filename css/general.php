@@ -1,7 +1,7 @@
 <?php
 header("Content-type: text/css; charset: UTF-8");
 $GLOBALS["_doDB"]=false;
-$GLOBALS["season"]=false;
+//$GLOBALS["season"]=false;
 require_once dirname(__DIR__)."/bootstrap.php";
 $isChrome = $_browser=="Chrome";
 $isIE = $_browser=="IE";
@@ -366,19 +366,20 @@ pre.wrapped6, prewrap6 {
 
 <?php if ($enableHiddenMenu) { ?>
 #lado_izquierdo {
-      position: fixed;
-      left: -169px; /* Oculta el menú dejando solo 20px visibles */
-      top: 0;
-      bottom: 0;
-      padding-right: 0px; /* 15px;*/
-      width: 170px;
-      transition: left 0.3s ease;
-      z-index: 2000;
-      background: transparent; / rgba(100,100,255,0.1); */
-      overflow-y: auto;
+    position: fixed;
+    left: -169px; /* Oculta el menú dejando solo 20px visibles */
+    top: 0;
+    bottom: 0;
+    padding-right: 0px; /* 15px;*/
+    width: 170px;
+    transition: left 0.3s ease;
+    z-index: 2000;
+    background: transparent; / rgba(100,100,255,0.1); */
+    overflow-y: auto;
+    font-family: Tahoma, Arial, sans-serif !important;
 }
 #lado_izquierdo:hover:not(.noApply) {
-  left: 0; /* Muestra completamente el menú al hacer hover */
+    left: 0; /* Muestra completamente el menú al hacer hover */
 }
 #pie_pagina {
     z-index: 1000;

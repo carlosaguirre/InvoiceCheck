@@ -9,7 +9,7 @@ if (isset($_POST["cmd"])) switch($_POST["cmd"]) {
         break;
     case "fix":
         $result=$_POST["result"];
-        $oldAutoCommit=DBi::isAutocommit(DBi::$conn);
+        $oldAutoCommit=DBi::isAutocommit();
         DBi::autocommit(false);
         break;
 }

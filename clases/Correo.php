@@ -125,7 +125,7 @@ class Correo {
         return $this->mail->AltBody=$altBody;
     }
     function addAttachment($path,$name="",$encoding=PHPMailer::ENCODING_BASE64,$type="",$disposition="attachment") {
-        return $this->mail->addAttachment();
+        return $this->mail->addAttachment($path,$name,$encoding,$type,$disposition);
     }
     function getInfo() {
         try {
@@ -136,14 +136,14 @@ class Correo {
                     "security"=>$this->mail->SMTPSecure, 
                     "allAddresses"=>$this->mail->getAllRecipientAddresses() ];*/
 
-            $data=[ "debug"=>$this->mail->SMTPDebug,
-                    "username"=>$this->mail->Username,
+            $data=[ "username"=>$this->mail->Username,
                     "monitor"=>$this->monitor,
                     "host"=>$this->mail->Host,
                     "hostname"=>$this->mail->Hostname,
                     "port"=>$this->mail->Port,
                     "security"=>$this->mail->SMTPSecure, 
                     "debug"=>$this->debug, 
+                    "smtpdebug"=>$this->mail->SMTPDebug,
                     "authtype"=>$this->mail->AuthType, 
                     "sender"=>$this->mail->Sender,
                     "replyTo"=>$this->mail->getReplyToAddresses(),

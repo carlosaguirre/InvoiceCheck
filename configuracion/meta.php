@@ -224,6 +224,7 @@ function doclog($content,$filebase=null,$data=null) {
     static $sharedLogs=["conn"=>"connection","pago"=>"pagos","conn1"=>"connection1","pago1"=>"pagos1","conn2"=>"connection2","pago2"=>"pagos2"];
     static $isPersonal=["action","read","action1","read1","action2","read2"];
     if (isset($GLOBALS['_now'])) {
+        global $_now;
         if (isset($_now["ymd"][5])) $dia=substr($_now["ymd"], 0, 6);
         if (isset($_now["now"][18])) $timestamp=substr($_now["now"], 11, 8);
     }
@@ -1611,7 +1612,7 @@ function sendMail($asunto,$mensaje,$from,$to,$cc=null,$bcc=null,$data=null) {
             if($ss) $_SESSION["lastEmailInfo"]+=["addressCount"=>$addressCount];
             else $GLOBALS['lastEmailInfo']+=["addressCount"=>$addressCount];
             return true;
-        } catch (phpmailerException $pe) {
+        } catch (Exception $pe) {
             $mailErrMsg="Excepcion PHPMailer en envío de correo";
             $errData=["info"=>$mail->getErrorInfo()];
             $errData["exception"]=getErrorData($pe);

@@ -12,7 +12,16 @@ else $_SERVER['REQUEST_SCHEME'] = 'http';
 $_SERVER["WEB_MD_PATH"]="/invoice/";
 $_SERVER["HTTP_ORIGIN"]="$_SERVER[REQUEST_SCHEME]://$_SERVER[HTTP_HOST]";
 
-require_once __DIR__ . '/vendor/autoload.php';
+// Ruta de proyecto
+set_include_path(get_include_path() . PATH_SEPARATOR . __DIR__);
+$_webPth=__DIR__;
+//$_pryPth = Config::get("project","path");
+//$_webPth = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $_pryPth ?? __DIR__), DIRECTORY_SEPARATOR);
+//if (!in_array(realpath($_webPth), array_map('realpath', explode(PATH_SEPARATOR, get_include_path())))) {
+//    set_include_path(get_include_path() . PATH_SEPARATOR . $_webPth);
+//}
+
+require_once 'vendor/autoload.php';
 // Detecta el nombre del proyecto desde el path físico
 $_pryNm = "invoice";
 $_project_name = $_pryNm;
@@ -23,7 +32,7 @@ $_envPth = "C:/PHP/includes/.env.$_pryNm";
 
 // Carga y valida el archivo .env
 //echo "<!-- BOOTSTRAP INI: '$_envPth' -->\n";
-require_once __DIR__."/clases/Config.php";
+require_once "clases/Config.php";
 Config::init($_envPth);
 
 // Configura entorno si el archivo fue válido
@@ -84,6 +93,7 @@ if (Config::get("error")!==null) {
     // r = RFC 2822/5322                  Thu, 21 Dec 2000 16:01:07 +0200
     // U = SECONDS SINCE UNIX EPOCH (January 1 1970 00:00:00 GMT)
     $_now = [];
+
     foreach (["Y","y","m","n","d","j","t","H","i","s","now","ym","ymd","1MY","DMY","tMY"] as $char) {
         if (!isset($char[1])) $_now[$char]=date($char);
         else switch($char) {
@@ -96,13 +106,6 @@ if (Config::get("error")!==null) {
         }
     }
     $monStrs=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-
-    // Ruta de proyecto
-    $_pryPth = Config::get("project","path");
-    $_webPth = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $_pryPth ?? __DIR__), DIRECTORY_SEPARATOR);
-    if (!in_array(realpath($_webPth), array_map('realpath', explode(PATH_SEPARATOR, get_include_path())))) {
-        set_include_path(get_include_path() . PATH_SEPARATOR . $_webPth);
-    }
 
     //echo "<!-- BOOTSTRAP: META BEGIN -->\n";
     require_once "configuracion/meta.php";
@@ -129,85 +132,20 @@ if (Config::get("error")!==null) {
 
     // seguimiento de errores
     require_once "configuracion/error.php";
-    //echo "<!-- Proyect Name: $_project_name -->\n";
+    echo "<!-- Proyect Name: $_project_name -->\n";
+
     // Configuracion inicial de la base de datos
     if ($_doDB && $habilitado && file_exists($_webPth . "\clases\DBi.php")) {
-        doclog("BOOTSTRAP: CONNECTION INIT","connection");
-        //echo "<!-- BOOTSTRAP: CONNECTION INIT -->\n";
+        echo "<!-- BOOTSTRAP: CONNECTION INIT -->\n";
+//        doclog("BOOTSTRAP: CONNECTION INIT","connection");
+    /*
         require_once "clases/DBi.php";
         $dbConnKey = DBi::connect();
         if ($dbConnKey===null) echo "<!-- BOOTSTRAP: NULL CONNECTION -->\n";
         else if (empty($dbConnKey)) echo "<!-- BOOTSTRAP: EMPTY CONNECTION -->\n";
         else echo "<!-- BOOTSTRAP: CONNECTED $dbConnKey(".DBi::getCount($dbConnKey).") -->\n";
+    */
     } else if (!$_doDB) echo "<!-- BOOTSTRAP: DB DISABLED -->\n";
     else if (!$habilitado) echo "<!-- BOOTSTRAP: DESHABILITADO -->\n";
     else echo "<!-- BOOTSTRAP: NOT FOUND $_webPth\clases\DBi.php -->\n";
-
-    // Configuracion inicial de la sesión
-    //echo "<!-- BOOTSTRAP: SESSION INIT".(isset($dbConnKey)?" CONN $dbConnKey(".DBi::getCount($dbConnKey).")":"")." -->\n";
-    sessionInit();
-    setUser();
-    global $_project_name, $hasUser, $user, $userid, $username;
-    //echo "<!-- BOOTSTRAP | SET USER : $userid | $username".(isset($dbConnKey)?" CONN $dbConnKey(".DBi::getCount($dbConnKey).")":"")." -->\n";
-    // Identificar y validar usuario
-    if ($_doLogin && file_exists($_webPth . "\configuracion\login.php")) {
-        //echo "<!-- BOOTSTRAP | LOGIN BEGIN : $userid | $username".(isset($dbConnKey)?" CONN $dbConnKey(".DBi::getCount($dbConnKey).")":"")." -->\n";
-        include "configuracion/login.php";
-    } //else cleanUser();
-
-    if ($_esPruebas) {
-        ini_set('display_errors', 1);
-        ini_set('display_startup_errors', 1);
-        error_reporting(E_ALL);
-    }
-
-    // Cambios GUI de Temporada
-    $waitPth=Config::get("interface","waitPth")??"";
-    $waitImg=Config::get("interface","waitImg");
-    $waitExt=Config::get("interface","waitExt");
-    $bkgdPth=Config::get("interface","bkgdPth")??"";
-    $lghtPth=Config::get("interface","lightPath")??"";
-    $bkgdImg=Config::get("interface","bkgdImg");
-    $bkgdExt=Config::get("interface","bkgdExt");
-    if (!array_key_exists("season",$GLOBALS)) $GLOBALS["season"]=Config::get("season","enable")??false;
-    $isSeason=($season!==false && $season!=="false");
-    if ($isSeason) {
-        global $hasUser, $username;
-        $VIPList=Config::get("season", "byUser")??[];
-        $isVIP=$hasUser && in_array($username, $VIPList);
-        $seasonNoList=Config::get("season", "exUser")??[];
-        $isIgnore=$hasUser && in_array($username, $seasonNoList);
-        if ($isVIP) {
-            if (isset(Config::get("season","waitPth",$season.$username)[0]))
-                $waitPth=Config::get("season","waitPth",$season.$username);
-            else $waitPth="seasons";
-            if (isset(Config::get("season","waitImg",$season.$username)[0]))
-                $waitImg=Config::get("season","waitImg",$season.$username);
-            if (isset(Config::get("season","bkgdPth",$season.$username)[0]))
-                $bkgdPth=Config::get("season","bkgdPth",$season.$username);
-            else $bkgdPth=$season;
-            if (isset(Config::get("season","bkgdImg",$season.$username)[0]))
-                $bkgdImg=Config::get("season","bkgdImg",$season.$username);
-            if (isset(Config::get("season","bkgdExt",$season.$username)[0]))
-                $bkgdExt=Config::get("season","bkgdExt",$season.$username);
-        } else if (!$isIgnore) {
-            if (isset(Config::get("season","waitPth",$season)[0]))
-                $waitPth=Config::get("season","waitPth",$season);
-            if (isset(Config::get("season","waitImg",$season)[0]))
-                $waitImg=Config::get("season","waitImg",$season);
-            if (isset(Config::get("season","bkgdPth",$season)[0]))
-                $bkgdPth=Config::get("season","bkgdPth",$season);
-            if (isset(Config::get("season","bkgdImg",$season)[0]))
-                $bkgdImg=Config::get("season","bkgdImg",$season);
-            if (isset(Config::get("season","bkgdExt",$season)[0]))
-                $bkgdExt=Config::get("season","bkgdExt",$season);
-        }
-    }
-    if (isset($bkgdPth[0])) $bkgdPth.="/";
-    if (isset($waitPth[0])) $waitPth.="/";
-    if (isset($lghtPth[0])) $lghtPth.="/";
-    if (isset($bkgdExt[0])) $bkgdExt=".$bkgdExt";
-    if (isset($waitExt[0])) $waitExt=".$waitExt";
-    $waitImgName="imagenes/".$waitPth.$waitImg.$waitExt;
-    $bkgdImgName="imagenes/fondos/".$bkgdPth.$lghtPth.$bkgdImg.$bkgdExt;
 }
