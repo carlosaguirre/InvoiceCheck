@@ -100,14 +100,10 @@ function getFileList($path,&$stats) {
     return $fixed;
 }
 function renameDBFiles() {
-    global $rvcObj, $rarObj, $query;
+    global $query;
     $filepath="C:/InvoiceCheckShare/invoiceDocs/viajes/";
     echo "<H1>RENAME TABLE FILES</H1>";
-    if (!isset($rvcObj)) {
-        require_once "clases/RepViaConceptos.php";
-        $rvcObj = new RepViaConceptos();
-    }
-    $rvcObj->rows_per_page=0;
+    $rvcObj = dao('rvc', ["rows_per_page"=>0]);
     $rvcData=$rvcObj->getData("archivoxml is not null", 0, "id,vid,archivoxml,archivopdf");
     $stats=["view"=>0,"xmlNotFound"=>0,"processed"=>0,"fileNotFound"=>0,"mkdir"=>0,"noMkdir"=>0,"updated"=>0,"notUpdated"=>0,"hasPDF"=>0,"xmlRenamed"=>0,"pdfRenamed"=>0,"notRenamed"=>0,"sameXML"=>0,"errors"=>[]];
     foreach ($rvcData as $rvcRow) {
@@ -178,11 +174,7 @@ function renameDBFiles() {
         }
         echo "</ul>";
     }
-    if (!isset($rarObj)) {
-        require_once "clases/ReposicionArchivos.php";
-        $rarObj = new ReposicionArchivos();
-    }
-    $rarObj->rows_per_page=0;
+    $rarObj = dao('rar', ["rows_per_page"=>0]);
     $rarData=$rarObj->getData("archivoxml is not null", 0, "id,repid,archivoxml,archivopdf");
     $stats=["view"=>0,"xmlNotFound"=>0,"processed"=>0,"fileNotFound"=>0,"mkdir"=>0,"noMkdir"=>0,"updated"=>0,"notUpdated"=>0,"hasPDF"=>0,"xmlRenamed"=>0,"pdfRenamed"=>0,"notRenamed"=>0,"sameXML"=>0,"errors"=>[]];
     foreach ($rarData as $rarRow) {
@@ -261,41 +253,22 @@ function doTransferFiles() {
     $before_timeout=$ini_max_time-($start_time-$req_start_time);
     $process_time=0;
     doclog("TRANSFER FILES BEGAN HAVING {$before_timeout}s","ftp");
-    global $rccObj,$rviObj,$rarObj,$rvcObj,$gpoObj,$prcObj;
     $tabla=strtolower($_POST["tipo"]??"");
     if (isset($tabla[0])&&$tabla[0]==="v") {
         $tipo="Viáticos";
         $abrv="VT";
         $tabla="reposicionviaticos";
         $tarch="repviaconceptos";
-        if (!isset($rviObj)) {
-            require_once "clases/ReposicionViaticos.php";
-            $rviObj = new ReposicionViaticos();
-        }
-        $remObj=$rviObj;
-        if (!isset($rvcObj)) {
-            require_once "clases/RepViaConceptos.php";
-            $rvcObj = new RepViaConceptos();
-        }
-        $rvcObj->rows_per_page=0;
-        $arcObj=$rvcObj;
+        $remObj=dao("rvi");
+        $arcObj=dao("rvc", ["rows_per_page"=>0]);
         $arcRegIdName="vid";
     } else if (isset($tabla[0])&&$tabla[0]==="c") {
         $tipo="Caja Chica";
         $abrv="CC";
         $tabla="reposicioncajachica";
         $tarch="reposicionarchivos";
-        if (!isset($rccObj)) {
-            require_once "clases/ReposicionCajaChica.php";
-            $rccObj = new ReposicionCajaChica();
-        }
-        $remObj=$rccObj;
-        if (!isset($rarObj)) {
-            require_once "clases/ReposicionArchivos.php";
-            $rarObj=new ReposicionArchivos();
-        }
-        $rarObj->rows_per_page=0;
-        $arcObj=$rarObj;
+        $remObj=dao("rcc");
+        $arcObj=dao("rar", ["rows_per_page"=>0]);
         $arcRegIdName="repid";
     } else {
         echoJSDoc("error", "Falta indicar si se trata de reembolso de Viáticos o Caja Chica", null, $_POST, "cajachica");
@@ -303,10 +276,6 @@ function doTransferFiles() {
     }
     $ids=$_POST["listaIds"]??"";
     if (!isset($ids[0])) { echoJSDoc("error", "Falta indicar algún folio de reembolso", null, $_POST, "cajachica"); return; }
-    if (!isset($gpoObj)) {
-        require_once "clases/Grupo.php";
-        $gpoObj=new Grupo();
-    }
     $idArr=explode(",", $ids);
     $lastBlock_time=$start_time;
     $lastLapse_time=$start_time;
@@ -316,7 +285,7 @@ function doTransferFiles() {
         if (isset($remData[0]["empresaId"])) $remData=$remData[0];
         $empresaId=+($remData["empresaId"]??"0");
         if ($empresaId>0) {
-            $gpoData=$gpoObj->getData("id=$empresaId", 1, "alias");
+            $gpoData=dao("gpo")->getData("id=$empresaId", 1, "alias");
             $alias = $gpoData[0]["alias"]??"";
             if (isset($alias[0])) {
                 $arcData=$arcObj->getData("$arcRegIdName=$regId and archivoxml is not null", 0, "id,archivoxml,archivopdf");
@@ -362,11 +331,7 @@ function doTransferFiles() {
                         echoJSDoc("error", "Falló la actualización del reembolso", null, ["errno"=>$errno, "error"=>$error], "error");
                         return;
                     }
-                    if (!isset($prcObj)) {
-                        require_once "clases/Proceso.php";
-                        $prcObj = new Proceso();
-                    }
-                    $prcObj->alta("CajaChica",$regId,"TransferFiles","Empresa:$alias, Id:$regId, Solicita:$remData[solicitante]");
+                    dao("prc")->alta("CajaChica",$regId,"TransferFiles","Empresa:$alias, Id:$regId, Solicita:$remData[solicitante]");
                     echo json_encode(["result"=>"exito","log"=>$llog,"filelist"=>$filelist]);
                     $block_time=microtime(true);
                     $before_timeout=$ini_max_time-($block_time-$req_start_time);
@@ -490,41 +455,25 @@ function transferInvoice($alias, $xmlPath, $pdfPath, &$log) {
     }
 }
 function transferFile($isBinary, $remotePath, $remoteName, $localFilepath) {
-    global $ftpObj, $prcObj;
-    if (!isset($prcObj)) {
-        require_once "clases/Proceso.php";
-        $prcObj = new Proceso();
-    }
+    global $ftpObj;
     if ($isBinary) {
         $ftpObj->cargarArchivoBinario($remotePath, $remoteName, $localFilepath);
     } else {
         $ftpObj->cargarArchivoAscii($remotePath, $remoteName, $localFilepath);
     }
-    $prcObj->alta("CajaChica",0,"AvanceFTP",$remotePath.$remoteName);
+    dao("prc")->alta("CajaChica",0,"AvanceFTP",$remotePath.$remoteName);
 }
 function fixDate($dbdate) {
     if (isset($dbdate[9])) return substr($dbdate, 8, 2)."/".substr($dbdate, 5, 2)."/".substr($dbdate, 0, 4);
     return "";
 }
 function getNombreEmpresa($empresaId) {
-    global $gpoObj;
-    if (!isset($gpoObj)) {
-        require_once "clases/Grupo.php";
-        $gpoObj=new Grupo();
-    }
-    $gpoObj->rows_per_page=0;
-    $gpoData=$gpoObj->getData("id=$empresaId", 1, "alias");
+    $gpoData=dao("gpo", ["rows_per_page"=>0])->getData("id=$empresaId", 1, "alias");
     if (isset($gpoData[0]["alias"])) return $gpoData[0]["alias"];
     return "DESCONOCIDO($empresaId)";
 }
 function getConceptosViaticos($id) {
-    global $rvcObj;
-    if (!isset($rvcObj)) {
-        require_once "clases/RepViaConceptos.php";
-        $rvcObj = new RepViaConceptos();
-    }
-    $rvcObj->rows_per_page=0;
-    $rvcData=$rvcObj->getData("vid='$id'");
+    $rvcData=dao("rvc", ["rows_per_page"=>0])->getData("vid='$id'");
     $retval=[];
     foreach ($rvcData as $val) {
         $cfecha=$val["fecha"];
@@ -537,23 +486,11 @@ function getConceptosViaticos($id) {
     return $retval;
 }
 function getArchivosViaje($id) {
-    global $rvcObj;
-    if (!isset($rvcObj)) {
-        require_once "clases/RepViaConceptos.php";
-        $rvcObj = new RepViaConceptos();
-    }
-    $rvcObj->rows_per_page=0;
-    $rvcData=$rvcObj->getData("vid='$id'");
+    $rvcData=dao("rvc", ["rows_per_page"=>0])->getData("vid='$id'");
     return $rvcData;
 }
 function getArchivosCaja($id) {
-    global $rarObj;
-    if (!isset($rarObj)) {
-        require_once "clases/ReposicionArchivos.php";
-        $rarObj = new ReposicionArchivos();
-    }
-    $rarObj->rows_per_page=0;
-    $rarData=$rarObj->getData("repid='$id'");
+    $rarData=dao("rar", ["rows_per_page"=>0])->getData("repid='$id'");
     return $rarData;
 }
 function doFixStatus() {
@@ -572,7 +509,7 @@ function doFixStatus() {
     } else if ($control==="rechazar") {
         $fieldarr["rechazadoPor"]=getUser()->persona;
     }
-    if (!$rccObj->saveRecord($fieldarr)) {
+    if (!dao("rcc")->saveRecord($fieldarr)) {
         DBi::rollback();
         DBi::autocommit(true);
         echoJSDoc("error", "Error al cambiar registro de caja chica", null, ["errors"=>DBi::$errors], "error");
@@ -592,7 +529,7 @@ function doViewRecord() {
     echo "<div class=\"selector centered\"><B>VIEW RECORD</B></div>";
 } // END doViewRecord
 function doReview() {
-    global $query, $esSistemas, $perObj, $ugObj;
+    global $query, $esSistemas;
     $parameters=[];
     $folio=$_POST["folio"]??"";
     if(isset($folio[0])) $parameters["folio"]=$folio;
@@ -609,26 +546,12 @@ function doReview() {
     $logmsg="";
     $empresaId=$_POST["empresaId"]??"";
     if (isset($empresaId[0])) {
-        global $gpoObj;
-        if (!isset($gpoObj)) {
-            require_once "clases/Grupo.php";
-            $gpoObj=new Grupo();
-        }
         $parameters["empresaId"]=$empresaId;
-        $parameters["empresa"]=$gpoObj->getValue("id",$empresaId,"alias");
+        $parameters["empresa"]=dao("gpo")->getValue("id",$empresaId,"alias");
     }
     $unaEmpresaElegida=(isset($empresaId[0]) && $empresaId!=="todas");
-    if (!isset($perObj)) {
-        require_once "clases/Perfiles.php";
-        $perObj=new Perfiles();
-    }
-    $ccId=$perObj->getIdByName("Caja Reporte");
-    if (!isset($ugObj)) {
-        require_once "clases/Usuarios_grupo.php";
-        $ugObj=new Usuarios_Grupo();
-    }
-    $ugObj->rows_per_page=0;
-    $refundGroupId=$ugObj->getRefundGroupId(getUser()->id, $ccId, "vista", true);
+    $ccId=dao("per")->getIdByName("Caja Reporte");
+    $refundGroupId=dao("ug", ["rows_per_page"=>0])->getRefundGroupId(getUser()->id, $ccId, "vista", true);
     //if (!isset($refundGroupId[0])) { echoJSDoc("error", "No tiene empresas válidas", null, $_POST, false); return; }
     $tieneVariasEmpresasValidas=isset($refundGroupId[1]);
     $tieneUnaEmpresaValida=(!$tieneVariasEmpresasValidas&&isset($refundGroupId[0]));
@@ -810,16 +733,11 @@ function trim_value(&$value) {
     $value = trim($value);
 }
 function doNewPettyCash() {
-    global $rccObj,$tmpObj,$prcObj,$gpoObj;
     array_walk($_POST, 'trim_value');
     $beneficiario=$_POST["beneficiario"]??"";
     if (!isset($beneficiario[0])) { echoJSDoc("error", "Debe ingresar el nombre del beneficiario", null, $_POST, false); return; }
     $empresaId=$_POST["empresaId"]??"";
     if (!isset($empresaId[0])) { echoJSDoc("error", "Debe indicar una empresa", null, $_POST, false); return; }
-    if (!isset($rccObj)) {
-        require_once "clases/ReposicionCajaChica.php";
-        $rccObj = new ReposicionCajaChica();
-    }
     $concepto=$_POST["concepto"]??"";
     if (!isset($concepto[0])) { echoJSDoc("error", "Debe ingresar un concepto", null, $_POST, false); return; }
     $banco=$_POST["banco"]??"";
@@ -840,76 +758,47 @@ function doNewPettyCash() {
     if (isset($cuentabancaria[0])) $fieldarr["cuentabancaria"]=$cuentabancaria;
     if (isset($cuentaclabe[0])) $fieldarr["cuentaclabe"]=$cuentaclabe;
     if (isset($observaciones[0])) $fieldarr["observaciones"]=$observaciones;
-    if (!$rccObj->saveRecord($fieldarr)) {
+    if (!dao("rcc")->saveRecord($fieldarr)) {
         DBi::rollback();
         DBi::autocommit(true);
         global $query;
         echoJSDoc("error", "Error al crear nuevo registro de reposición de caja chica", null, ["query"=>$query,"errno"=>DBi::$errno,"error"=>DBi::$error], "error");
         return;
     }
-    if (!isset($prcObj)) {
-        require_once "clases/Proceso.php";
-        $prcObj = new Proceso();
-    }
-    if (!isset($gpoObj)) {
-        require_once "clases/Grupo.php";
-        $gpoObj = new Grupo();
-    }
-    $alias = $gpoObj->getAliasById($empresaId);
+    $alias = dao("gpo")->getAliasById($empresaId);
     if (!$alias) $alias="";
-    $regId=$rccObj->lastId;
+    $regId=dao("rcc")->lastId;
     $_POST["regId"]="$regId";
-    $prcObj->alta("CajaChica",$regId,"NewPettyCash","Empresa:$alias, Solicita:$solicitante");
+    dao("prc")->alta("CajaChica",$regId,"NewPettyCash","Empresa:$alias, Solicita:$solicitante");
     DBi::commit();
     DBi::autocommit(true);
     doGetPettyCash();
 }
 function doGetPettyCash($additionalData=null) {
-    global $query,$rccObj, $rarObj, $gpoObj, $perObj, $ugObj;
+    global $query;
     $regId=$_POST["regId"]??"";
     $beneficiario=$_POST["beneficiario"]??"";
     if (!isset($regId[0])&&!isset($beneficiario[0])) { echoJSDoc("error", "Se necesita el número de registro o nombre del beneficiario", null, $_POST, false); return; }
-    if (!isset($rccObj)) {
-        require_once "clases/ReposicionCajaChica.php";
-        $rccObj = new ReposicionCajaChica();
-    }
     $where="";
     if (isset($regId[0])) $where="id='$regId'";
     else {
         $lowName=str_replace(" ", "", strtolower($beneficiario));
         $where="lower(replace(beneficiario,' ','')) like '%{$lowName}%'";
     }
-    if (!isset($perObj)) {
-        require_once "clases/Perfiles.php";
-        $perObj=new Perfiles();
-    }
-    $ccId=$perObj->getIdByName("Caja Chica");
-    if (!isset($ugObj)) {
-        require_once "clases/Usuarios_grupo.php";
-        $ugObj=new Usuarios_Grupo();
-    }
-    $ugObj->rows_per_page=0;
-    $refundGroupId=$ugObj->getRefundGroupId(getUser()->id, $ccId, "vista", true);
+    $ccId=dao("per")->getIdByName("Caja Chica");
+    $refundGroupId=dao("ug", ["rows_per_page"=>0])->getRefundGroupId(getUser()->id, $ccId, "vista", true);
     if (isset($refundGroupId[1])) $where.=" and empresaId in (".implode(",",$refundGroupId).")";
     else if (isset($refundGroupId[0])) $where.=" and empresaId=".$refundGroupId[0];
 
-    $rccData=$rccObj->getData($where);
+    $rccData=dao("rcc")->getData($where);
     if (!isset($rccData[0])) { echoJSDoc("error", "No se encontró el registro solicitado", null, ["query"=>$query], false); return; }
-    if (!isset($rarObj)) {
-        require_once "clases/ReposicionArchivos.php";
-        $rarObj = new ReposicionArchivos();
-    }
-    if (!isset($gpoObj)) {
-        require_once "clases/Grupo.php";
-        $gpoObj = new Grupo();
-    }
     for ($i=0; isset($rccData[$i]); $i++) {
         $iid=$rccData[$i]["id"];
-        $rarData=$rarObj->getData("repid='$iid'");
+        $rarData=dao("rar")->getData("repid='$iid'");
         if (isset($rarData[0]))
             $rccData[$i]["archivos"]=$rarData;
         $empId=$rccData[$i]["empresaId"];
-        $gpoData=$gpoObj->getData("id='$empId'", 1, "alias");
+        $gpoData=dao("gpo")->getData("id='$empId'", 1, "alias");
         if (isset($gpoData[0]))
             $rccData[$i]["empresa"]=$gpoData[0]["alias"];
     }
@@ -923,7 +812,7 @@ function doSavePettyCash() {
     $ini_max_time=+ini_get('max_execution_time');
     $before_timeout=$ini_max_time-($start_time-$req_start_time);
     $process_time=0;
-    global $rccObj, $tmpObj, $gpoObj, $rarObj, $prcObj, $query;
+    global $query;
     array_walk($_POST, 'trim_value');
     $regId=$_POST["regId"]??"";
     if (!isset($regId[0])) { echoJSDoc("error", "No se recibió registro a guardar", null, _POST+["action"=>"SavePettyCash"], false); return; }
@@ -993,17 +882,10 @@ function doSavePettyCash() {
     } else $dtpath=date("Ym")."/";
     $viatpath=$docspath."viajes/".$dtpath;
     if (!file_exists($viatpath)) mkdir($viatpath,0777,true);
-    if (!isset($rccObj)) {
-        require_once "clases/ReposicionCajaChica.php";
-        $rccObj = new ReposicionCajaChica();
-    }
     DBi::autocommit(false);
+    $tmpObj=dao("tmp");
     if (isset($_POST["xmlId"][0])) {
         $xmlId=$_POST["xmlId"];
-        if (!isset($tmpObj)) {
-            require_once "clases/Temporales.php";
-            $tmpObj = new Temporales();
-        }
         $xmlName=$tmpObj->procesar($xmlId);
         $fullTmpXML=$temppath.$xmlName;
         if ($xmlName!==false && file_exists($fullTmpXML)) {
@@ -1024,10 +906,6 @@ function doSavePettyCash() {
     }
     if (isset($_POST["pdfId"][0])) {
         $pdfId=$_POST["pdfId"];
-        if (!isset($tmpObj)) {
-            require_once "clases/Temporales.php";
-            $tmpObj=new Temporales();
-        }
         $pdfName=$tmpObj->procesar($pdfId);
         $fullTmpPDF=$temppath.$pdfName;
         if ($pdfName!==false && file_exists($fullTmpPDF)) {
@@ -1040,6 +918,7 @@ function doSavePettyCash() {
     } else if (isset($_POST["pdfPath"]) && !isset($_POST["pdfPath"][0])) {
         $fieldarr["archivopdf"]=NULL;
     }
+    $rarObj=dao("rar");
     $control=$_POST["control"]??"";
     if ($control==="pagado") {
         $fieldarr["pagadoPor"]=getUser()->persona;
@@ -1048,10 +927,6 @@ function doSavePettyCash() {
         }
     } else if ($control==="autorizar") {
         // validar que todos los archivos tengan XML
-        if (!isset($rarObj)) {
-            require_once "clases/ReposicionArchivos.php";
-            $rarObj=new ReposicionArchivos();
-        }
         if (!$rarObj->exists("repid=$regId")) { echoJSDoc("error", "No puede autorizar registros sin comprobantes", null, ["action"=>"SavePettyCash", "query"=>$query], "error"); return; }
         $rarValue=+$rarObj->getValue("repid",$regId,"count(1)","archivoxml IS NULL");
         if ($rarValue!==0) { echoJSDoc("error", "Para autorizar el registro, todos los comprobantes deben incluir XML", null, ["action"=>"SavePettyCash", "query"=>$query], "error"); return; }
@@ -1067,6 +942,7 @@ function doSavePettyCash() {
         $fieldarr["rechazadoPor"]=NULL;
     }
     global $query;
+    $rccObj=dao("rcc");
     if (!$rccObj->saveRecord($fieldarr)&&DBi::$errno>0) {
         DBi::rollback();
         DBi::autocommit(true);
@@ -1083,11 +959,7 @@ function doSavePettyCash() {
         echoJSDoc("error", "No se encontró empresa relacionada con Reembolso de Caja Chica", null, ["action"=>"SavePettyCash", "folio"=>$regId, "errno"=>DBi::$errno, "error"=>DBi::$error,"query"=>$query], "error");
         return;
     }
-    if (!isset($gpoObj)) {
-        require_once "clases/Grupo.php";
-        $gpoObj=new Grupo();
-    }
-    $gpoData=$gpoObj->getData("id=$empresaId", 1, "alias");
+    $gpoData=dao("gpo")->getData("id=$empresaId", 1, "alias");
     $alias=$gpoData[0]["alias"]??"";
     if (!isset($alias[0])) {
         DBi::rollback();
@@ -1095,12 +967,7 @@ function doSavePettyCash() {
         echoJSDoc("error", "No se encontró empresa relacionada con Reembolso de Caja Chica", null, ["action"=>"SavePettyCash", "regId"=>$regId, "control"=>$control, "errno"=>DBi::$errno, "error"=>DBi::$error,"query"=>$query], "error");
         return;
     }
-
     if ($control==="autorizar") {
-        if (!isset($rarObj)) {
-            require_once "clases/ReposicionArchivos.php";
-            $rarObj=new ReposicionArchivos();
-        }
         $rarData=$rarObj->getData("repid=$regId and archivoxml is not null", 0, "archivoxml,archivopdf");
         try {
             $llog=[];
@@ -1125,35 +992,22 @@ function doSavePettyCash() {
             return;
         }
     }
-    if (!isset($prcObj)) {
-        require_once "clases/Proceso.php";
-        $prcObj = new Proceso();
-    }
-    $prcObj->alta("CajaChica", $regId, "SavePettyCash", "Empresa:$alias, Id:$regId, Solicita:$rccData[solicitante]");
+    dao("prc")->alta("CajaChica", $regId, "SavePettyCash", "Empresa:$alias, Id:$regId, Solicita:$rccData[solicitante]");
     DBi::commit();
     DBi::autocommit(true);
     doGetPettyCash();
 }
 function doDeletePettyCashFile() {
-    global $rccObj, $rarObj, $prcObj;
     $regId=$_POST["regId"]??"";
     if (!isset($regId[0])) { echoJSDoc("error", "No se recibió registro a borrar", null, $_POST, false); return; }
     $fileId=$_POST["fileId"]??"";
     if (!isset($fileId[0])) { echoJSDoc("error", "No se recibieron los datos del archivo a borrar", null, $_POST, false); return; }
-    if (!isset($rarObj)) {
-        require_once "clases/ReposicionArchivos.php";
-        $rarObj = new ReposicionArchivos();
-    }
     global $query;
-    if (!$rarObj->deleteRecord(["id"=>$fileId, "repid"=>$regId])) {
+    if (!dao("rar")->deleteRecord(["id"=>$fileId, "repid"=>$regId])) {
         echoJSDoc("error", "Ocurrió un error al eliminar archivo(s)", null, ["errno"=>DBi::$errno, "error"=>DBi::$error, "query"=>$query], "error");
         return;
     }
-    if (!isset($rccObj)) {
-        require_once "clases/ReposicionCajaChica.php";
-        $rccObj = new ReposicionCajaChica();
-    }
-    $rccData=$rccObj->getData("id=$regId", 1, "empresaId, solicitante");
+    $rccData=dao("rcc")->getData("id=$regId", 1, "empresaId, solicitante");
     if (isset($rccData[0]["empresaId"])) {
         $rccData=$rccData[0];
         $empresaId=$rccData["empresaId"];
@@ -1161,43 +1015,28 @@ function doDeletePettyCashFile() {
         echoJSDoc("error", "No se encontró empresa relacionada con Reembolso de Caja Chica", null, ["action"=>"DeletePettyCashFile", "folio"=>$regId, "errno"=>DBi::$errno, "error"=>DBi::$error, "query"=>$query], "error");
         return;
     }
-    if (!isset($gpoObj)) {
-        require_once "clases/Grupo.php";
-        $gpoObj=new Grupo();
-    }
-    $gpoData=$gpoObj->getData("id=$empresaId", 1, "alias");
+    $gpoData=dao("gpo")->getData("id=$empresaId", 1, "alias");
     $alias=$gpoData[0]["alias"]??"";
     if (!isset($alias[0])) {
         echoJSDoc("error", "No se encontró empresa relacionada con Reembolso de Caja Chica", null, $_POST+["action"=>"DeletePettyCashFile", " errno"=>DBi::$errno, "error"=>DBi::$error, "query"=>$query], "error");
         return;
     }
-    if (!isset($prcObj)) {
-        require_once "clases/Proceso.php";
-        $prcObj = new Proceso();
-    }
-    $prcObj->alta("CajaChica", $regId, "DeletePettyCashFile", "Empresa:$alias, Id:$regId, Solicita:$rccData[solicitante]");
+    dao("prc")->alta("CajaChica", $regId, "DeletePettyCashFile", "Empresa:$alias, Id:$regId, Solicita:$rccData[solicitante]");
     doGetPettyCash();
 }
 function doDeletePettyCashReq() {
-    global $rccObj, $rarObj, $query;
+    global $query;
     $regId=$_POST["regId"]??"";
     if (!isset($regId[0])) { echoJSDoc("error", "No se recibió registro a borrar", null, $_POST+["action"=>"DeletePettyCashReq"], false); return; }
-    if (!isset($rarObj)) {
-        require_once "clases/ReposicionArchivos.php";
-        $rarObj = new ReposicionArchivos();
-    }
     DBi::autocommit(false);
+    $rarObj=dao("rar");
     if ($rarObj->exists("repid=$regId") && !$rarObj->deleteRecord(["repid"=>$regId])) {
         DBi::rollback();
         DBi::autocommit(true);
         echoJSDoc("error", "Ocurrió un error al eliminar los archivos del registro", null, ["action"=>"DeletePettyCashReq", "errno"=>DBi::$errno, "error"=>DBi::$error,"query"=>$query], "error");
         return;
     }
-    if (!isset($rccObj)) {
-        require_once "clases/ReposicionCajaChica.php";
-        $rccObj = new ReposicionCajaChica();
-    }
-    if (!$rccObj->deleteRecord(["id"=>$regId])) {
+    if (!dao("rcc")->deleteRecord(["id"=>$regId])) {
         DBi::rollback();
         DBi::autocommit(true);
         echoJSDoc("error", "Ocurrió un error al eliminar el registro", null, ["action"=>"DeletePettyCashReq", "errno"=>DBi::$errno, "error"=>DBi::$error, "query"=>$query], "error");
@@ -1209,7 +1048,7 @@ function doDeletePettyCashReq() {
     echo json_encode($result);
 }
 function doNewRecord() {
-    global $user, $username, $_now, $rviObj, $query;
+    global $user, $username, $_now, $query;
     array_walk($_POST, 'trim_value');
     $beneficiario=$_POST["beneficiario"]??"";
     $lugares=$_POST["lugares"]??"";
@@ -1225,10 +1064,6 @@ function doNewRecord() {
     if ($empresaId<=0) { echoJSDoc("error", "Se requiere que indique la empresa que pagará sus viáticos", null, $_POST+["action"=>"newRecord"], false); return; }
     if (!isset($lugares[0])) { echoJSDoc("error", "Se requiere el o los lugares a visitar", null, $_POST+["action"=>"newRecord"], false); return; }
     if ($viaticos<=0) { echoJSDoc("error", "Debe indicar el monto total de viáticos requeridos", null, $_POST+["action"=>"newRecord"], false); return; }
-    if (!isset($rviObj)) {
-        require_once "clases/ReposicionViaticos.php";
-        $rviObj = new ReposicionViaticos();
-    }
     $solicitante = ($username==="viajero")?$beneficiario:$user->persona;
     $fechaHoy=$_now["now"];
     $fieldarr=["fechasolicitud"=>$fechaHoy, "fechapago"=>$fechaHoy, "beneficiario"=>$beneficiario, "empresaId"=>$empresaId, "lugaresvisita"=>$lugares, "viaticosrequeridos"=>$viaticos, "solicitante"=>$solicitante];
@@ -1236,6 +1071,7 @@ function doNewRecord() {
     if (isset($cuentabancaria[0])) $fieldarr["cuentabancaria"]=$cuentabancaria;
     if (isset($cuentaclabe[0])) $fieldarr["cuentaclabe"]=$cuentaclabe;
     if (isset($observaciones[0])) $fieldarr["observaciones"]=$observaciones;
+    $rviObj=dao("rvi");
     if (!$rviObj->saveRecord($fieldarr)) {
         echoJSDoc("error", "Error al crear nuevo registro de reposición de viáticos", null, ["action"=>"newRecord", "errno"=>DBi::$errno, "error"=>DBi::$error, "query"=>$query], "error");
         return;
@@ -1246,7 +1082,7 @@ function doNewRecord() {
     doGetRecord();
 }
 function doSaveRecord() {
-    global $rviObj, $rvcObj, $gpoObj, $query;
+    global $query;
     array_walk($_POST, 'trim_value');
     $viaId=$_POST["regid"]??"";
     if (!isset($viaId[0])) { echoJSDoc("error", "No se recibió registro a guardar", null, $_POST+["action"=>"saveRecord"], false); return; }
@@ -1294,6 +1130,7 @@ function doSaveRecord() {
         $fieldarr["viaticosrequeridos"]=$_POST["reqviaticos"];
     }
     $control=$_POST["control"]??"";
+    $rvcObj=dao("rvc");
     if ($control==="pagado") {
         $fieldarr["pagadoPor"]=getUser()->persona;
         if (isset($_POST["control2"])&&$_POST["control2"]==="autorizar") {
@@ -1301,10 +1138,6 @@ function doSaveRecord() {
         }
     } else if ($control==="autorizar") {
         // validar que todos los archivos tengan XML
-        if (!isset($rvcObj)) {
-            require_once "clases/RepViaConceptos.php";
-            $rvcObj=new RepViaConceptos();
-        }
         $rvcValue=+$rvcObj->getValue("vid",$viaId,"count(1)","archivoxml IS NULL");
         if ($rvcValue!==0) { echoJSDoc("error", "Para autorizar el registro, todos los conceptos deben tener XML.", null, $_POST+["action"=>"saveRecord", "query"=>$query, "result"=>$rvcValue], false); return; }
         $fieldarr["autorizadoPor"]=getUser()->persona;
@@ -1314,11 +1147,8 @@ function doSaveRecord() {
         $fieldarr["autorizadoPor"]=NULL;
         $fieldarr["rechazadoPor"]=NULL;
     }
-    if (!isset($rviObj)) {
-        require_once "clases/ReposicionViaticos.php";
-        $rviObj = new ReposicionViaticos();
-    }
     DBi::autocommit(false);
+    $rviObj=dao("rvi");
     if (!$rviObj->saveRecord($fieldarr)&&DBi::$errno>0) {
         DBi::rollback();
         DBi::autocommit(true);
@@ -1330,18 +1160,10 @@ function doSaveRecord() {
         $rviData=$rviObj->getData("id=$viaId", 1, "empresaId");
         $rviQuery=$query;
         if (isset($rviData[0]["empresaId"])) {
-            if (!isset($gpoObj)) {
-                require_once "clases/Grupo.php";
-                $gpoObj=new Grupo();
-            }
-            $gpoData=$gpoObj->getData("id='".$rviData[0]["empresaId"]."'", 1, "alias");
+            $gpoData=dao("gpo")->getData("id='".$rviData[0]["empresaId"]."'", 1, "alias");
             $gpoQuery=$query;
             $alias=$gpoData[0]["alias"]??"";
             if (isset($alias[0])) {
-                if (!isset($rvcObj)) {
-                    require_once "clases/RepViaConceptos.php";
-                    $rvcObj=new RepViaConceptos();
-                }
                 $rvcData=$rvcObj->getData("vid=$viaId and archivoxml is not null", 0, "archivoxml,archivopdf");
                 $rvcQuery=$query;
                 try {
@@ -1392,7 +1214,7 @@ function doSaveRecord() {
     doGetRecord();
 }
 function doFixPerDiem() {
-    global $rviObj, $rvcObj, $tmpObj, $query;
+    global $query;
     array_walk($_POST, 'trim_value');
     $conId=$_POST["conId"]??"";
     if (!isset($conId[0])) { echoJSDoc("error", "No se recibió un concepto válido", null, $_POST+["action"=>"fixPerDiem"], "error"); return; }
@@ -1453,12 +1275,9 @@ function doFixPerDiem() {
     DBi::autocommit(false);
     $queries=[];
     $results=[];
+    $tmpObj=dao("tmp");
     if (isset($_POST["xmlId"][0])) {
         $xmlId=$_POST["xmlId"];
-        if (!isset($tmpObj)) {
-            require_once "clases/Temporales.php";
-            $tmpObj = new Temporales();
-        }
         $xmlName=$tmpObj->procesar($xmlId);
         $fullTmpXML=$temppath.$xmlName;
         $queries["ProcesarXML"]=$query;
@@ -1486,10 +1305,6 @@ function doFixPerDiem() {
     }
     if (isset($_POST["pdfId"][0])) {
         $pdfId=$_POST["pdfId"];
-        if (!isset($tmpObj)) {
-            require_once "clases/Temporales.php";
-            $tmpObj=new Temporales();
-        }
         $pdfName=$tmpObj->procesar($pdfId);
         $fullTmpPDF=$temppath.$pdfName;
         $queries["ProcesarPDF"]=$query;
@@ -1507,11 +1322,7 @@ function doFixPerDiem() {
         $logs["6-ARCHIVOPDF"]="IS NULL";
     }
     if (isset($fieldarr["archivoxml"][0])&&!isset($fieldarr["foliofactura"])) { echoJSDoc("error", "Debe indicar el número de folio de su comprobante", null, $_POST+["action"=>"fixPerDiem", "fieldarr"=>$fieldarr], "error"); return; }
-    if (!isset($rvcObj)) {
-        require_once "clases/RepViaConceptos.php";
-        $rvcObj = new RepViaConceptos();
-    }
-    if (!$rvcObj->saveRecord($fieldarr)) {
+    if (!dao("rvc")->saveRecord($fieldarr)) {
         $errQry=$query;
         DBi::rollback();
         DBi::autocommit(true);
@@ -1526,11 +1337,7 @@ function doFixPerDiem() {
     DBi::commit();
     DBi::autocommit(true);
     if (getUser()->nombre==="viajero") {
-        if (!isset($rviObj)) {
-            require_once "clases/ReposicionViaticos.php";
-            $rviObj = new ReposicionViaticos();
-        }
-        $rviData=$rviObj->getData("id=$viaId", 1, "beneficiario,empresaId");
+        $rviData=dao("rvi")->getData("id=$viaId", 1, "beneficiario,empresaId");
         if (isset($rviData[0])) {
             $_POST["recipient"]=$rviData[0]["beneficiario"];
             $_POST["empresaId"]=$rviData[0]["empresaId"];
@@ -1539,7 +1346,7 @@ function doFixPerDiem() {
     doGetRecord(["post"=>$_POST,"queries"=>$queries,"results"=>$results,"logs"=>$logs]);
 }
 function doAddPerDiem() {
-    global $rviObj, $rvcObj, $query, $username;
+    global $query, $username;
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__];
     array_walk($_POST, 'trim_value');
     $fecha=$_POST["fecha"]??"";
@@ -1565,16 +1372,9 @@ function doAddPerDiem() {
     }
     if (!isset($concepto[0])) { echoJSDoc("error", "Es necesario el concepto del viático", null, $_POST+["action"=>"addPerDiem"], "error"); return; }
     if ((isset($xmlId[0])||isset($pdfId[0])) && !isset($folio[0])) { echoJSDoc("error", "Especifique el folio de su comprobante", null, $_POST+["action"=>"addPerDiem"], "error"); return; }
-    if (!isset($rvcObj)) {
-        require_once "clases/RepViaConceptos.php";
-        $rvcObj = new RepViaConceptos();
-    }
+    $rvcObj = dao("rvc");
     if ($importe<=0) { echoJSDoc("error", "Debe indicar el importe del concepto"); return; }
-    if (!isset($rviObj)) {
-        require_once "clases/ReposicionViaticos.php";
-        $rviObj = new ReposicionViaticos();
-    }
-    
+    $rviObj = dao("rvi");
     $rviData=$rviObj->getData("id=$viaId", 1, "empresaId");
     if (!isset($rviData[0]["empresaId"])) { echoJSDoc("error", "No existe el registro de Viáticos indicado", null, $_POST+["action"=>"addPerDiem"], "error"); return; }
     $empresaId=$rviData[0]["empresaId"];
@@ -1593,12 +1393,9 @@ function doAddPerDiem() {
         $docspath="C:/InvoiceCheckShare/invoiceDocs/";
         $temppath=$docspath."temporal/";
         $viatpath=$docspath."viajes/".$dtpath;
+        $tmpObj = dao("tmp");
         if (!file_exists($viatpath)) mkdir($viatpath,0777,true);
         if (isset($xmlId[0])) {
-            if (!isset($tmpObj)) {
-                require_once "clases/Temporales.php";
-                $tmpObj = new Temporales();
-            }
             $xmlName=$tmpObj->procesar($xmlId);
             $fullTmpXML=$temppath.$xmlName;
             if ($xmlName!==false && file_exists($fullTmpXML)) {
@@ -1617,10 +1414,6 @@ function doAddPerDiem() {
             }
         }
         if (isset($pdfId[0])) {
-            if (!isset($tmpObj)) {
-                require_once "clases/Temporales.php";
-                $tmpObj=new Temporales();
-            }
             $pdfName=$tmpObj->procesar($pdfId);
             $fullTmpPDF=$temppath.$pdfName;
             if ($pdfName!==false && file_exists($fullTmpPDF)) {
@@ -1661,7 +1454,7 @@ function doAddPerDiem() {
     doGetRecord();
 }
 function doGetRecord($additionalData=null) {
-    global $rviObj, $rvcObj, $gpoObj, $query, $perObj, $ugObj;
+    global $query;
     $viaId=$_POST["regid"]??"";
     $nameId=$_POST["recipient"]??"";
     $firmId=$_POST["empresaId"]??"";
@@ -1669,42 +1462,29 @@ function doGetRecord($additionalData=null) {
     if ($esSolicitante) {
         if (!isset($viaId[0])||!isset($nameId[0])||!isset($firmId[0])) { echoJSDoc("error", "Es necesario ingresar todos los datos para realizar la búsqueda", null, $_POST+["action"=>"getRecord"], "error"); return; }
     } else if (!isset($viaId[0])&&!isset($nameId[0])) { echoJSDoc("error", "Se necesita el número de registro o nombre del beneficiario de los viáticos", null, $_POST+["action"=>"getRecord"], "error"); return; }
-    if (!isset($rviObj)) {
-        require_once "clases/ReposicionViaticos.php";
-        $rviObj = new ReposicionViaticos();
-    }
     $where="";
     if (isset($viaId[0])) $where.="id='$viaId'";
     if (isset($nameId[0])) {
         $lowName=str_replace(" ", "", mb_strtolower($nameId));
         $where.=(isset($where[0])?" AND ":"")."lower(replace(beneficiario,' ','')) like '%{$lowName}%'";
     }
-    if (!isset($perObj)) {
-        require_once "clases/Perfiles.php";
-        $perObj=new Perfiles();
-    }
-    $ccId=$perObj->getIdByName("Viaticos"); // Viaticos
+    $ccId=dao("per")->getIdByName("Viaticos"); // Viaticos
     if (!isset($ugObj)) {
         require_once "clases/Usuarios_grupo.php";
         $ugObj=new Usuarios_Grupo();
     }
-    $ugObj->rows_per_page=0;
-    $refundGroupId=$ugObj->getRefundGroupId(getUser()->id, $ccId, "vista");
+    $refundGroupId=dao("ug", ["rows_per_page"=>0])->getRefundGroupId(getUser()->id, $ccId, "vista");
     if (isset($firmId[0])) $where.=(isset($where[0])?" AND ":"")."empresaId=$firmId";
     else if (isset($refundGroupId[1])) $where.=" and empresaId in (".implode(",",$refundGroupId).")";
     else if (isset($refundGroupId[0])) $where.=" and empresaId=".$refundGroupId[0];
-    $rviData = $rviObj->getData($where);
+    $rviData = dao("rvi")->getData($where);
     if (!isset($rviData[0])) { echoJSDoc("error", "No se encontró el registro solicitado", null, $_POST+["action"=>"getRecord", "query"=>$query], "error"); return; }
     // armar datos
     for ($i=0; isset($rviData[$i]); $i++) {
-        if (!isset($rvcObj)) {
-            require_once "clases/RepViaConceptos.php";
-            $rvcObj = new RepViaConceptos();
-        }
         $rvcObj->clearOrder();
         $rvcObj->addOrder("fecha");
         $rvcObj->addOrder("concepto");
-        $rvcData = $rvcObj->getData("vid='".$rviData[$i]["id"]."'");
+        $rvcData = dao("rvc", ["orderlist"=>["fecha"=>"asc", "concepto"=>"asc"]])->getData("vid='".$rviData[$i]["id"]."'");
         $rviData[$i]["conceptos"] = [];
         foreach ($rvcData as $val) {
             $cfecha=$val["fecha"];
@@ -1714,11 +1494,7 @@ function doGetRecord($additionalData=null) {
             if (!isset($rviData[$i]["conceptos"][$cfecha][$cnombre])) $rviData[$i]["conceptos"][$cfecha][$cnombre]=[];
             $rviData[$i]["conceptos"][$cfecha][$cnombre][]=$val;
         }
-        if (!isset($gpoObj)) {
-            require_once "clases/Grupo.php";
-            $gpoObj=new Grupo();
-        }
-        $gpoData=$gpoObj->getData("id='".$rviData[$i]["empresaId"]."'", 1, "alias");
+        $gpoData=dao("gpo")->getData("id='".$rviData[$i]["empresaId"]."'", 1, "alias");
         if (isset($gpoData[0])) $rviData[$i]["empresa"]=$gpoData[0]["alias"];
     }
     $result=["result"=>"exito","message"=>"Carga de archivos exitosa","datos"=>$rviData];
@@ -1728,26 +1504,18 @@ function doGetRecord($additionalData=null) {
     echo json_encode($result);
 }
 function doDeleteRecord() {
-    global $rvcObj, $rviObj, $query;
+    global $query;
     $viaId=$_POST["regid"];
     if (!isset($viaId[0])) { echoJSDoc("error", "No se recibió registro a borrar", null, $_POST+["action"=>"deleteRecord"], "error"); return; }
-    if (!isset($rvcObj)) {
-        require_once "clases/RepViaConceptos.php";
-        $rvcObj = new RepViaConceptos();
-    }
     DBi::autocommit(false);
-    if (!$rvcObj->deleteRecord(["vid"=>$viaId,"id"=>new DBExpression("0",">")]) && !empty(DBi::$errors)) {
+    if (!dao("rvc")->deleteRecord(["vid"=>$viaId,"id"=>new DBExpression("0",">")]) && !empty(DBi::$errors)) {
         $rvcQuery=$query; $rvcErrno=DBi::$errno; $rvcError=DBi::$error;
         DBi::rollback();
         DBi::autocommit(true);
         echoJSDoc("error", "Ocurrió un error al eliminar conceptos", null, $_POST+["action"=>"deleteRecord", "errno"=>$rvcErrno, "error"=>$rvcError, "query"=>$rvcQuery], "error");
         return;
     }
-    if (!isset($rviObj)) {
-        require_once "clases/ReposicionViaticos.php";
-        $rviObj = new ReposicionViaticos();
-    }
-    if (!$rviObj->deleteRecord(["id"=>$viaId])) {
+    if (!dao("rvi")->deleteRecord(["id"=>$viaId])) {
         $rviQuery=$query; $rviErrno=DBi::$errno; $rviError=DBi::$error;
         DBi::rollback();
         DBi::autocommit(true);
@@ -1760,17 +1528,13 @@ function doDeleteRecord() {
     echo json_encode($result);
 }
 function doDelPerDiem() {
-    global $rviObj, $rvcObj, $query;
+    global $query;
     $conceptoId=$_POST["perDiemId"]??"";
     $viaId=$_POST["regid"]??"";
     if (!isset($conceptoId[0])) { echoJSDoc("error", "No se recibió concepto a borrar", null, $_POST+["action"=>"delPerDiem"], "error"); return; }
     if (!isset($viaId[0])) { echoJSDoc("error", "No se recibió registro a borrar", null, $_POST+["action"=>"delPerDiem"], "error"); return; }
-    if (!isset($rvcObj)) {
-        require_once "clases/RepViaConceptos.php";
-        $rvcObj = new RepViaConceptos();
-    }
     DBi::autocommit(false);
-    if (!$rvcObj->deleteRecord(["id"=>$conceptoId,"vid"=>$viaId])) {
+    if (!dao("rvc")->deleteRecord(["id"=>$conceptoId,"vid"=>$viaId])) {
         $rvcQuery=$query; $rvcErrno=DBi::$errno; $rvcError=DBi::$error;
         DBi::rollback();
         DBi::autocommit(true);
@@ -1781,11 +1545,7 @@ function doDelPerDiem() {
     DBi::commit();
     DBi::autocommit(true);
     if (getUser()->nombre==="viajero") {
-        if (!isset($rviObj)) {
-            require_once "clases/ReposicionViaticos.php";
-            $rviObj = new ReposicionViaticos();
-        }
-        $rviData=$rviObj->getData("id=$viaId", 1, "beneficiario,empresaId");
+        $rviData=dao("rvi")->getData("id=$viaId", 1, "beneficiario,empresaId");
         if (isset($rviData[0])) {
             $_POST["recipient"]=$rviData[0]["beneficiario"];
             $_POST["empresaId"]=$rviData[0]["empresaId"];
@@ -1794,19 +1554,11 @@ function doDelPerDiem() {
     doGetRecord();
 }
 function recalcTotalAtRecord($id) {
-    global $query,$rviObj,$rvcObj;
-    if (!isset($rvcObj)) {
-        require_once "clases/RepViaConceptos.php";
-        $rvcObj = new RepViaConceptos();
-    }
-    $rvcData=$rvcObj->getData("vid='$id'", 1, "sum(importe) total");
+    global $query;
+    $rvcData=dao("rvc")->getData("vid='$id'", 1, "sum(importe) total");
     if (isset($rvcData[0]["total"])) {
         $total = +$rvcData[0]["total"];
-        if (!isset($rviObj)) {
-            require_once "clases/ReposicionViaticos.php";
-            $rviObj=new ReposicionViaticos();
-        }
-        $rviObj->updateRecord(["id"=>$id, "montototal"=>"$total"]);
+        dao("rvi")->updateRecord(["id"=>$id, "montototal"=>"$total"]);
     }
 }
 function doAddFiles() {
@@ -1817,18 +1569,9 @@ function doAddFiles() {
     $messages=$_POST["message"]??[];
     if (!is_array($messages)) $messages=[$messages];
     if (!isset($regId[0])) { echoJSDoc("error", "Debe existir un registro de caja chica válido para ingresar archivos", null, $_POST+["action"=>"addFiles"], "error"); return; }
-    global $rarObj, $rccObj;
-    if (!isset($rccObj)) {
-        require_once "clases/ReposicionCajaChica.php";
-        $rccObj = new ReposicionCajaChica();
-    }
-    $rccData=$rccObj->getData("id=$regId", 1, "empresaId");
+    $rccData=dao("rcc")->getData("id=$regId", 1, "empresaId");
     if (!isset($rccData[0]["empresaId"])) { echoJSDoc("error", "No se reconoce la empresa indicada", null, $_POST+["action"=>"addFiles"], "error"); return; }
     $gpoId=$rccData[0]["empresaId"];
-    if (!isset($rarObj)) {
-        require_once "clases/ReposicionArchivos.php";
-        $rarObj = new ReposicionArchivos();
-    }
     $funcData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__];
     if ($hasUser) $funcData["usuario"]=$username;
     $dbdata=[];
@@ -1840,6 +1583,7 @@ function doAddFiles() {
     $numErrorMessages=0;
     $concepto=$_POST["concepto"]??null;
     $thisTimeStamp=date("ymdB");
+    $rarObj=dao("rar");
     for ($i=0;isset($files[$i]);$i++) {
         $numReceivedFiles++;
         $file=$files[$i];
@@ -1899,6 +1643,7 @@ function doAddFiles() {
                     $xmlWebName=$dtpath.$filename;
                     $viatpath=$filepath.$dtpath;
                     $xmlFullName=$filepath.$xmlWebName;
+                    
                     //doclog("VERIFICACION DE ARCHIVO","cajachica",["original"=>$filename,"xml"=>$xmlWebName,"path"=>$xmlFullName]);
                     if (!file_exists($viatpath)) mkdir($viatpath,0777,true);
                     if (file_exists($xmlFullName)) {
@@ -2042,7 +1787,6 @@ function doAddFiles() {
     doGetPettyCash(["errormessages"=>$messages,"nFiles"=>$numReceivedFiles,"nXML"=>$numXMLFiles,"nFields"=>$numPreparedFields,"nSaved"=>$numSavedFiles,"nErrors"=>$numErrorMessages,"post"=>$_POST,"files"=>$files]);
 }
 function doTemporales() {
-    global $tmpObj;
     if (isset($_FILES["xml"])) {
         $xmlf=$_FILES["xml"];
         if (!isValidFile($xmlf,$invalidMessage,["type"=>"text/xml"])) { echoJSDoc("error", $invalidMessage, null, $_POST+["action"=>"temporales"], "error"); return; }
@@ -2054,10 +1798,7 @@ function doTemporales() {
         //isValidFileCC($pdff,"application/pdf");
     }
     if (!isset($xmlf) && !isset($pdff)) { echoJSDoc("error", "No se recibieron archivos", null, $_POST+["action"=>"temporales"], "error"); return; }
-    if (!isset($tmpObj)) {
-        require_once "clases/Temporales.php";
-        $tmpObj=new Temporales();
-    }
+    $tmpObj=dao("tmp");
     $filepath="C:/InvoiceCheckShare/invoiceDocs/temporal/";
     $concepto=$_POST["concepto"]??null;
     if (isset($xmlf)) {

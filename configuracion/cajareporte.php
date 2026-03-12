@@ -14,29 +14,12 @@ if(!$esReporte&&!$esRespalda) {
 clog2ini("configuracion.cajareporte");
 clog1seq(1);
 
-if (!isset($perObj)) {
-    require_once "clases/Perfiles.php";
-    $perObj=new Perfiles();
-}
-$ccId=$perObj->getIdByName("Caja Reporte");
-if (!isset($ugObj)) {
-    require_once "clases/Usuarios_grupo.php";
-    $ugObj=new Usuarios_Grupo();
-}
-$ugObj->rows_per_page=0;
-$refundGroupId=$ugObj->getRefundGroupId($userid, $ccId, "vista");
+$ccId=dao("per")->getIdByName("Caja Reporte");
+$refundGroupId=dao("ug", ["rows_per_page" => 0])->getRefundGroupId($userid, $ccId, "vista");
 if (isset($refundGroupId[1])) $gpWhere="id in (".implode(",",$refundGroupId).")";
 else if (isset($refundGroupId[0])) $gpWhere="id=".$refundGroupId[0];
 else $gpWhere=false;
-if (!isset($gpoObj)) {
-    require_once "clases/Grupo.php";
-    $gpoObj=new Grupo();
-}
-$gpoObj->rows_per_page=0;
-$gpoObj->clearFullMap();
-$gpoObj->clearOrder();
-$gpoObj->addOrder("alias");
-$grupoOptionMap=$gpoObj->getFullMap("id","alias",$gpWhere); 
+$grupoOptionMap=dao("gpo", ["rows_per_page" => 0, "orderlist"=>["alias"=>"asc"], "fullmap"=>null])->getFullMap("id","alias",$gpWhere);
 $idLst=array_keys($grupoOptionMap);
 $repLogoAttribs="";
 if (isset($idLst[1])) $groupOptions="<OPTION value=\"todas\">TODAS</OPTION>";

@@ -28,11 +28,7 @@ if (count($files)>0) {
             } else if ($file["type"]==="text/xml") {
                 $xmls[]=$file;
             } else {
-                //if (!isset($logObj)) {
-                //    require_once "clases/Logs.php";
-                //    $logObj=new Logs();
-                //}
-                //$logObj->agrega(getUser()->id, "ALTA FACTURA", "WRONG FILEINFO:".json_encode($file));
+                //dao("log")->agrega(getUser()->id, "ALTA FACTURA", "WRONG FILEINFO:".json_encode($file));
                 $filetext.=" WRONGTYPE $file[type]";
             }
         } else $filetext.=" ERROR $file[error]";
@@ -254,11 +250,7 @@ if (count($files)>0) {
                     if ($esTemporal) {
                         $file["registroexiste"] = TRUE;
                         if ($tc==="i") {
-                            if (!isset($solObj)) {
-                                require_once "clases/SolicitudPago.php";
-                                $solObj = new SolicitudPago();
-                            }
-                            if ($solObj->exists("idFactura='$respuesta[id]'")) {
+                            if (dao("sol")->exists("idFactura='$respuesta[id]'")) {
                                 $file["registroexiste"] = FALSE;
                                 anexaError("Ya existe una solicitud de pago para esta factura",null,["logname"=>"altafac","filename"=>$file["name"],"uuid"=>$uuid,"respuesta"=>$respuesta,"usrid"=>$userid,"usrname"=>$username]);
                             }
@@ -343,6 +335,7 @@ if (count($files)>0) {
         }
         $fechaReciboPago="";
         $saldoReciboPago=0;
+        $invObj=dao("inv");
         if (isset($file["xml"]) && $tipoComprobante==="p") { // isEnough() // Validar que las facturas que contiene existan en invoice check
             $pdoctos = $file["xml"]->get("pago_doctos");
             if (isset($pdoctos["@iddocumento"])) $pdoctos = [$pdoctos];
@@ -355,10 +348,6 @@ if (count($files)>0) {
             else if ($seconds>1000) $seconds=1000;
             set_time_limit($seconds);
             doclog("SUBMITXML CFDIP","altafac",["STL"=>2,"lapse"=>lapse(),"numPagos"=>$numPagos,"timeLimit"=>$seconds]);
-            if (!isset($invObj)) {
-                require_once "clases/Facturas.php";
-                $invObj = new Facturas();
-            }
             $doctIds=[];
             $folioFacturaFaltanteEnRecibo=[];
             $monedas=[];
@@ -427,21 +416,13 @@ if (count($files)>0) {
         // Se  agrega la factura al sistema
         // Se genera error en caso de detectarse error al guardar la factura en base y archivo 
         if (isEnough()) {
-            if (!isset($invObj)) {
-                require_once "clases/Facturas.php";
-                $invObj = new Facturas();
-            }
             if (($file["registroexiste"]??FALSE) && $invObj->exists("id='$respuesta[id]' && status='Temporal'")) {
                 $delfldarray = ["id"=>$respuesta["id"], "status"=>"Temporal"];
                 $invObj->deleteRecord($delfldarray);
             }
             $invData=$invObj->getData("nombreInterno='$file[new_name]' && status='Temporal'",false,"id");
             if (isset($invData[0]["id"])) {
-                if (!isset($solObj)) {
-                    require_once "clases/SolicitudPago.php";
-                    $solObj = new SolicitudPago();
-                }
-                if ($solObj->exists("idFactura='".$invData[0]["id"]."'")) anexaError("Ya existe una solicitud de pago para esta factura");
+                if (dao("sol")->exists("idFactura='".$invData[0]["id"]."'")) anexaError("Ya existe una solicitud de pago para esta factura");
                 else {
                     $delfldarray = ["id"=>$invData[0]["id"], "status"=>"Temporal"];
                     $invObj->deleteRecord($delfldarray);
@@ -513,9 +494,10 @@ if (count($files)>0) {
                 $file["facturaId"] = $invObj->lastId;
                 doclog("SUBMITXML SAVE","altafac",["STL"=>3,"lapse"=>lapse(),"id"=>$file["facturaId"]]);
                 if (isset($file["xml"]) && $tipoComprobante==="p") /* $file["xml"]->savePagos($file["facturaId"],$doctIds); */ {
-                    global $cpyObj, $query;
-                    if (!isset($cpyObj)) { require_once "clases/CPagos.php"; $cpyObj=new CPagos(); }
-                    //$cpyObj->
+                    global $query;
+                    
+                    $cpyObj=dao("cpy");
+                    $dpyObj=dao("dpy");
                     // CPagos: id,idCPago, (idFactura,numParcialidad,saldoAnterior,impPagado,saldoInsoluto,moneda,equivalencia,) idEPago,fechaPago,montoPago,monedaPago,tipocambioPago
                     // DPagos: id,idPPago,idFactura,numParcialidad,saldoAnterior,impPagado,saldoInsoluto,moneda,equivalencia
                     $pagos = $file["xml"]->get("pagos");
@@ -531,7 +513,6 @@ if (count($files)>0) {
                             $dpgArr=["idFactura"=>$pgFId,"numParcialidad"=>$drItem["@numparcialidad"],"saldoAnterior"=>$drItem["@impsaldoant"],"impPagado"=>$drItem["@imppagado"],"saldoInsoluto"=>$drItem["@impsaldoinsoluto"],"moneda"=>$drItem["@monedadr"],"equivalencia"=>$drItem["@equivalenciadr"]??1];
                             if (!isset($cpgArr["id"])) {
                                 $cpgArr=array_merge($cpgArr,$dpgArr);
-                                if (!isset($cpyObj)) { require_once "clases/CPagos.php"; $cpyObj=new CPagos(); }
                                 if ($cpyObj->saveRecord($cpgArr)) {
                                     $cpgArr["id"]=$cpyObj->lastId;
                                 } else {
@@ -543,7 +524,6 @@ if (count($files)>0) {
                                 $cpgArrNeedUpdate=true;
                             }
                             $dpgArr["idPPago"]=$cpgArr["id"];
-                            if (!isset($dpyObj)) { require_once "clases/DPagos.php"; $dpyObj=new DPagos(); }
                             if (!$dpyObj->saveRecord($dpgArr)) {
                                 errlog("Error al guardar Pagos/Pago/DoctoRelacionado en DPago","error",$baseData+["line"=>__LINE__,"query"=>$query,"errors"=>$dpyObj->errors]);
                             }
@@ -562,12 +542,8 @@ if (count($files)>0) {
                     if(isset($_SESSION['gpoRFCOpt']))    unset($_SESSION['gpoRFCOpt']);
                 }
                 //clog2("# CFDI TEST # SUCCESS! ID = ".$invObj->lastId);
-                global $prcObj;
-                if (!isset($prcObj)) {
-                    require_once "clases/Proceso.php";
-                    $prcObj = new Proceso();
-                }
-                $prcObj->cambioFactura($invObj->lastId, "Temporal", $username, $fecha, "altafactura01");
+
+                dao("prc")->cambioFactura($invObj->lastId, "Temporal", $username, $fecha, "altafactura01");
             } else {
                 $errMasked="# CFDI TEST # FAILURE!";
                 $errParsed="";

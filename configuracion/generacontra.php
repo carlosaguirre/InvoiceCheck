@@ -16,15 +16,10 @@ clog1seq(1);
 $_SESSION["gpoIdOpt"]=null;
 $_SESSION['prvIdOpt']=null;
 
-global $gpoObj;
-if (!isset($gpoObj)) {
-    require_once "clases/Grupo.php";
-    $gpoObj = new Grupo();
-}
 $optDefaultValue=$_SESSION['optDefaultValue']; // Definido en Grupo
 if ($_esComprasB&&!$_esCompras)
-    $gpoFullMapWhere= $gpoObj->setIdOptSessions(["Compras Basico"],$optDefaultValue);
-else $gpoFullMapWhere = $gpoObj->setIdOptSessions(["Compras"],$optDefaultValue);
+    $gpoFullMapWhere= dao("gpo")->setIdOptSessions(["Compras Basico"],$optDefaultValue);
+else $gpoFullMapWhere = dao("gpo")->setIdOptSessions(["Compras"],$optDefaultValue);
 $gpoIdOpt = $_SESSION['gpoIdOpt'];
 $gpoRazSoc2Id=$_SESSION['gpoRazSoc2Id'];
 $gpoCodigo2Id=$_SESSION['gpoCodigo2Id'];
@@ -32,12 +27,7 @@ $gpoRFC2Id=$_SESSION['gpoRFC2Id'];
 $esCompras=isset($gpoFullMapWhere[0]);
 $defaultGpoId="";
 
-global $prvObj;
-if (!isset($prvObj)) {
-    require_once "clases/Proveedores.php";
-    $prvObj = new Proveedores();
-}
-$prvObj->setIdOptSessions(0,$optDefaultValue);
+dao("prv")->setIdOptSessions(0,$optDefaultValue);
 $prvIdOpt = $_SESSION['prvIdOpt'];
 $prvRazSoc2Id=$_SESSION['prvRazSoc2Id'];
 $prvCodigo2Id=$_SESSION['prvCodigo2Id'];

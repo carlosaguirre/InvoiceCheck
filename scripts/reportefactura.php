@@ -244,7 +244,7 @@ function cancelingInvoice(evt) {
     }
 }
 function cancelledInvoice(jobj,extra) { // docAnexado
-    if (jobj.params.xmlHttpPost.readyState!==4) return;
+    if (jobj.params.controller.readyState!==4) return;
     if (jobj && jobj.result && jobj.result==="success") {
         cladd('cancelReasonBlk','hidden');
         ekil("cancelInvoice");
@@ -357,7 +357,7 @@ function browseCancelUser(evt) {
             timeOutBrowseUser=0;
             console.log("INI function browseCancelUser "+elem.id+": "+elem.value);
             elem.xhr=readyService("consultas/Usuarios.php", {accion:"browseUserName",nombre:elem.value+"*",sortList:"nombre",exceptions:"'admin','test','test1','test2','test3'"}, browseCancelUserFound, browseCancelUserNotFound);
-            elem.xhr.onabort=browseCancelUserAbort;
+            elem.xhr.signal.addEventListener("abort", ()=>browseCancelUserAbort(elem), {once:true});
         },100,tgt);
     } else console.log("INI function browseCancelUser "+tgt.id+": nothing changed");
 }
@@ -369,7 +369,7 @@ function browseCancelUserAbort(evt) {
     ekil("cancelUserList");
 }
 function browseCancelUserFound(jobj,extra) {
-    console.log("SUCCESS browseCancelUserFound "+(jobj?"JOBJ-STATE="+jobj.params.xmlHttpPost.readyState:(extra&&extra.lastJObj?"LASTJSTT="+extra.lastJObj.params.xmlHttpPost.readyState:"NO JOBJ")));
+    console.log("SUCCESS browseCancelUserFound "+(jobj?"JOBJ-STATE="+jobj.params.controller.readyState:(extra&&extra.lastJObj?"LASTJSTT="+extra.lastJObj.params.controller.readyState:"NO JOBJ")));
     const prefix=jobj?"J":(extra&&extra.lastJObj?"X":false);
     if (prefix==="X") jobj=extra.lastJObj;
     if (jobj && jobj.result && jobj.result==="success") {
@@ -1005,7 +1005,7 @@ function repairCFDIs(evt) {
 }
 function repaired(jobj,extra) {
     const pars=jobj.params;
-    const xhp=pars.xmlHttpPost;
+    const xhp=pars.controller;
     console.log("INI repaired j("+pars.state+"/"+pars.status+" | "+xhp.readyState+"/"+xhp.status+":"+xhp.statusText+"), e("+extra.state+"/"+extra.status+")");
     if (xhp.readyState!==4) return;
     if (jobj && jobj.result==="error") {
@@ -1158,7 +1158,7 @@ function reemplazaDoc(evt) {
     }
 }
 function docSent(jobj,extra) {
-    if (jobj.params.xmlHttpPost.readyState!==4) return;
+    if (jobj.params.controller.readyState!==4) return;
     if (jobj.result==="error") {
         extra.error={message:(jobj.message?jobj.message:"Error Indefinido")};
         if (jobj.file) extra.error.file=jobj.file;
@@ -1252,7 +1252,7 @@ function preEliminaDoc(evt) {
     } else console.log("Tipo inválido: "+tipo);
 }
 function docEliminado(jobj,extra) {
-    console.log("SUCCESS docEliminado"+((jobj&&jobj.params&&jobj.params.xmlHttpPost)?" STATE="+jobj.params.xmlHttpPost.readyState:((extra&&extra.lastJObj&&extra.lastJObj.params&&extra.lastJObj.params.xmlHttpPost)?" LASTSTATE="+extra.lastJObj.params.xmlHttpPost.readyState:"")));
+    console.log("SUCCESS docEliminado"+((jobj&&jobj.params&&jobj.params.controller)?" STATE="+jobj.params.controller.readyState:((extra&&extra.lastJObj&&extra.lastJObj.params&&extra.lastJObj.params.controller)?" LASTSTATE="+extra.lastJObj.params.controller.readyState:"")));
     if ((!jobj && extra && extra.lastJObj && extra.lastJObj.result==="success")||(jobj && jobj.result && jobj.result==="success")) {
         submitAjax("Buscar",function(ajaxObj5,flag){
             console.log("CALLBACK submitAjax Buscar"+(ajaxObj5?". docEliminado:"+ajaxObj5.responseText.length+". "+(flag?" PARTIAL.":" FULL."):""));
@@ -1708,7 +1708,7 @@ function submitEAFile(evt) {
     }
 }
 function docAnexado(jobj,extra) {
-    console.log("SUCCESS docAnexado "+(jobj?"JOBJ-STATE="+jobj.params.xmlHttpPost.readyState:(extra&&extra.lastJObj?"LASTJSTT="+extra.lastJObj.params.xmlHttpPost.readyState:"NO JOBJ")));
+    console.log("SUCCESS docAnexado "+(jobj?"JOBJ-STATE="+jobj.params.controller.readyState:(extra&&extra.lastJObj?"LASTJSTT="+extra.lastJObj.params.controller.readyState:"NO JOBJ")));
     if ((!jobj && extra && extra.lastJObj && extra.lastJObj.result==="success")||(jobj && jobj.result && jobj.result==="success")) {
         submitAjax("Buscar",function(ajaxObj6,flag) {
             console.log("CALLBACK submitAjax Buscar"+(ajaxObj6?". docAnexado:"+ajaxObj6.responseText.length+". "+(flag?" PARTIAL.":" FULL."):""));
@@ -1777,10 +1777,10 @@ function disableEA(evt) {
     postService("consultas/Facturas.php", {accion:"disWHEntry",id:fId,idx:idx,ea:a_do==="off"?-1:0,motivo:"sin motivo"}, getPostRetFunc(disabledInvoice,notDisabledInvoice,{tgt:tgt}), getPostErrFunc(notDisabledInvoice,{tgt:tgt}));
 }
 function disabledInvoice(jobj,extra) {
-    if (jobj.params.xmlHttpPost.readyState!==4) return;
     if (jobj) {
+        if (jobj.params.controller.readyState!==4) return;
         const kys=Object.keys(jobj);
-        //if (jobj.params && jobj.params.xmlHttpPost && jobj.params===jobj.params.xmlHttpPost.parameters) jobj.params.xmlHttpPost.parameters='params';
+        //if (jobj.params && jobj.params.controller && jobj.params===jobj.params.controller.parameters) jobj.params.controller.parameters='params';
         let msg="";
         kys.forEach(ky=>{msg+=" | "+ky+"=";if(typeof jobj[ky]==="object")msg+=JSON.stringify(jobj[ky],jsonCircularReplacer());else msg+="'"+jobj[ky]+"'";});
         if (jobj.result && jobj.result==="success") {

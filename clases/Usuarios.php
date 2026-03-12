@@ -27,14 +27,12 @@ class Usuarios extends DBObject {
             if (!empty($usrArr["id"])) { $plog .= " - Found id $usrArr[id]\n"; $id = $usrArr["id"]; }
         }
         if(empty($id)) { $plog .= " - Empty id\n"; $id = $this->getValue("nombre", $usuario, "id"); }
-        require_once "clases/Usuarios_Perfiles.php";
-        $upObj = new Usuarios_Perfiles();
+        $upObj = dao('up');
         $perfilIds = $upObj->getList("idUsuario", $id, "idPerfil");
         $plog .= " - Retrieved ids list: $perfilIds\n";
         $prfIds = explode("|", $perfilIds);
         $this->log .= $upObj->log;
-        require_once "clases/Perfiles.php";
-        $prfObj = new Perfiles();
+        $prfObj = dao('per');
         $perfiles = $prfObj->getList("id", $prfIds, "nombre");
         $plog .= " - Retrieved perfil list: $perfiles\n";
         $this->log .= $prfObj->log;
@@ -51,9 +49,7 @@ class Usuarios extends DBObject {
                 $perfilArr=explode(",",$profileNames);
                 if(isset($perfilArr[1])) $profileNames=$perfilArr;
             }
-            require_once "clases/Perfiles.php";
-            $prfObj = new Perfiles();
-            $prfObj->rows_per_page=0;
+            $prfObj = dao('per', ['rows_per_page'=>0]);
             $prfWhere=$prfObj->getQueryExpression("nombre",$profileNames,"WHERE");
             if(isset($prfWhere[0])) {
                 $prfData = $prfObj->getData(rtrim($prfWhere," AND "),0,"id");
@@ -61,9 +57,7 @@ class Usuarios extends DBObject {
             }
         }
         if(isset($prfData[0]["id"])) {
-            require_once "clases/Usuarios_Perfiles.php";
-            $upObj = new Usuarios_Perfiles();
-            $upObj->rows_per_page=0;
+            $upObj = dao('up', ['rows_per_page'=>0]);
             if (!isset($prfData[1]["id"])) $upWhere="idPerfil=".$prfData[0]["id"];
             else {
                 $idPrfLst=array_column($prfData, "id");

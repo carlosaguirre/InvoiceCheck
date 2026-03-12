@@ -19,13 +19,8 @@ if (isset($_POST["reMap"][0])) {
     unset($_SESSION[$_POST["reMap"]."Map"]);
 }
 $monedaOI=" <input type=\"button\" id=\"ord_moneda\" class=\"wid40px\" value=\"MXN\" onclick=\"this.value=(this.value==='MXN'?'USD':(this.value==='USD'?'EUR':'MXN'));\">";
-global $gpoObj;
-if (!isset($gpoObj)) {
-    require_once "clases/Grupo.php";
-    $gpoObj = new Grupo();
-}
 $optDefaultValue=$_SESSION['optDefaultValue']; // Definido en Grupo
-$gpoFullMapWhere=$gpoObj->setIdOptSessions($_esCompras?["Compras"]:($_esComprasB?["Compras Basico"]:["Autoriza Pagos"]),$optDefaultValue);
+$gpoFullMapWhere=dao("gpo")->setIdOptSessions($_esCompras?["Compras"]:($_esComprasB?["Compras Basico"]:["Autoriza Pagos"]),$optDefaultValue);
 $gpoMap=[];
 $gpoAliasOpt=[];
 foreach ($_SESSION['gpoIdOpt'] as $gpoId => $gv) {
@@ -41,12 +36,7 @@ if (count($gpoAliasOpt)==1) {
     $gpoRazSocDefault = "";
     $gpoAliasOpt = [""=>""] + $gpoAliasOpt;
 }
-global $prvObj;
-if (!isset($prvObj)) {
-    require_once "clases/Proveedores.php";
-    $prvObj = new Proveedores();
-}
-$prvObj->setIdMap();
+dao("prv")->setIdMap();
 $prvMap = $_SESSION['prvMap'];
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - M E T H O D S - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - //

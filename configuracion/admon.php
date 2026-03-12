@@ -27,14 +27,6 @@ if (!$consultaGrpo && !$consultaProv && !$consultaPerm && !$modificaUsrs && !$co
 clog2ini("configuracion.admon");
 clog1seq(1);
 
-if (!isset($prcObj)) {
-    require_once "clases/Proceso.php";
-    $prcObj = new Proceso();
-}
-if (!isset($bnkObj)) {
-    require_once "clases/Bancos.php";
-    $bnkObj = new Bancos();
-}
 if (isset($_POST["proveedor_code"])) $codigoProveedor = $_POST["proveedor_code"];
 if (isset($_POST["proveedor_field"])) $razonProveedor = $_POST["proveedor_field"];
 if (isset($_POST["proveedor_rfc"])) $rfcProveedor = $_POST["proveedor_rfc"];
@@ -59,6 +51,7 @@ if (isset($_POST["banco_rfc"])) $rfcBanco = trim($_POST["banco_rfc"]??"");
 if (isset($_POST["banco_status"])) $statusBanco = trim($_POST["banco_status"]??"");
 if (isset($_POST["banco_cuenta"])) $cuentaBanco = trim($_POST["banco_cuenta"]??"");
 if (isset($_POST["banco_id"])) $idBanco = $_POST["banco_id"]??"";
+$prcObj = dao('prc');
 if (isset($_POST["proveedor_submit"])) {
     if ($modificaProv) {
         $fldarr = [];
@@ -82,10 +75,7 @@ if (isset($_POST["proveedor_submit"])) {
                 $fldarr["id"] = $idProveedor;
             if (!empty($zonaProveedor))
                 $fldarr["zona"] = $zonaProveedor;
-            if (!isset($prvObj)) {
-                require_once "clases/Proveedores.php";
-                $prvObj = new Proveedores();
-            }
+            $prvObj = dao('prv');
             if ($prvObj->saveRecord($fldarr)||empty(DBi::$errno)) {
                 unset($_SESSION['prvRazSocOpt']);
                 unset($_SESSION['prvCodigoOpt']);
@@ -112,10 +102,7 @@ if (isset($_POST["proveedor_submit"])) {
         if (empty($idProveedor)) {
             $errorMessage .= "<P class='fontMedium margin20 centered'>Es necesario seleccionar un proveedor para poder borrarlo</P>";
         } else {
-            if (!isset($prvObj)) {
-                require_once "clases/Proveedores.php";
-                $prvObj = new Proveedores();
-            }
+            $prvObj = dao('prv');
             if ($prvObj->deleteRecord(["id"=>$idProveedor])/* && $prvObj->affectedrows*/) {
                 unset($_SESSION['prvRazSocOpt']);
                 unset($_SESSION['prvCodigoOpt']);
@@ -149,15 +136,12 @@ if (isset($_POST["proveedor_submit"])) {
         if (empty($rfcEmpresa)) {
             $errorMessage .= "<P class='fontMedium margin20 centered'>Es necesario indicar el RFC de la empresa del corporativo</P>";
         } else $fldarr["rfc"] = $rfcEmpresa;
+        $gpoObj = dao('gpo');
         if (!isset($cutEmpresa[2])) {
             $errorMessage .= "<P class='fontMedium margin20 centered'>Debe indicar un prefijo de 3 caracteres para las solicitudes de pago</P>";
             //$cutEmpresa=strtoupper(substr($aliasEmpresa, 0, 3));
             //if (!isset($cutEmpresa[2])) $cutEmpresa=strtoupper(substr($rfcEmpresa, 0, 3));
         } else {
-            if (!isset($gpoObj)) {
-                require_once "clases/Grupo.php";
-                $gpoObj = new Grupo();
-            }
             $gpoData=$gpoObj->getData("cut='$cutEmpresa'");
             if (isset($gpoData[0]["id"])) $errorMessage .= "<P class='fontMedium margin20 centered'>El prefijo para solicitudes de pago debe ser único</P>";
             else $fldarr["cut"] = $cutEmpresa;
@@ -169,10 +153,7 @@ if (isset($_POST["proveedor_submit"])) {
         }
         $fldarr["filtro"] = $filtroEmpresaSum;
         
-        /*if (!isset($gpoObj)) {
-            require_once "clases/Grupo.php";
-            $gpoObj = new Grupo();
-        }
+        /*
         while(!isset($cutEmpresa[3])) {
             $gpoData=$gpoObj->getData("cut='$cutEmpresa'");
             if (isset($gpoData[0]["id"])) $cutEmpresa++;
@@ -187,10 +168,7 @@ if (isset($_POST["proveedor_submit"])) {
         if (empty($errorMessage)) {
             if (!empty($idEmpresa))
                 $fldarr["id"] = $idEmpresa;
-            if (!isset($gpoObj)) {
-                require_once "clases/Grupo.php";
-                $gpoObj = new Grupo();
-            }
+            
             if ($gpoObj->saveRecord($fldarr)||empty(DBi::$errno)) {
                 unset($_SESSION['gpoRazSocOpt']);
                 unset($_SESSION['gpoCodigoOpt']);
@@ -216,10 +194,7 @@ if (isset($_POST["proveedor_submit"])) {
         if (empty($idEmpresa)) {
             $errorMessage .= "<P class='fontMedium margin20 centered'>Es necesario seleccionar una empresa del corporativo para poder borrarla</P>";
         } else {
-            if (!isset($gpoObj)) {
-                require_once "clases/Grupo.php";
-                $gpoObj = new Grupo();
-            }
+            $gpoObj = dao('gpo');
             if ($gpoObj->deleteRecord(["id"=>$idEmpresa])/* && $gpoObj->affectedrows*/) {
                 unset($_SESSION['gpoRazSocOpt']);
                 unset($_SESSION['gpoCodigoOpt']);
@@ -272,10 +247,6 @@ if (isset($_POST["proveedor_submit"])) {
             if ($kval!==$kupd) {
                 $fldarr["banderas"] = $kupd;//getUser()->banderas^1;
             }
-            if (!isset($usrObj)) {
-                require_once "clases/Usuarios.php";
-                $usrObj = new Usuarios();
-            }
             echo "<!-- TEST SISTEMAS -->\n";
             if ($esSistemas) {
                 echo "<!-- SI ES SISTEMAS -->\n";
@@ -285,7 +256,7 @@ if (isset($_POST["proveedor_submit"])) {
                 if ($sval!==$skey) {
                     $sysId="0";
                     if ($skey=="1") {
-                        //$usrData=$usrObj->getData("nombre='SISTEMAS'",0,"id");
+                        //$usrData=dao('usr')->getData("nombre='SISTEMAS'",0,"id");
                         $sysId=getUser()->id; //$usrData[0]["id"]??"0";
                     }
                     $fldarr["unoComo"]=$sysId;
@@ -293,7 +264,8 @@ if (isset($_POST["proveedor_submit"])) {
                 }
             }
             global $query;
-            DBi::autocommit(FALSE);
+            DBi::autocommit(FALSE);  // $prvObj = dao('prv') | $gpoObj = dao('gpo') | $usrObj = dao('usr')
+            $usrObj = dao('usr');
             $saveResult=$usrObj->saveRecord($fldarr);
             unset($fldarr["password"]);
             unset($fldarr["seguro"]);
@@ -320,8 +292,8 @@ if (isset($_POST["proveedor_submit"])) {
                 $delProfileList=array_values(array_diff($userPerfilOld, $userPerfil));
                 // extraer perfiles a agregar (existen en la lista nueva pero no en la vieja)
                 $newProfileList=array_values(array_diff($userPerfil, $userPerfilOld));
+                $upObj = dao('up');
                 if (isset($delProfileList[0])) { // eliminar perfiles encontrados
-                    if (!isset($upObj)) { require_once "clases/Usuarios_Perfiles.php"; $upObj = new Usuarios_Perfiles(); }
                     $delRes = $upObj->deleteRecord(["idUsuario"=>$usrLastId,"idPerfil"=>$delProfileList]);
                     if (!empty(DBi::$errors)) {
                         $keepGoing=false;
@@ -335,7 +307,6 @@ if (isset($_POST["proveedor_submit"])) {
                         $valuesArray[]=[$usrLastId,$value];
                     }
                     // insertar perfiles encontrados
-                    if (!isset($upObj)) { require_once "clases/Usuarios_Perfiles.php"; $upObj = new Usuarios_Perfiles(); }
                     $newRes = $upObj->insertMultipleRecords(["idUsuario","idPerfil"], $valuesArray);
                     if (!empty(DBi::$errors)) {
                         $keepGoing=false;
@@ -348,8 +319,6 @@ if (isset($_POST["proveedor_submit"])) {
                 if ($keepGoing) { // Actualizar TABLA usuarios_grupo
                     $usrPrfGpo = $_POST["uxg"]??[]; // obtener lista nueva de perfiles por grupo
                     $usrPrfGpoOld=$_POST["uxgOld"]??[]; // obtener lista vieja de perfiles por grupo
-                    if (!isset($ugObj)) {
-                        require_once "clases/Usuarios_Grupo.php"; $ugObj = new Usuarios_Grupo(); }
                     // extraer perfiles por grupo a borrar (existen en la lista vieja pero no en la nueva), se incluyen los que existen en ambas pero modificados
                     $delGroupList=array_diff_assoc($usrPrfGpoOld, $usrPrfGpo); // extraer perfiles por grupo a agregar (existen en la lista nueva pero no en la vieja), se incluyen los que existen en ambas pero modificados
                     $newGroupList=array_diff_assoc($usrPrfGpo, $usrPrfGpoOld); // extraer los perfiles del grupo a borrar.
@@ -361,6 +330,7 @@ if (isset($_POST["proveedor_submit"])) {
                     $addArray=[]; // los datos a agregar se incluyen en una lista para un solo insert multiple
                     // incluir datos de los perfiles que solo estan para borrar, con todos los grupos en el bloque
                     //doclog("REALKEYS",null,["realAddKeys"=>$realAddKeys,"newGroupList"=>$newGroupList,"realDelKeys"=>$realDelKeys,"delGroupList"=>$delGroupList,"usrLastId"=>$usrLastId]);
+                    $ugObj = dao('ug');
                     if (isset($realDelKeys[0])) foreach($realDelKeys as $key) {
                         $gpIds=explode(";",$delGroupList[$key]);
                         if ($ugObj->deleteRecord(["idUsuario"=>$usrLastId,"idPerfil"=>$key]))
@@ -434,21 +404,13 @@ if (isset($_POST["proveedor_submit"])) {
             $errorMessage .= "<P class='fontMedium margin20 centered'>Es necesario seleccionar un usuario para poder borrarlo</P>";
         } else {
             DBi::autocommit(FALSE);
-            if (!isset($upObj)) {
-                require_once "clases/Usuarios_Perfiles.php";
-                $upObj = new Usuarios_Perfiles();
-            }
-            if (!isset($ugObj)) {
-                require_once "clases/Usuarios_Grupo.php";
-                $ugObj = new Usuarios_Grupo();
-            }
-            if (!$upObj->deleteRecord (["idUsuario"=>$idUsuario])&&!empty(DBi::$errno)) {
+            $ugObj = dao('ug');
+            if (!dao('up')->deleteRecord (["idUsuario"=>$idUsuario])&&!empty(DBi::$errno)) {
                 $errorMessage .= "<P class='fontMedium margin20 centered'>Error al borrar perfiles del usuario $nombreUsuario</P>";
             } else if ($ugObj->exists("idUsuario=$idUsuario") && !$ugObj->deleteRecord (["idUsuario"=>$idUsuario])) {
                 $errorMessage .= "<P class='fontMedium margin20 centered'>Error al borrar grupos del usuario $nombreUsuario</P>";
             } else {
-                require_once "clases/Usuarios.php";
-                $usrObj = new Usuarios();
+                $usrObj = dao('usr');
                 if ($usrObj->deleteRecord(["id"=>$idUsuario]) && $usrObj->affectedrows) {
                     $resultMessage .= "<P class='fontMedium margin20 centered'>Usuario $nombreUsuario eliminado satisfactoriamente</P>";
                     $procDetalle = "Usuario";
@@ -477,6 +439,7 @@ if (isset($_POST["proveedor_submit"])) {
         $fldarr=[];
         $procDetalle="Banco ";
         $procColon=false;
+        $bnkObj=dao('bnk');
         if (empty($idBanco)) {
             $procDetalle.="Nuevo ";
         } else {
@@ -551,6 +514,7 @@ if (isset($_POST["proveedor_submit"])) {
         if (empty($idBanco)) {
             $errorMessage .= "<P class='fontMedium margin20 centered'>Es necesario seleccionar un banco para poder borrarlo</P>";
         } else {
+            $bnkObj = dao('bnk');
             if ($bnkObj->deleteRecord(["id"=>$idBanco])/* && $bnkObj->affectedrows*/) {
                 //unset($_SESSION['bnkRazSocOpt']);
                 //unset($_SESSION['bnkCodigoOpt']);
@@ -574,16 +538,12 @@ if (isset($_POST["proveedor_submit"])) {
 }
 
 if (!empty($errorMessage)) {
-    if (isset($prvObj)) {
-        clog2("LOGPRV: ".$prvObj->log);
-        clog2("ERRLOG: ".arr2str($prvObj->errors));
-    } else if (isset($gpoObj)) {
-        clog2("LOGGPO: ".$gpoObj->log);
-        clog2("ERRLOG: ".arr2str($gpoObj->errors));
-    } else if (isset($usrObj)) {
-        clog2("LOGUSR: ".$usrObj->log);
-        clog2("ERRLOG: ".arr2str($usrObj->errors));
-    }
+    clog2("LOGPRV: ".dao('prv')->log);
+    clog2("ERRLOG: ".arr2str(dao('prv')->errors));
+    clog2("LOGGPO: ".dao('gpo')->log);
+    clog2("ERRLOG: ".arr2str(dao('gpo')->errors));
+    clog2("LOGUSR: ".dao('usr')->log);
+    clog2("ERRLOG: ".arr2str(dao('usr')->errors));
 }
 
 clog2("POST: ".arr2str($_POST));
@@ -595,8 +555,7 @@ $bnkIdVal = ""; $bnkRzSocVal = ""; $bnkBrfVal = ""; $bnkKeyVal = ""; $bnkRfcVal 
 $aliasListaComprasGrupo = "";
 
 $defaultCheckMetodoPago = "";
-require_once "clases/InfoLocal.php";
-if (!isset($infObj)) $infObj = new InfoLocal();
+$infObj = dao("inf");
 $availableCheckMetodoPago = $infObj->available();
 $retIL = $infObj->obtener("validaMetodoPago");
 if (empty($retIL) || $retIL!="NO") $defaultCheckMetodoPago = " checked";
@@ -629,12 +588,7 @@ if (isset($errorMessage[0]) || isset($resultMessage[0])) {
     if (!empty($usrLastId)) {
         $usrIdVal = " value=\"$usrLastId\"";
         $usrDelBtnDisp = "inline";
-        if (!isset($ugObj)) {
-            require_once "clases/Usuarios_Grupo.php";
-            $ugObj = new Usuarios_Grupo();
-        }
-        $ugObj->rows_per_page=0;
-        $aliasEmpresas = $ugObj->getGroupAliases((object)["id"=>$usrLastId], "Compras", "vista");
+        $aliasEmpresas = dao('ug', ['rows_per_page'=>0])->getGroupAliases((object)["id"=>$usrLastId], "Compras", "vista");
         $aliasListaComprasGrupo=implode(",", $aliasEmpresas);
     } else if (isset($idUsuario[0])) {
         $usrIdVal = " value=\"$idUsuario\"";
@@ -660,12 +614,7 @@ if (isset($errorMessage[0]) || isset($resultMessage[0])) {
 }
 $statusOptions=getHtmlOptions(["activo"=>"activo","actualizar"=>"actualizar","inactivo"=>"inactivo"], $prvSttVal);
 if ($consultaPerm) {
-    require_once "clases/Acciones.php";
-    $actObj = new Acciones();
-    $actObj->rows_per_page=0;
-    $actObj->clearOrder();
-    $actObj->addOrder("id");
-    $actData=$actObj->getData();
+    $actData=dao('act', ['rows_per_page'=>0, 'orderlist'=>["id"=>"asc"]])->getData();
     $actOpts=[""=>"-- NUEVA --"];
     $actOpts1=[];
     foreach($actData as $actIdx=>$actRow) {
@@ -675,18 +624,9 @@ if ($consultaPerm) {
     $actOptions=getHtmlOptions($actOpts,"");
     $actOptions1=getHtmlOptions($actOpts1,"");
 
-    require_once "clases/Perfiles.php";
-    $prfObj = new Perfiles();
-    $prfObj->rows_per_page=0;
-    $prfObj->clearOrder();
-    $prfObj->addOrder("id");
-    $prfData=$prfObj->getData();
+    $prfData=dao("prf", ['rows_per_page'=>0, 'orderlist'=>["id"=>"asc"]])->getData();
     $prfOpts=[""=>"-- NUEVO --"];
-    require_once "clases/Permisos.php";
-    $prmObj = new Permisos();
-    $prmObj->rows_per_page=0;
-    $prmObj->clearOrder();
-    $prmObj->addOrder("idAccion");
+    $prmObj = dao("prm", ['rows_per_page'=>0, 'orderlist'=>["idAccion"=>"asc"]]);
     foreach ($prfData as $prfIdx => $prfRow) {
         $prmReadData=$prmObj->getData("idPerfil=$prfRow[id] and consulta=1",0,"idAccion");
         $readTxt="";
@@ -713,19 +653,17 @@ if ($esSistemas) {
     if (isset($_POST["cuenta_delete"])) {
         $_SESSION["accounts"]=null;
     }
-    require_once "clases/Cuentas.php"; $accObj = new Cuentas(); $accObj->rows_per_page=0;
-    $accObj->clearOrder(); $accObj->addOrder("nombre"); $accData=$accObj->getData(false,0,"id,nombre,tipo,cuenta");
+    $accData=dao("acc", ['rows_per_page'=>0, 'orderlist'=>["nombre"=>"asc"]])->getData(false,0,"id,nombre,tipo,cuenta");
     $accOpts=[""=>"-- NUEVA --"];
     if (!isset($_SESSION["accounts"])) $_SESSION["accounts"]=$accData;
-    foreach ($accData as $accIdx => $accData) {
-        $accOpts[$accData["id"]]=["value"=>$accData["nombre"],"tipo"=>$accData["tipo"],"cuenta"=>$accData["cuenta"]];
+    foreach ($accData as $accIdx => $accValue) {
+        $accOpts[$accValue["id"]]=["value"=>$accValue["nombre"],"tipo"=>$accValue["tipo"],"cuenta"=>$accValue["cuenta"]];
     }
     $accOptions=getHtmlOptions($accOpts,"");
 
-    require_once "clases/ProveedorTipos.php"; $prtObj = new ProveedorTipos(); $prtObj->rows_per_page=0;
-    $prtObj->clearOrder(); $prtObj->addOrder("nombre"); $prtData=$prtObj->getData();
+    $prtData=dao("prt", ['rows_per_page'=>0, 'orderlist'=>["nombre"=>"asc"]])->getData();
     $tprvOpts=[""=>"-- NUEVO --"];
-    require_once "clases/ProveedorTipoCuentas.php"; $ptcObj = new ProveedorTipoCuentas(); $ptcObj->rows_per_page=0;
+    $ptcObj = dao("ptc", ['rows_per_page'=>0]);
     foreach ($prtData as $prtIdx => $prtRow) {
         $ptcData=$ptcObj->getData("idProveedor=$prtRow[id]");
         $ctaTxt="";

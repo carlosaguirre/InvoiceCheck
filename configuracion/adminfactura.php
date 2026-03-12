@@ -9,12 +9,7 @@ if (!$_esSistemas) {
 }
 clog2ini("configuracion.adminfactura");
 clog1seq(1);
-global $gpoObj;
-if (!isset($gpoObj)) {
-    require_once "clases/Grupo.php";
-    $gpoObj = new Grupo();
-}
-$gpoFullMapWhere = $gpoObj->setCodigoOptSession();
+$gpoFullMapWhere = dao('gpo')->setCodigoOptSession();
 $gpoCodigoOpt = $_SESSION['gpoCodigoOpt'];
 
 clog1seq(-1);

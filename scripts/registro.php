@@ -300,7 +300,7 @@ function prvIdChng(id, force=false) {
                 clearProv();
             }
         }, function(errmsg, parameters, evt) {
-            console.log("RESP ERROR: '"+errmsg+"', STATE="+parameters.xmlHttpPost.readyState+", STATUS="+parameters.xmlHttpPost.status);
+            console.log("RESP ERROR: '"+errmsg+"', STATE="+parameters.controller.readyState+", STATUS="+parameters.controller.status);
             clearProv();
         });
     }
@@ -384,7 +384,7 @@ function populateProv(code,force) {
                 }
             }, function(errmsg, parameters, evt) {
                 clearProv();
-                console.log("ERROR EN RESPUESTA: '"+errmsg+"', STATE="+parameters.xmlHttpPost.readyState+", STATUS="+parameters.xmlHttpPost.status);
+                console.log("ERROR EN RESPUESTA: '"+errmsg+"', STATE="+parameters.controller.readyState+", STATUS="+parameters.controller.status);
             });
         } else {
             fillData(code);

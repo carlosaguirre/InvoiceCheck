@@ -163,7 +163,7 @@ function revisaCuenta(evt,id,rfcprov) {
             },function(errmsg, parameters, evt) {
                 cladd(ebyid("rolWaitImg"),"hidden");
                 setErrorField("Error en envío de archivo");
-                console.log("Error="+errmsg+", State="+parameters.xmlHttpPost.readyState+", Status="+parameters.xmlHttpPost.status);
+                console.log("Error="+errmsg+", State="+parameters.controller.readyState+", Status="+parameters.controller.status);
             }
         );}},{eName:"IMG",id:"rolWaitImg",src:"imagenes/icons/rollwait2.gif",className:"hei18 hidden"},{eName:"SPAN",id:"errFld",className:"cancelLabel boldValue bgred qblink hidden"}]}]}]},codeId+"EDITAR DATOS BANCARIOS");
     if(archivo&&archivo.length>0) {
@@ -268,7 +268,7 @@ function revisaCuenta(evt,id,rfcprov) {
                 }, function(text, parameters, evt) {
                     elem.classList.remove("bgbeige");
                     elem.classList.add("bgred");
-                    console.log("POST SERVICE ERROR (STE "+parameters.xmlHttpPost.readyState+", STA "+parameters.xmlHttpPost.status+"): "+text);
+                    console.log("POST SERVICE ERROR (STE "+parameters.controller.readyState+", STA "+parameters.controller.status+"): "+text);
                     setTimeout(function() {
                         elem.classList.remove("bgred");
                     }, 3000);
@@ -379,7 +379,7 @@ function doSave(type) {
                 }
             },function(errmsg, parameters, evt){
                 setOvError("Error de conexión: "+errmsg);
-                console.log("Saving Provider, connection error. State="+parameters.xmlHttpPost.readyState+", Status="+parameters.xmlHttpPost.status+". Parameters=",parameters);
+                console.log("Saving Provider, connection error. State="+parameters.controller.readyState+", Status="+parameters.controller.status+". Parameters=",parameters);
             });
         } else {
             setOvError("Sin cambios");
@@ -544,7 +544,7 @@ function revisaOpinion(evt,id,rfcprov) {
                 }, function(text, parameters, evt) {
                     elem.classList.remove("bgbeige");
                     elem.classList.add("bgred");
-                    console.log("POST SERVICE ERROR (STE "+parameters.xmlHttpPost.readyState+", STA "+parameters.xmlHttpPost.status+"): "+text);
+                    console.log("POST SERVICE ERROR (STE "+parameters.controller.readyState+", STA "+parameters.controller.status+"): "+text);
                     setTimeout(function() {
                         elem.classList.remove("bgred");
                     }, 3000);

@@ -17,11 +17,7 @@ class DPagos extends DBObject {
         DBi::query($query); // proceso no entra para replicar insert, no hace falta pasar el objeto
     }
     function updateTables($codigoProveedor, $numChanges=100) {
-        global $invObj, $cpyObj;
-        if (!isset($invObj)) { require_once "clases/Facturas.php"; $invObj=new Facturas(); }
-        if (!isset($cpyObj)) { require_once "clases/CPagos.php"; $cpyObj=new CPagos(); }
-        $invObj->rows_per_page=$numChanges;
-        $invData = $invObj->getData("codigoProveedor='$codigoProveedor' and tipoComprobante='p' and id not in (select distinct cp.idCPago from CPagos cp inner join DPagos dp on cp.id=dp.idPPago)");
+        $invData = dao('inv', ['rows_per_page'=>$numChanges])->getData("codigoProveedor='$codigoProveedor' and tipoComprobante='p' and id not in (select distinct cp.idCPago from CPagos cp inner join DPagos dp on cp.id=dp.idPPago)");
         require_once "clases/CFDI.php";
         $sysPath=$_SERVER["DOCUMENT_ROOT"];
         foreach ($invData as $iidx => $iitem) {

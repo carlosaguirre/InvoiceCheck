@@ -148,12 +148,7 @@ class DBPDO {
     private static function getCodigoZona($rfc) {
         if (!isset($rfc[0])) return null;
         if (!isset(self::$corp[$rfc])) {
-            global $gpoObj;
-            if (!isset($gpoObj)) {
-                require_once "clases/Grupo.php";
-                $gpoObj = new Grupo();
-            }
-            $gpoData = $gpoObj->getData("rfc='$rfc'");
+            $gpoData = dao('gpo')->getData("rfc='$rfc'");
             if (isset($gpoData[0]["id"])) $gpoData=$gpoData[0];
             $alias=$gpoData["alias"];
             $codZn=null;

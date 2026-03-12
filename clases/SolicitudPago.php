@@ -33,14 +33,7 @@ class SolicitudPago extends DBObject {
     public static function init($empresas=null,$secciones=null) {
         self::$lastFunc=__FUNCTION__;
         //clog2("INI function init"); //: empresas=".json_encode($empresas).", secciones=".json_encode($secciones));
-        global $gpoObj;
-        if (!isset($gpoObj)) {
-            require_once "clases/Grupo.php";
-            $gpoObj=new Grupo();
-        }
-        $gpoObj->rows_per_page=0;
-        $gpoObj->clearOrder();
-        $gpoObj->addOrder("alias");
+        $gpoObj=dao('gpo', ['rows_per_page'=>0, 'alias'=>'asc']);
         if (isset($empresas[0])) $gpoData=$gpoObj->getData("id in (".implode(",", $empresas).")",0,"id,alias");
         else $gpoData=$gpoObj->getData(false,0,"id,alias");
         $aliasId=[];
@@ -49,13 +42,7 @@ class SolicitudPago extends DBObject {
             $aliasId[$gpoRow["alias"]]=$gpoRow["id"];
             $optionEmpresas[]=["eName"=>"OPTION","value"=>$gpoRow["alias"],"eText"=>$gpoRow["alias"]];
         }
-        global $prvObj;
-        if (!isset($prvObj)) {
-            require_once "clases/Proveedores.php";
-            $prvObj=new Proveedores();
-        }
-        $prvObj->rows_per_page=0;
-        $prvData=$prvObj->getData("status not in (\"inactivo\",\"eliminado\")",0,"id,codigo");
+        $prvData=dao('prv', ['rows_per_page'=>0])->getData("status not in (\"inactivo\",\"eliminado\")",0,"id,codigo");
         $codigoId=[];
         $optionProveedores=[];
         foreach ($prvData as $idx => $prvRow) {
@@ -444,14 +431,8 @@ class SolicitudPago extends DBObject {
         if ($canLog) echo "<!-- ".self::$lastFunc." [";
         if (isset($fEmpresa[0])) {
             if ($canLog) echo "Filtro Empresas:".implode(",",$fEmpresa);
-            global $gpoObj;
-            if (!isset($gpoObj)) {
-                require_once "clases/Grupo.php";
-                $gpoObj=new Grupo();
-            }
-            $gpoObj->rows_per_page=0;
             $fEmpresaId=[];
-            foreach ($fEmpresa as $key => $value) $fEmpresaId[]=$gpoObj->getIdByAlias($value);
+            foreach ($fEmpresa as $key => $value) $fEmpresaId[]=dao('gpo', ['rows_per_page'=>0])->getIdByAlias($value);
             if ($canLog) echo "; Ids:".implode(",",$fEmpresaId);
             if ($empresas===null) {
                 $empresas=$fEmpresaId;
@@ -610,14 +591,8 @@ class SolicitudPago extends DBObject {
         $oldEmpresas=$empresas;
         $fEmpresa=$filtros["filter04"]??null;
         if (isset($fEmpresa[0])) {
-            global $gpoObj;
-            if (!isset($gpoObj)) {
-                require_once "clases/Grupo.php";
-                $gpoObj=new Grupo();
-            }
-            $gpoObj->rows_per_page=0;
             $fEmpresaId=[];
-            foreach ($fEmpresa as $key => $value) $fEmpresaId[]=$gpoObj->getIdByAlias($value);
+            foreach ($fEmpresa as $key => $value) $fEmpresaId[]=dao('gpo', ['rows_per_page'=>0])->getIdByAlias($value);
             if ($empresas===null) {
                 $empresas=$fEmpresaId;
             } else {
@@ -815,27 +790,17 @@ class SolicitudPago extends DBObject {
         return $this->saveRecord(["id"=>$solId,"status"=>new DBExpression("status".$bitOp.$newStatusSolPago)]);
     }
     function firma($solId,$accion,$motivo=null) {
-        global $firObj;
-        if (!isset($firObj)) {
-            require_once "clases/Firmas.php";
-            $firObj=new Firmas();
-        }
         sessionInit();
         if (hasUser()) {
             $userId=getUser()->id;
             if (getUser()->nombre==="admin") {
-                global $usrObj;
-                if (!isset($usrObj)) {
-                    require_once "clases/Usuarios.php";
-                    $usrObj=new Usuarios();
-                }
-                $usrData=$usrObj->getData("nombre='SISTEMAS'",0,"id");
+                $usrData=dao('usr')->getData("nombre='SISTEMAS'",0,"id");
                 if (isset($usrData[0]["id"])) $userId=$usrData[0]["id"];
             }
         } else $userId=0;
         $fieldarr=["idUsuario"=>$userId,"modulo"=>"solpago","idReferencia"=>$solId,"accion"=>$accion];
         if(isset($motivo[0])) $fieldarr["motivo"]=$motivo;
-        $firObj->saveRecord($fieldarr);
+        dao('fir')->saveRecord($fieldarr);
     }
     function hasInvoice($idFactura) {
         if (empty($idFactura)) return false;

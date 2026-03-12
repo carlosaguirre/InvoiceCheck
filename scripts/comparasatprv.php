@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once dirname(__DIR__)."/bootstrap.php";
 header("Content-type: application/javascript; charset: UTF-8");
 clog2ini("scripts.comparasatprv");
@@ -141,7 +141,7 @@ function loadCSV(name) {
     }
   };
   let errorFunc=function(reasonText, parameters, evt) {
-    overlayMessage("<p>REASON "+parameters.xmlHttpPost.readyState+"/"+parameters.xmlHttpPost.status+":</p><pre>"+reasonText+"</pre>","ERROR");
+    overlayMessage("<p>REASON "+parameters.controller.readyState+"/"+parameters.controller.status+":</p><pre>"+reasonText+"</pre>","ERROR");
   };
   postService(url,parameters,successFunc,errorFunc);
   tgt.value="";
@@ -341,7 +341,7 @@ function despliegaDatosEncontrados(resultText,parameters,state,status) {
   }
 }
 function despliegaError(errorText, parameters, evt) {
-  console.log("INI function despliegaError", errorText, parameters.xmlHttpPost.readyState, parameters.xmlHttpPost.status);
+  console.log("INI function despliegaError", errorText, parameters.controller.readyState, parameters.controller.status);
   overlayMessage("<pre>"+errorText+"</pre>","ERROR");
 }
 function page(e) {
@@ -489,7 +489,7 @@ function comparaDatos() {
     }
   };
   let errorFunc=function(reasonText, parameters, evt) {
-    overlayMessage("<p>REASON "+parameters.xmlHttpPost.readyState+"/"+parameters.xmlHttpPost.status+":</p><pre>"+reasonText+"</pre>","ERROR");
+    overlayMessage("<p>REASON "+parameters.controller.readyState+"/"+parameters.controller.status+":</p><pre>"+reasonText+"</pre>","ERROR");
   };
   postService(url,parameters,successFunc,errorFunc);
 }
@@ -562,7 +562,7 @@ function eliminaDatos() {
     }
   };
   let errorFunc=function(reasonText, parameters, evt) {
-    overlayMessage("<p>REASON "+parameters.xmlHttpPost.readyState+"/"+parameters.xmlHttpPost.status+":</p><pre>"+reasonText+"</pre>","ERROR");
+    overlayMessage("<p>REASON "+parameters.controller.readyState+"/"+parameters.controller.status+":</p><pre>"+reasonText+"</pre>","ERROR");
   };
   postService(url,parameters,successFunc,errorFunc);
 }

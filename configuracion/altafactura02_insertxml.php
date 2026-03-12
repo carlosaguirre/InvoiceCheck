@@ -34,6 +34,7 @@ $ftpObj = MiFTP::newInstanceGlama();
 DBi::autocommit(FALSE);
 //clog2("DBI autocommit = FALSE");
 //if (isset($pdffiles)) clog2("PDFFILES:\n".arr2str($pdffiles));
+$invObj = dao("inv");
 for ($idx = 0; $idx < $numFacturas; $idx++) {
     $factura = $facturas[$idx];
 //clog2("FACTURA $idx:\n".arr2str($factura));
@@ -53,8 +54,6 @@ for ($idx = 0; $idx < $numFacturas; $idx++) {
     $esTraslado = ($tipoComprobante==="TRASLADO");
 //if ($esPago) clog2("ES PAGO");
 //if ($esNota) clog2("ES NOTA");
-    require_once "clases/Facturas.php";
-    $invObj = new Facturas();
     $invData=$invObj->getData("uuid='$uuid'");
     if (isset($invData[0])) $invData=$invData[0];
     $newPdfName=null;
@@ -302,11 +301,7 @@ for ($idx = 0; $idx < $numFacturas; $idx++) {
         ];
         $fieldarray["fechaCaptura"]=$_now["now"];
         if (!$esNota && !$esTraslado) {
-            if (!isset($prvObj)) {
-                require_once "clases/Proveedores.php";
-                $prvObj = new Proveedores();
-            }
-            $prvData=$prvObj->getData("rfc='$frfc' and status not in (\"inactivo\",\"eliminado\")",0,"credito");
+            $prvData=dao("prv")->getData("rfc='$frfc' and status not in (\"inactivo\",\"eliminado\")",0,"credito");
             if (!isset($prvData[0])) {
                 global $query;
                 clog2("ERROR8 con rollback en rfc '$frfc' no encontrado");
@@ -392,15 +387,10 @@ for ($idx = 0; $idx < $numFacturas; $idx++) {
         doclog("INSERTXML SAVE","altafac",$baseData+["line"=>__LINE__,"idx"=>$idx, "query"=>$query, "lastId"=>$invObj->lastId]);
         $factura["id"] = $invObj->lastId;
         if ($esPago) {
-            global $cpyObj;
-            if (!isset($cpyObj)) { require_once "clases/CPagos.php"; $cpyObj=new CPagos(); }
+            $cpyObj = dao("cpy");
             $cpyObj->fixInvStats($factura["id"]);
             doclog("Actualiza Pagos","pagos",["id"=>$factura["id"],"fieldarray"=>$fieldarray,"pasos"=>$cpyObj->fixedIdList["Pasos"]]);
-            if (!isset($prcObj)) {
-                require_once "clases/Proceso.php";
-                $prcObj = new Proceso();
-            }
-            $prcObj->cambioFactura($factura["id"], $fieldarray["status"], $username, $now["now"], "altafactura02");
+            dao("prc")->cambioFactura($factura["id"], $fieldarray["status"], $username, $now["now"], "altafactura02");
         } else {
             $columns = ["idFactura", "codigoArticulo", "cantidad", "unidad", "claveUnidad", "claveProdServ", "descripcion", "precioUnitario", "importe", "importeDescuento", "impuestoTraslado", "impuestoRetenido"]; // "version" (default 3.3), "status" (default activo)
             $conceptArrays = [];
@@ -473,17 +463,12 @@ for ($idx = 0; $idx < $numFacturas; $idx++) {
                 }
             }
             //clog2("Id: $factura[id], Folio: $folioFix, Pedido: $pedido\nColumns: ".json_encode($columns)."\nValues: ".json_encode($conceptArrays));
-            require_once "clases/Conceptos.php";
-            $cptObj = new Conceptos();
+            $cptObj = dao("cpt");
 //clog2("INSERT MULTIPLE conceptos");
             if ($cptObj->insertMultipleRecords($columns, $conceptArrays)) {
-                global $prcObj;
                 $factura["dblog"] .= "\n".$cptObj->log;
-                if (!isset($prcObj)) {
-                    require_once "clases/Proceso.php";
-                    $prcObj = new Proceso();
-                }
                 doclog("INSERTXML Conceptos","altafac",$baseData+["line"=>__LINE__,"numConceptos"=>$numConceptos,"numGuardados"=>count($conceptArrays)]);
+                $prcObj = dao("prc");
                 $prcObj->cambioFactura($factura["id"], "Pendiente", $username, $_now["now"], "altafactura02");
                 $factura["dblog"] .= "\n".$prcObj->log;
             } else {

@@ -128,9 +128,8 @@ if (isset($_POST["frgn_return"][0])) {
             $nvPrfo="<br>";
         }
     }
-    require_once "clases/Proveedores.php";
     DBi::autocommit(FALSE);
-    $prvObj = new Proveedores();
+    $prvObj = dao('prv');
     $esNuevoPrv=empty($idProveedor);
     if ($esNuevoPrv) {
         if (empty($errorMessage)) {
@@ -268,9 +267,9 @@ if (isset($_POST["frgn_return"][0])) {
                     $autoReject=false;
                     foreach($output as $op) {
                         if (!isset($dateLine[0])&&preg_match("/Revisi.+n practicada el d.+a (\d+) de (\w+) de (\d+), a las (\d+):(\d+) horas/",$op, $matches) === 1) {
-                            $meses=["enero"=>"01","febrero"=>"02","marzo"=>"03","abril"=>"04","mayo"=>"05","junio"=>"06","julio"=>"07","agosto"=>"08","septiembre"=>"09","octubre"=>"10","noviembre"=>"11","diciembre"=>"12"];
-                            if(isset($meses[$matches[2]])) {
-                                $dateLine=str_pad($matches[1],2,"0",STR_PAD_LEFT)."/".$meses[$matches[2]]."/".$matches[3];
+                            $monNum = getMonthNumber(monthname: $matches[2]);
+                            if($monNum !== false) {
+                                $dateLine=str_pad($matches[1],2,"0",STR_PAD_LEFT)."/".$monNum."/".$matches[3];
                                 if ($autoReject) break;
                             }
                         }
@@ -308,9 +307,7 @@ if (isset($_POST["frgn_return"][0])) {
         }
     }
     if (empty($errorMessage)) {
-        require_once "clases/Usuarios.php";
-        $usrObj = new Usuarios();
-        $usrData=$usrObj->getData("nombre='$codigoProveedor'",0,"id,email");
+        $usrData=dao('usr')->getData("nombre='$codigoProveedor'",0,"id,email");
         if (isset($usrData[0])) {
             $dbUsrId=$usrData[0]["id"];
             $dbUsrEmail=$usrData[0]["email"];
@@ -494,6 +491,7 @@ if (isset($_POST["frgn_return"][0])) {
             if ($doSaveUsr&&!isset($ufldarr["id"])) {
                 $ufldarr["nombre"] = $codigoProveedor;
             }
+            $usrObj = dao('usr');
             $savedUsr=$doSaveUsr&&$usrObj->saveRecord($ufldarr);
             if ($doSaveUsr&&!$savedUsr&&empty(DBi::$errno)) {
                 $doSaveUsr=false;
@@ -501,8 +499,7 @@ if (isset($_POST["frgn_return"][0])) {
             if ($savedUsr) {
                 if ($esNuevoPrv) {
                     $upArr = ["idUsuario"=>$usrObj->lastId, "idPerfil"=>"3"]; // Perfil de Proveedor
-                    require_once "clases/Usuarios_Perfiles.php";
-                    $upObj = new Usuarios_Perfiles();
+                    $upObj = dao('up');
                     if (!$upObj->exists("idUsuario='$upArr[idUsuario]' AND idPerfil='$upArr[idPerfil]'")) {
                         if (!$upObj->saveRecord($upArr)) {
                             $errorMessage .= $nvPrfo."Error al guardar perfil del proveedor $razonProveedor.";
@@ -523,8 +520,7 @@ if (isset($_POST["frgn_return"][0])) {
         } else if ($savedPrv) {
             $procStatus = $statusProveedor; //"Registro";
             $procDetalle = "Registro de Proveedor $codigoProveedor $razonProveedor";
-            require_once "clases/Proceso.php";
-            $prcObj = new Proceso();
+            $prcObj = dao('prc');
             if ($prcObj->cambioProveedor($idProveedor, $procStatus, getUser()->nombre, $procDetalle)) {
                 $resultMessage .= "<p class='margin20 centered'>Proveedor $razonProveedor registrado satisfactoriamente.</p>"; //" Consulte su correo electr&oacute;nico por la aprobaci&oacute;n de acceso al sistema.";
             } else {
@@ -610,17 +606,7 @@ if (isset($_POST["frgn_return"][0])) {
         $fldarr["reqObjImp"]="1";
     }
 
-    require_once "clases/Proveedores.php";
-    $prvObj = new Proveedores();
-    if (empty($_POST["regPerPage"])) $prvObj->rows_per_page=100;
-    else $prvObj->rows_per_page=+$_POST["regPerPage"];
-    if (!empty($_POST["pageSwitch"])) {
-        $prvObj->pageno=+$_POST["pageSwitch"];
-    } else {
-        //clog1("NO PAGE SWITCH");
-    }
-    $prvObj->clearOrder();
-    $prvObj->addOrder("codigo");
+    $prvObj = dao('prv', ["rows_per_page"=>$_POST["regPerPage"]??100, "pageno"=>$_POST["pageSwitch"]??1, "orderlist"=>["codigo"=>"asc"]]);
     $prvData = $prvObj->getDataByFieldArray($fldarr); //,0,"");
     if (isset($prvData[1])) $urlAction="registroMasivo";
     else if (isset($prvData[0])) {
@@ -661,9 +647,7 @@ if (isset($_POST["frgn_return"][0])) {
         $esServicio=($esServicio==="1");
         $conCodgEnDesc=($conCodgEnDesc==="1");
         $reqObjImp=($reqObjImp==="1");
-        require_once "clases/Usuarios.php";
-        $usrObj = new Usuarios();
-        $usrData=$usrObj->getData("nombre='$codigoProveedor'",0,"id,email");
+        $usrData=dao('usr')->getData("nombre='$codigoProveedor'",0,"id,email");
         $idUsuario=$usrData[0]["id"];
         $emailUser=$usrData[0]["email"];    //
 

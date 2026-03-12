@@ -83,7 +83,7 @@ $output2 = implode(', ', array_map(function ($v, $k) { return $k.':"'.$v.'"'; },
               rw.appendChild(ecrea({eName:"DIV", className:"bCell c err", eText:"EMPTY"}));
               rw.appendChild(ecrea({eName:"DIV", className:"bCell d err", eText:"-"}));
             } else {
-              if (msg===parameters.xmlHttpPost.responseText) try {
+              if (msg===parameters.controller.responseText) try {
                 const jobj=JSON.parse(msg);
                 const hasResult=!!jobj.result;
                 const hasMessage=!!jobj.message;

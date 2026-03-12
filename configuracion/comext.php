@@ -15,21 +15,12 @@ if(!$_esSistemas && !$consultaX) {
 clog2ini("configuracion.comext");
 clog1seq(1);
 
-global $gpoObj; // 
-if (!isset($gpoObj)) {
-    require_once "clases/Grupo.php";
-    $gpoObj = new Grupo();
-}
-$optDefaultValue=$_SESSION['optDefaultValue']; // Definido en Grupo
-$gpoFullMapWhere = $gpoObj->setIdOptSessions(["Compras"],$optDefaultValue);
+$optDefaultValue=$_SESSION['optDefaultValue'];
+$gpoFullMapWhere = dao("gpo")->setIdOptSessions(["Compras"],$optDefaultValue);
 $gpoIdOpt = $_SESSION['gpoIdOpt'];
 //$esCompras=isset($gpoFullMapWhere[0]);
 
-global $prvObj;
-if(!isset($prvObj)) {
-    require_once "clases/Proveedores.php";
-    $prvObj = new Proveedores();
-}
+$prvObj=dao("prv");
 $prvObj->setIdOptSessions(1000,$optDefaultValue);
 $_SESSION['extIdOpt']=$_SESSION['prvIdOpt'];
 $prvObj->setIdOptSessions(4,$optDefaultValue);

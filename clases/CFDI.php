@@ -222,6 +222,12 @@ class CFDI {
         if (!isset(self::$xsddata["exceptionParameters"])) self::$xsddata["exceptionParameters"]=[$k => $v];
         else self::$xsddata["exceptionParameters"][$k]=$v;
     }
+    public static function getExceptionParameter($k) {
+        if (isset($k[0])) $k=trim($k);
+        if (!isset($k[0])) return null;
+        if (!isset(self::$xsddata["exceptionParameters"][$k])) return null;
+        return self::$xsddata["exceptionParameters"][$k];
+    }
     private static function newException($code) { // , $replaceSearch=null, $replaceReplace=null
         $message=self::getExceptionMessage($code);
         return new Exception($message, $code);
@@ -258,7 +264,7 @@ class CFDI {
             libxml_use_internal_errors(true);
 
             $size = filesize($xmlFileName);
-            $fixResult=self::reparaXML($xmlFileName,$xmlOriginalName,$log);
+            $fixResult=self::reparaXML($xmlFileName, $xmlOriginalName, $log);
             if (is_bool($fixResult)) { // true=cambios realizados exitosamente, false=no fue necesario hacer cambios // exception thrown=ocurrieron errores no esperados // number=se detectaron errores provocados por datos mal ingresados
                 if (@$xmldoc->load($xmlFileName, LIBXML_DTDLOAD|LIBXML_DTDATTR) === false) {
                     //self::setLastErrorText("El archivo $xmlOriginalName no está bien construido",1000);
@@ -522,7 +528,7 @@ class CFDI {
         } else $logTxt.="|NotFoundAddenda3";
         return $text;
     }
-    public static function reparaXML($filePath,$originalPath, &$log) {
+    public static function reparaXML($filePath, $originalPath, &$log) {
         // resultados:
             // true=se hicieron cambios satisfactoriamente
             // false=no se hicieron cambios, todo en orden
@@ -1255,9 +1261,7 @@ class CFDI {
                 }
                 $uid=getUser()->id;
                 $reqPayTaxChk = !isset($this->cache["infoProveedor"]) || ($this->cache["infoProveedor"]["t"]==="1");
-                global $infObj;
-                if (!isset($infObj)) { require_once "clases/InfoLocal.php"; $infObj=new InfoLocal(); }
-                $allowPayTaxIgnore = $infObj->exists("nombre='CFDI_ALLOWPRTV_{$uid}' and valor='1'");
+                $allowPayTaxIgnore = dao('inf')->exists("nombre='CFDI_ALLOWPRTV_{$uid}' and valor='1'");
                 if ($reqPayTaxChk&&!$allowPayTaxIgnore) {
                     doclog("CFDI:validar PRT VALIDATION","cfdi",["noval"=>1]); // Payment Receipt Tax Validation : Validacion de impuestos en complementos de pago
                     $rets=$this->get("pago_total_retenciones");
@@ -1365,9 +1369,7 @@ class CFDI {
                 self::setLastErrorText($err);
             } else if ($esReceptorValido && $usoCFDI==="P01") {
                 $uid=getUser()->id;
-                global $infObj;
-                if (!isset($infObj)) { require_once "clases/InfoLocal.php"; $infObj=new InfoLocal(); }
-                if (!$infObj->exists("nombre='CFDI_ALLOWP01_{$uid}' and valor='1'")) {
+                if (!dao('inf')->exists("nombre='CFDI_ALLOWP01_{$uid}' and valor='1'")) {
                     $err = "El USO CFDI del receptor debe estar definido (P01 no aceptable)";
                     $logList[] = $err;
                     $errlist[] = "<TD class='lefted wordwrap'>$err</TD>";
@@ -1494,7 +1496,7 @@ class CFDI {
                 chmod($rutaBase.$carpeta.$alias, 0777);
                 chmod($rutaBase.$carpeta.$aliasDir.$anio, 0777);
                 chmod($rutaBase.$ubicacion, 0777);
-                copy("{$rutaBase}{$carpeta}index.php", "{$rutaBase}{$ubicacionDir}index.php");
+                copy("{$rutaBase}{$carpeta}index.php", "{$rutaBase}{$ubiDir}index.php");
             } else {
                 $this->cache["errors"][]=["message"=>"No pudo crearse la ruta para guardar el xml","name"=>"ubicacion","value"=>$ubicacion];
                 return null;
@@ -1511,7 +1513,6 @@ class CFDI {
         return $ubicacion;
     }
     public function prepareData() {
-        global $invObj;
         $this->cache["registroexiste"]=FALSE;
         $uuid=$this->gdbData("uuid",null,"strtoupper");
         if (isset($uuid[50])) {
@@ -1601,13 +1602,11 @@ class CFDI {
             $this->cache["errors"][] = ["message"=>"Información insuficiente para definir ubicacion","data"=>$this->data["facturas"],"fileSuffix"=>$fileSuffix??"","name"=>"ubicacion","value"=>"","filePath"=>$xmlLoadPath,"errpath"=>"conError"];
             return false;
         }
-        if (!isset($invObj)) { require_once "clases/Facturas.php"; $invObj=new Facturas(); }
+        $invObj=dao('inv');
         $respuesta=$invObj->consultaBase($uuid);
         if (isset($respuesta) && isset($respuesta["status"])) {
             if ($respuesta["status"]==="Temporal") {
-                global $solObj;
-                if (!isset($solObj)) { require_once "clases/SolicitudPago.php"; $solObj=new SolicitudPago(); }
-                if ($solObj->exists("idFactura='$respuesta[id]'")) {
+                if (dao('sol')->exists("idFactura='$respuesta[id]'")) {
                     $this->cache["errors"][]=["message"=>"Ya existe una solicitud de pago para esta factura","name"=>"idFactura","value"=>$respuesta["id"],"filePath"=>$xmlLoadPath,"errpath"=>"yaExiste"];
                     return false;
                 }
@@ -1688,7 +1687,7 @@ class CFDI {
             $epsilon=0.015; // 0.015 ... cambiado a 15 centavos por acuerdo interno 29 feb 2024
             $sum=$subtotal-$descuento-$impRetenido+$impTraslado;
             $total=+$total;
-            $dif=Math.abs($total-$sum);
+            $dif=abs($total-$sum);
             /* DESHABILITAR TEMPORALMENTE para subir facturas con ISH (Impuestos Locales Complementarios) */
             if ($dif>$epsilon) {
                 $errmsg="El monto total $".number_format($total,2)." no coincide con suma de subtotal $".number_format($subtotal,2);
@@ -1798,7 +1797,6 @@ class CFDI {
             }
         }
         if (!isset($this->cache["errors"][0]) && $tc==="p") {
-            global $cpyObj, $dpyObj, $solObj;
             $this->data["facturas"]["saldoReciboPago"]=$this->get("pago_monto_total");
             $this->data["facturas"]["fechaReciboPago"]=null;
             $pagos=$this->get("pagos");
@@ -1821,16 +1819,14 @@ class CFDI {
                         break;
                     }
                     if ($invPgD["status"]==="Temporal") {
-                        if (!isset($solObj)) { require_once "clases/SolicitudPago.php"; $solObj=new SolicitudPago(); }
-                        if ($solObj->exists("idFactura=$invPgD[id]")) {
+                        if (dao('sol')->exists("idFactura=$invPgD[id]")) {
                             $this->cache["errors"][]=["message"=>"No se ha registrado correctamente una factura del complemento de pago","name"=>"idFactura","value"=>$respuesta["id"],"errpath"=>"yaExiste"];
                             break;
                         }
                     }
                     $invPgDId=$invPgD["id"];
                     $drNumPar=$drItem["@numparcialidad"];
-                    if (!isset($dpyObj)) { require_once "clases/DPagos.php"; $dpyObj=new DPagos(); }
-                    $dpyData=$dpyObj->getData("idFactura=$invPgDId and numParcialidad=$drNumPar");
+                    $dpyData=dao('dpy')->getData("idFactura=$invPgDId and numParcialidad=$drNumPar");
                     if ($dpyData[0]["id"]) {
                         $this->cache["errors"][]=["message"=>"El pago ya fue registrado","name"=>"idFactura","value"=>$invPgDId,"errpath"=>"yaExiste"];
                         break;
@@ -1910,12 +1906,7 @@ class CFDI {
             if ($this->cache["registroexiste"] && $invObj->exists("id='$respuesta[id]' && status='Temporal'")) $invObj->deleteRecord(["id"=>$respuesta["id"],"status"=>"Temporal"]);
             $tmpData=$invObj->getData("nombreInterno='$this->data[facturas][nombreInterno]' && status='Temporal'",false,"id,uuid");
             if (isset($tmpData[0]["id"])) {
-                global $solObj;
-                if (!isset($solObj)) {
-                    require_once "clases/SolicitudPago.php";
-                    $solObj=new SolicitudPago();
-                }
-                if ($solObj->exists("idFactura='".$tmpData[0]["id"]."'")) {
+                if (dao('sol')->exists("idFactura='".$tmpData[0]["id"]."'")) {
                     $this->cache["errors"][]=["message"=>"Ya existe una solicitud de pago para esa factura","data"=>["idFactura"=>$tmpData[0]["id"],"nombreInterno"=>$this->data["facturas"]["nombreInterno"],"uuid"=>$tmpData[0]["uuid"],"newuuid"=>$this->data["facturas"]["uuid"]],"errpath"=>"revisar"];
                 } else {
                     $invObj->deleteRecord(["id"=>$tmpData[0]["id"],"status"=>"Temporal"]);
@@ -1996,7 +1987,7 @@ class CFDI {
         return !isset($this->cache["errors"][0]);
     } // prepareData function
     public function saveData() {
-        global $invObj, $prcObj, $cptObj, $query;
+        global $query;
         if (isset($this->cache["errors"][0])) {
             $this->cache["errors"][]=["message"=>"No se guarda por tener errores","data"=>$this->data];
             return false;
@@ -2005,10 +1996,7 @@ class CFDI {
             $this->cache["errors"][]=["message"=>"Datos insuficientes para guardar","data"=>$this->data];
             return false;
         }
-        if (!isset($invObj)) {
-            require_once "clases/Facturas.php";
-            $invObj=new Facturas();
-        }
+        $invObj=dao('inv');
         DBi::autocommit(FALSE);
         if (!$invObj->saveRecord($this->data["facturas"])) {
             $dberror=["errno"=>DBi::$errno,"error"=>DBi::$error,"query"=>$query];
@@ -2024,19 +2012,16 @@ class CFDI {
         }
         $id=$invObj->lastId;
         $this->data["facturas"]["id"]=$id;
+        $columns=["idFactura", "codigoArticulo", "cantidad", "unidad", "claveUnidad", "claveProdServ", "descripcion", "precioUnitario", "importe", "importeDescuento", "impuestoTraslado", "impuestoRetenido"];
         if (isset($this->data["conceptos"][0])) {
             foreach ($this->data["conceptos"] as &$concepto) {
                 $concepto[0]=$id;
             }
-            if (!isset($cptObj)) {
-                require_once "clases/Conceptos.php";
-                $cptObj = new Conceptos();
-            }
-            if (!$cptObj->insertMultipleRecords($columns,$this->data["conceptos"])) {
+            if (!dao('cpt')->insertMultipleRecords($columns,$this->data["conceptos"])) {
                 $dberror=["errno"=>DBi::$errno,"error"=>DBi::$error,"query"=>$query];
                 if (!empty(DBi::$errors)) {
                     $dberror["data"]=[];
-                    foreach(DBi::errors as $sErn=>$sErr) {
+                    foreach(DBi::$errors as $sErn=>$sErr) {
                         $dberror["data"][]=["code"=>$sErn,"msg"=>$sErr,"fix"=>DBi::getErrorTranslated($sErn, $sErr)];
                     }
                 }
@@ -2044,10 +2029,6 @@ class CFDI {
                 DBi::rollback();
                 return false;
             }
-        }
-        if (!isset($prcObj)) {
-            require_once "clases/Proceso.php";
-            $prcObj=new Proceso();
         }
         //$this->data["proceso"]=["modulo"=>"Factura","status"=>"Pendiente","usuario"=>"SISTEMAS","detalle"=>"Alta Masiva por carpeta","fecha"=>$fecha]; // "identif"=>idFactura,
         if (hasUser()) {
@@ -2061,7 +2042,7 @@ class CFDI {
                     $dberror=["errno"=>DBi::$errno,"error"=>DBi::$error,"query"=>$query];
                     if (!empty(DBi::$errors)) {
                         $dberror["data"]=[];
-                        foreach(DBi::errors as $sErn=>$sErr) {
+                        foreach(DBi::$errors as $sErn=>$sErr) {
                             $dberror["data"][]=["code"=>$sErn,"msg"=>$sErr,"fix"=>DBi::getErrorTranslated($sErn, $sErr)];
                         }
                     }
@@ -2070,19 +2051,18 @@ class CFDI {
                     return false;
                 }
                 $idf=$pago["id"];
-                $prcObj->cambioFactura($idf, $pago["status"], $usuario, $pago["fechaReciboPago"], "Comprobante de Pago $id");
+                dao('prc')->cambioFactura($idf, $pago["status"], $usuario, $pago["fechaReciboPago"], "Comprobante de Pago $id");
             }
         }
         if (isset($this->data["cpagos"][0])) {
-            global $cpyObj;
-            if (!isset($cpyObj)) { require_once "clases/CPagos.php"; $cpyObj=new CPagos(); }
+            $cpyObj=dao('cpy');
             foreach ($this->data["cpagos"] as &$cpago) {
                 $cpago["idCPago"]=$id;
                 if (!$cpyObj->saveRecord($cpago)) {
                     $dberror=["errno"=>DBi::$errno,"error"=>DBi::$error,"query"=>$query];
                     if (!empty(DBi::$errors)) {
                         $dberror["data"]=[];
-                        foreach(DBi::errors as $sErn=>$sErr) {
+                        foreach(DBi::$errors as $sErn=>$sErr) {
                             $dberror["data"][]=["code"=>$sErn,"msg"=>$sErr,"fix"=>DBi::getErrorTranslated($sErn, $sErr)];
                         }
                     }
@@ -2092,7 +2072,7 @@ class CFDI {
                 }
             }
         }
-        $prcObj->cambioFactura($id, $this->data["facturas"]["status"], $usuario, $this->data["facturas"]["fechaCaptura"], "Alta Masiva Interna");
+        dao('prc')->cambioFactura($id, $this->data["facturas"]["status"], $usuario, $this->data["facturas"]["fechaCaptura"], "Alta Masiva Interna");
         DBi::commit();
         return true;
     } // saveData function
@@ -2245,7 +2225,6 @@ class CFDI {
     public function validaConcepto($listaConceptos, $modifiers, &$detalle) {
         $this->cache["trace"][]="INI validaConcepto";
         $cutUndefined=isset($modifiers["ignoreUndefined"])?!$modifiers["ignoreUndefined"]:true;
-        //$cutObjImp
         $conceptType=$modifiers["tipoconcepto"]??"";
         if (!isset($detalle)) $detalle=["result"=>"","code"=>0,"message"=>""];
         if (isset($listaConceptos["@claveprodserv"]) || isset($listaConceptos["@claveunidad"])) {
@@ -2324,9 +2303,7 @@ class CFDI {
                 $isAllow01x4=!$reqNo01x4Chk;
                 if (hasUser()) {
                     $uid=getUser()->id;
-                    global $infObj;
-                    if (!isset($infObj)) { require_once "clases/InfoLocal.php"; $infObj=new InfoLocal(); }
-                    if ($infObj->exists("nombre='CFDI_ALLOW01x4_{$uid}' and valor='1'")) $isAllow01x4=true;
+                    if (dao('inf')->exists("nombre='CFDI_ALLOW01x4_{$uid}' and valor='1'")) $isAllow01x4=true;
                 }
                 if ($cutUndefined&&$clvPrdSrv==="01010101"&&!$isAllow01x4) {
                     $detalle["result"]="error";
@@ -2414,9 +2391,7 @@ class CFDI {
             }
             if (hasUser()) {
                 $uid=getUser()->id;
-                global $infObj;
-                if (!isset($infObj)) { require_once "clases/InfoLocal.php"; $infObj=new InfoLocal(); }
-                if ($infObj->exists("nombre='CFDI_ALLOW33_{$uid}' and valor='1'")) {
+                if (dao('inf')->exists("nombre='CFDI_ALLOW33_{$uid}' and valor='1'")) {
                     $this->cache["trace"][]="END validaVersion: 3.3 allowed for User Id:$uid";
                     return "";
                 }
@@ -2462,7 +2437,6 @@ class CFDI {
     public function validaFecha() {
         if (!isset($this->cache["trace"])) $this->cache["trace"]=[];
         $this->cache["trace"][]="INI validaFecha";
-        global $infObj;
         $currentDate = new DateTime();
         $creationDate = new DateTime($this->gdbData("fecha","fechaFactura","CFDI::getDBDateFromXMLDate"));
         $monN = $creationDate->format('m'); // 01 - 12
@@ -2488,16 +2462,14 @@ class CFDI {
             $vMonthLimitDate = new DateTime("first day of this month 00:00:00");
             $vLastMonthLimitDate = new DateTime("first day of last month 00:00:00");
             if ($creationDate<$v2020LimitDate && $currentDate>=$v2020LimitDate) {
-                if (!isset($infObj)) { require_once "clases/InfoLocal.php"; $infObj=new InfoLocal(); }
-                if (!$infObj->exists("nombre='CFDI_IGNORE2020LIMIT' and valor='1'") && getUser()->id!=1) {
+                if (!dao('inf')->exists("nombre='CFDI_IGNORE2020LIMIT' and valor='1'") && getUser()->id!=1) {
                     doclog("CFDI:validaFecha","cfdiLog",["fecha"=>$fechaFactura,"hoy"=>$currentDate->format('Y-m-d H:i:s'),"err"=>"Factura anterior al 2019"]);
                     $this->cache["trace"][]="ERROR validaFecha <2019";
                     return "<b>A partir del 1° de enero del 2020 no se recibirán facturas del año 2019.</b>";
                 }
                 doclog("CFDI:validaFecha","cfdiLog",["fecha"=>$fechaFactura,"hoy"=>$currentDate->format('Y-m-d H:i:s'),"err"=>"Temporalmente ignorado: Factura anterior al 2019"]);
             } else if ($creationDate<$vMonthLimitDate) {
-                if (!isset($infObj)) { require_once "clases/InfoLocal.php"; $infObj=new InfoLocal(); }
-                $val=$infObj->getValue("nombre","CFDI_IGNOREMONTHLIMIT","valor");
+                $val=dao('inf')->getValue("nombre","CFDI_IGNOREMONTHLIMIT","valor");
                 if ($val!=="1") {  // valor=1 significa que todos tienen permiso
                     if ($val!=="0") { // valor=0 que nadie
                         $idAuthList=explode(",", $val); // valor=<lista de ids de usuario separados por comas>
@@ -2525,7 +2497,7 @@ class CFDI {
                     $this->cache["trace"][]="ERROR validaFecha: No mes actual";
                     return "<b>Sus facturas deben tener fecha del mes actual, le solicitamos ingresarlas a tiempo o refacturarlas.</b>";
                 }
-            } else if (isset(getUser()->proveedor) && validaPerfil("Proveedor") && !in_array(getUser()->nombre, CFDI::PRV_MONTHLIMIT_EXCEPTION) && !Proveedores::esCorporativo(getUser()->nombre)) {
+            } else if (isset(getUser()->proveedor) && validaPerfil("Proveedor") && !in_array(getUser()->nombre, CFDI::PRV_MONTHLIMIT_EXCEPTION) && !dao('prv')->esCorporativo(getUser()->nombre)) {
                 $lastWorkingDay=getLastInvoicingDay();
                 $lastWorkingDateTime=$lastWorkingDay?new DateTime($lastWorkingDay." 16:00:00"):null;
                 if (!isset($lastWorkingDateTime) || $currentDate>$lastWorkingDateTime) {
@@ -2559,16 +2531,6 @@ class CFDI {
         }
         $this->cache["trace"][]="END validaFecha";
         return "";
-    }
-    public static function fechaHoraMexico($datetime) {
-        date_default_timezone_set('UTC');
-        date_default_timezone_set("Etc/GMT+6");
-        $hora = date_format($datetime,"g:ia");
-        setlocale(LC_TIME, 'spanish');
-        $fecha = utf8_encode(strftime("%#d de %B del %Y", $datetime->getTimestamp()));
-        //require_once "clases/DBi.php";
-        //$fecha = mb_convert_encoding(DBi::$spDtFmt->format($datetime->getTimestamp()), 'UTF-8', mb_list_encodings());
-        return $fecha." ".$hora;
     }
     public static function formatInterval($interval) {
         $hasDays = ($interval->d)>0;
@@ -2626,7 +2588,6 @@ class CFDI {
     public function validaUUID() {
         if (!isset($this->cache["trace"])) $this->cache["trace"]=[];
         $this->cache["trace"][]="INI validaUUID";
-        global $invObj;
         $uuid = $this->gdbData("uuid",null,"strtoupper");
         if (empty($uuid)) {
             if (!isset($this->cache["errors"])) $this->cache["errors"]=[];
@@ -2634,13 +2595,9 @@ class CFDI {
             $this->cache["trace"][]="ERROR validaUUID: No UUID";
             return "<b>TimbreFiscalDigital.UUID</b> : No está definido y es requerido.";
         }
-        if (!isset($invObj)) {
-            require_once "clases/Facturas.php";
-            $invObj = new Facturas();
-        }
         $this->cache["uuid"]=$uuid;
-        //$invId = $invObj->getValue("uuid", $uuid, "id", "status NOT IN ('Temporal')");
-        $invData = $invObj->getData("uuid=upper('$uuid') and statusn IS NOT NULL", 0, "id,fechaCaptura,codigoProveedor,folio");
+        //$invId = dao('inv')->getValue("uuid", $uuid, "id", "status NOT IN ('Temporal')");
+        $invData = dao('inv')->getData("uuid=upper('$uuid') and statusn IS NOT NULL", 0, "id,fechaCaptura,codigoProveedor,folio");
         if (!isset($invData[0])) {
             $this->cache["trace"][]="END validaUUID: No CFDI";
             return "";
@@ -2651,18 +2608,8 @@ class CFDI {
         $invCodProv=$invData[0]["codigoProveedor"];
         $this->cache["idFactura"]=$invId;
         if (isset($invRegistry[9])) {
-            $regYear=substr($invRegistry,0,4);
-            $regMonth=+substr($invRegistry,5,2);
-            $months=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-            $regDay=+substr($invRegistry,8,2);
-            $timeMsg=", desde el $regDay de ".$months[$regMonth-1]." del {$regYear}";
-            if (isset($invRegistry[15])) $timeMsg.=" a las ".substr($invRegistry,11,5);
-            global $prcObj;
-            if (!isset($prcObj)) {
-                require_once "clases/Proceso.php";
-                $prcObj=new Proceso();
-            }
-            $prcData=$prcObj->getData("modulo='Factura' and identif=$invId and fecha='$invRegistry'",0,"usuario");
+            $timeMsg=", desde el ".fechaBdAHumana($invRegistry);
+            $prcData=dao('prc')->getData("modulo='Factura' and identif=$invId and fecha='$invRegistry'",0,"usuario");
             if (isset($prcData[0]["usuario"][0])) $timeMsg.=" (".$prcData[0]["usuario"].")";
         } else $timeMsg="";
         if (!empty($invId)) {
@@ -2685,15 +2632,10 @@ class CFDI {
     public function validaProveedor($rfc, &$nombre) {
         if (!isset($this->cache["trace"])) $this->cache["trace"]=[];
         $this->cache["trace"][]="INI validaProveedor $rfc";
-        global $prvObj;
-        if (!isset($prvObj)) {
-            require_once "clases/Proveedores.php";
-            $prvObj = new Proveedores();
-        }
         $hasName = (isset($nombre[0]));
         self::$xsddata["lastError"]["validar"].="|PRV:$rfc";
         if($hasName) self::$xsddata["lastError"]["validar"].=",$nombre";
-        $prvData = $prvObj->getData("rfc='$rfc'",0,"id,codigo".($hasName?"":",razonSocial").",verificado,cumplido,esServicio,conCodgEnDesc,reqObjImp,reqPayTaxChk,reqDefCvPrdSrv,status,credito");
+        $prvData = dao('prv')->getData("rfc='$rfc'",0,"id,codigo".($hasName?"":",razonSocial").",verificado,cumplido,esServicio,conCodgEnDesc,reqObjImp,reqPayTaxChk,reqDefCvPrdSrv,status,credito");
         if (!isset($prvData[0])) {
             if ($hasName) $retName = "$nombre ($rfc)";
             else $retName = $rfc;
@@ -2746,18 +2688,13 @@ class CFDI {
             $this->cache["trace"][]="ERROR validaCorporativo: No Rfc";
             return "No se pudo obtener la informacion del receptor";
         }
-        global $gpoObj;
-        if (!isset($gpoObj)) {
-            require_once "clases/Grupo.php";
-            $gpoObj = new Grupo();
-        }
         $rfc = $receptor["@rfc"];
         $this->data["facturas"]["rfcGrupo"]=$rfc;
         $nombre = isset($receptor["@nombre"])?$receptor["@nombre"]:null;
         $hasName = (isset($nombre[0]));
         self::$xsddata["lastError"]["validar"].="|GPO:$rfc";
         if($hasName) self::$xsddata["lastError"]["validar"].=",$nombre";
-        $gpoData = $gpoObj->getData("rfc='$rfc'",0,"id,alias".($hasName?"":",razonSocial"));
+        $gpoData = dao('gpo')->getData("rfc='$rfc'",0,"id,alias".($hasName?"":",razonSocial"));
         if (!isset($gpoData[0])) {
             if ($hasName) $retName="$nombre ($rfc)";
             else $retName=$rfc;
@@ -2820,11 +2757,7 @@ class CFDI {
         if (validaPerfil("Compras Basico")) $perfilValido[]="Compras Basico";
         if (validaPerfil("Alta Facturas")) $perfilValido[]="Alta Facturas";
         if (isset($perfilValido[0])/*validaPerfil("Compras")||validaPerfil("Alta Facturas")*/) {
-            global $ugObj;
-            if (!isset($ugObj)) {
-                require_once "clases/Usuarios_Grupo.php";
-                $ugObj = new Usuarios_Grupo();
-            }
+            $ugObj = dao('ug');
             if ($ugObj->exists("idUsuario=$usr->id")) {
                 if ($ugObj->isRelatedByRFC($usr, $rfcReceptor, $perfilValido, "vista")) {
                     $this->cache["trace"][]="END validaUsuario: receptor";
@@ -2834,12 +2767,7 @@ class CFDI {
                     $this->cache["trace"][]="END validaUsuario: emisor";
                     return ""; // Permitir subir facturas de ventas. Donde la empresa es proveedor y el usuario es empleado y esta subiendo facturas como proveedor para otra empresa del corporativo
                 }
-                global $gpoObj;
-                if (!isset($gpoObj)) {
-                    require_once "clases/Grupo.php";
-                    $gpoObj = new Grupo();
-                }
-                $alias=$gpoObj->getAliasByRFC($rfcReceptor);
+                $alias=dao('gpo')->getAliasByRFC($rfcReceptor);
                 $this->cache["trace"][]="ERROR validaUsuario: user ".$usr->nombre." not authorized for $alias invoices";
                 return "El usuario ".$usr->nombre." no tiene autorizado dar de alta comprobantes para {$alias}.";
             } else return "";
@@ -2850,25 +2778,15 @@ class CFDI {
     public function validaMetodoDePago($metodoDePago, $formaDePago, $tc) {
         if (!isset($this->cache["trace"])) $this->cache["trace"]=[];
         $this->cache["trace"][]="INI validaMetodoPago: M=$metodoDePago, F=$formaDePago, T=$tc";
-        global $mdpObj;
-        if (!isset($mdpObj)) {
-            require_once "clases/MetodosDePago.php";
-            $mdpObj = new MetodosDePago();
-        }
         if ($this->xsd===self::XSD32) {
-            global $infObj;
-            if (!isset($infObj)) {
-                require_once "clases/InfoLocal.php";
-                $infObj = new InfoLocal();
-            }
-            $retIL = $infObj->obtener("validaMetodoPago");
+            $retIL = dao('inf')->obtener("validaMetodoPago");
             if (empty($retIL) || $retIL!=="NO") {
                 $mdpArr = explode(",",$metodoDePago);
                 $mdpOtros = ["NA", "NOAPLICA", "NOIDENTIFICADO"];
                 $skipChars = [" ", ".", ",", "/", "_", "-"];
                 foreach ($mdpArr as $mdp) {
                     $mdpVal = str_replace($skipChars, "", $mdp);
-                    if (!$mdpObj->esValido($mdpVal) && !in_array(strtoupper($mdpVal),$mdpOtros)) {
+                    if (!dao('mdp')->esValido($mdpVal) && !in_array(strtoupper($mdpVal),$mdpOtros)) {
                         $this->cache["trace"][]="ERROR validaMetodoDePago: $mdp is not valid";
                         return "El m&eacute;todo de pago \"$mdp\" no es un c&oacute;digo v&aacute;lido";
                     }
@@ -2911,7 +2829,7 @@ class CFDI {
             require_once "clases/catalogoSAT.php";
             $fpDesc = CatalogoSAT::getValue(CatalogoSAT::CAT_FORMAPAGO,"codigo",$formaDePago,"descripcion");
             
-            if (!$mdpObj->esValido($formaDePago)) {
+            if (!dao('mdp')->esValido($formaDePago)) {
                 $this->cache["trace"][]="ERROR validaMetodoDePago: invalid FP ($formaDePago=$fpDesc)";
                 return "La forma de pago \"$formaDePago\": \"$fpDesc\" no es un c&oacute;digo v&aacute;lido.";
             }
@@ -3046,12 +2964,16 @@ class CFDI {
 //            $this->log("END function evaluateXPath.");
         return $xresult;
     }
-    public function toArray() {
+    public function toArray(): array|null {
         $values = $this->explodeNode($this->xmldoc->documentElement, true);
-        $schema = (self::$xsddata["doc.".$this->xsd])->documentElement;
-        return $this->explodeXSD($schema, $values);
+        $domDoc = (self::$xsddata["doc.".$this->xsd]);
+        if (isset($domDoc) && is_object($domDoc) && get_class($domDoc)==="DOMDocument") {
+            $schema = $domDoc->documentElement;
+            return $this->explodeXSD($schema, $values);
+        }
+        return [];
     }
-    public static function getNodeDesc($node) {
+    /*public static function getNodeDesc($node) {
         $desc = "NULL";
         if (isset($node)) {
             if (is_object($node)) {
@@ -3085,12 +3007,14 @@ class CFDI {
             }
         }
         return $desc;
-    }
-    private function explodeXSD($node, $values=null) {
+    }*/
+    private function explodeXSD(DOMElement $node, $values=null) {
         //$this->log("INI function explodeXSD Node(".self::getNodeDesc($node).") Value(".self::getNodeDesc($values).")");
         $arr = [];
         $xsdxpath = self::$xsddata["xpath.".$this->xsd]; //$this->getXSD("xpath");
         if ($xsdxpath==null) return ["error"=>"Null XPATH"];
+        if (!is_object($xsdxpath)) return ["error"=>"Invalid XSD XPATH. Type: ".gettype($xsdxpath)];
+        if (get_class($xsdxpath)!=="DOMXPath") return ["error"=>"Invalid XSD XPATH. Class: ".get_class($xsdxpath)];
         $elementsDefs = $xsdxpath->evaluate(self::QUERY_XS_TOP_ELEMENT);
         foreach($elementsDefs as $elemDef) {
             $arr[$elemDef->getAttribute("name")] = $this->explodeXSDElement($elemDef, $values);
@@ -3105,6 +3029,8 @@ class CFDI {
         if (!isset($xpathkey)) $xpathkey=$this->xsd;
         $xsdxpath = self::$xsddata["xpath.".$xpathkey]; //$this->getXSD("xpath");
         if ($xsdxpath==null) return ["error"=>"Null XPATH"];
+        if (!is_object($xsdxpath)) return ["error"=>"Invalid XSD XPATH. Type: ".gettype($xsdxpath)];
+        if (get_class($xsdxpath)!=="DOMXPath") return ["error"=>"Invalid XSD XPATH. Class: ".get_class($xsdxpath)];
         $hasType = $node->hasAttribute("type");
         $hasMinOccurs = $node->hasAttribute("minOccurs");
         $hasMaxOccurs = $node->hasAttribute("maxOccurs");
@@ -3189,6 +3115,8 @@ class CFDI {
             if ($node->getAttribute("name")==="Complemento") {
                 $tfdxpath = self::$xsddata["xpath.".self::TFD11];
                 if (isset($tfdxpath)) {
+                    if (!is_object($tfdxpath)) return ["error"=>"Invalid XSD XPATH. Type: ".gettype($tfdxpath)];
+                    if (get_class($tfdxpath)!=="DOMXPath") return ["error"=>"Invalid XSD XPATH. Class: ".get_class($tfdxpath)];
                     $elementsDefs = $tfdxpath->evaluate(self::QUERY_XS_TOP_ELEMENT);
                     foreach($elementsDefs as $elemDef) {
                         $attrname = $elemDef->getAttribute("name");

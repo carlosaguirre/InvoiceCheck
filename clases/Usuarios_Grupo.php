@@ -32,48 +32,27 @@ class Usuarios_Grupo extends DBObject {
         return $this->exists($usrCond.$gpoCond.$perfCond.$tipoCond);
     }
     function isRelatedByRFC($usr, $rfcEmpresa, $perfil, $tipo=null, $forceRead=false) {
-        global $gpoObj;
-        if (!isset($gpoObj)) {
-            require_once "clases/Grupo.php";
-            $gpoObj=new Grupo();
-        }
-        $idEmpresa = $gpoObj->getIdByRFC($rfcEmpresa, $forceRead);
+        $idEmpresa = dao('gpo')->getIdByRFC($rfcEmpresa, $forceRead);
         if (!empty($idEmpresa)) {
-            global $perObj;
-            if (!isset($perObj)) {
-                require_once "clases/Perfiles.php";
-                $perObj=new Perfiles();
-            }
-            $perfilId=$perObj->getIdByName($perfil);
+            $perfilId=dao('per')->getIdByName($perfil);
             return $this->isRelated($usr->id, $idEmpresa, $perfilId, $tipo);
         }
         return false;
     }
     function isRelatedByPerfil($usr, $idEmpresa, $perfil, $tipo=null){
-        global $perObj;
-        if (!isset($perObj)) {
-            require_once "clases/Perfiles.php";
-            $perObj=new Perfiles();
-        }
-        $perfilId=$perObj->getIdByName($perfil);
+        $perfilId=dao('per')->getIdByName($perfil);
         return $this->isRelated($usr->id, $idEmpresa, $perfilId, $tipo);
     }
     function getRefundGroupId($idUsuario, $idPerfil=0, $tipo="vista",$esReporte=false) {
         $refundGroupId=$this->getIdGroup($idUsuario, $idPerfil, $tipo);
         if (!isset($refundGroupId[0])) {
-            global $gpoObj;
-            if (!isset($gpoObj)) {
-                require_once "clases/Grupo.php";
-                $gpoObj=new Grupo();
-            }
-            $gpoObj->rows_per_page=0;
-            $refundGroupId=$esReporte?[]:$gpoObj->getValidRefundGroupId();
-
+            if ($esReporte) return [];
+            $refundGroupId=dao('gpo', ['rows_per_page'=>0])->getValidRefundGroupId();
         }
         return $refundGroupId;
     }
     function getIdGrupo($idUsuario, $idPerfil, $tipo=null) {
-        return getIdGroup($idUsuario, $idPerfil, $tipo);
+        return $this->getIdGroup($idUsuario, $idPerfil, $tipo);
     }
     function getIdGroup($idUsuario, $idPerfil, $tipo=null) {
         if (is_null($idUsuario) || (is_string($idUsuario) && !isset($idUsuario[0]))) $usrCond="";
@@ -91,12 +70,7 @@ class Usuarios_Grupo extends DBObject {
         return array_column($ugData, "idGrupo");
     }
     function getIdGroupByNames($usr,$perfil,$tipo=null) {
-        global $perObj;
-        if (!isset($perObj)) {
-            require_once "clases/Perfiles.php";
-            $perObj=new Perfiles();
-        }
-        $perfilId=$perObj->getIdByName($perfil);
+        $perfilId=dao('per')->getIdByName($perfil);
         if (!empty($perfilId))
             $idEmpresas=$this->getIdGroup($usr->id, $perfilId, $tipo);
         return $idEmpresas??[];
@@ -118,15 +92,9 @@ class Usuarios_Grupo extends DBObject {
         return array_column($ugData, "idUsuario");
     }
     function getGroupAliases($usr, $perfil, $tipo=null) {
-        global $gpoObj;
-        if (!isset($gpoObj)) {
-            require_once "clases/Grupo.php";
-            $gpoObj=new Grupo();
-        }
-        $gpoObj->rows_per_page=0;
         $idEmpresas=$this->getIdGroupByNames($usr, $perfil, $tipo);
         if (isset($idEmpresas[0]))
-            $aliasEmpresas=$gpoObj->getAliasById($idEmpresas);
+            $aliasEmpresas=dao('gpo', ['rows_per_page'=>0])->getAliasById($idEmpresas);
         return $aliasEmpresas??[];
     }
     function getFullMapWhere($usr,$perfiles=["Compras"]) {
@@ -144,15 +112,9 @@ class Usuarios_Grupo extends DBObject {
         return $fmw??false;
     }
     function getGroupRFC($usr,$perfil,$tipo=null) {
-        global $gpoObj;
-        if (!isset($gpoObj)) {
-            require_once "clases/Grupo.php";
-            $gpoObj=new Grupo();
-        }
-        $gpoObj->rows_per_page=0;
         $idEmpresas=$this->getIdGroupByNames($usr, $perfil, $tipo);
         if (isset($idEmpresas[0]))
-            $rfcEmpresas=$gpoObj->getRFCById($idEmpresas);
+            $rfcEmpresas=dao('gpo', ['rows_per_page'=>0])->getRFCById($idEmpresas);
         return $rfcEmpresas??[];
     }
 }

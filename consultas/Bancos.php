@@ -5,7 +5,7 @@ if (!$preBoot)
 require_once "clases/QueryService.php";
 require_once "clases/Bancos.php";
 
-$bnkObj = new Bancos();
+$bnkObj = dao('bnk');
 if (isValueService()) getValueService($bnkObj);
 else if (isTestService()) getTestService($bnkObj);
 else if (isCatalogService()) getCatalogService($bnkObj);
@@ -20,7 +20,7 @@ function isGetActionService() {
     return isset($_GET["action"]);
 }
 function doGetActionService() {
-    global $bnkObj;
+    $bnkObj = dao('bnk');
     switch($_GET["action"]) {
         case "layout":
             if (isset($_REQUEST["exacto"][0])) $exacto=explode(",", $_REQUEST["exacto"]);
@@ -56,7 +56,7 @@ function isActionService() {
     return isset($_POST["action"]);
 }
 function doActionService() {
-    global $bnkObj;
+    //$bnkObj = dao('bnk');
     sessionInit();
     if (!hasUser()) {
         echo "REFRESH";

@@ -13,12 +13,9 @@ clog2ini("configuracion.formapago");
 clog1seq(1);
 
 require_once "clases/catalogoSAT.php";
-require_once "clases/MetodosDePago.php";
 CatalogoSAT::setOrder(CatalogoSAT::CAT_FORMAPAGO, [["codigo"]]);
 $catData = CatalogoSAT::getData(CatalogoSAT::CAT_FORMAPAGO);
-$mdpObj = new MetodosDePago();
-$mdpObj->rows_per_page=0;
-$mdpObj->clearFullMap();
+$mdpObj = dao("mdp", ["rows_per_page"=>0, "fullmap"=>[]]);
 $mdpMap = $mdpObj->getFullMap("clave", "descripcion");
 //$mdpData = $mdpObj->getData();
 //$mdpHeaders = $mdpObj->fetch_headers;

@@ -15,12 +15,7 @@ clog1seq(1);
 
 $tracelog = "";
 
-global $gpoObj;
-if (!isset($gpoObj)) {
-    require_once "clases/Grupo.php";
-    $gpoObj = new Grupo();
-}
-$gpoFullMapWhere = $gpoObj->setCodigoOptSession();
+$gpoFullMapWhere = dao("gpo")->setCodigoOptSession();
 $gpoCodigoOpt = $_SESSION['gpoCodigoOpt'];
 
 $prvFullMapWhere = ($_esProveedor?"codigo='".$username."'":false);

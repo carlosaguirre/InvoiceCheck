@@ -74,7 +74,7 @@ $factIds=[245178,245201,245226]; // ,245227,245228,245508,245824,247364,247365,2
             },
             function(em,pa,ev){
                 console.log('WEBERROR!');
-                overlayMessage({eName:'P',eText:pa.xmlHttpPost.readyState+'-'+pa.xmlHttpPost.status+': '+em},'WEBERROR');
+                overlayMessage({eName:'P',eText:pa.controller.readyState+'-'+pa.controller.status+': '+em},'WEBERROR');
             }
         );
     }

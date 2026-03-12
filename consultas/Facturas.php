@@ -1,12 +1,9 @@
 <?php
 require_once dirname(__DIR__)."/bootstrap.php";
 require_once "clases/QueryService.php";
-global $invObj,$eDrivePath;
-if (!isset($invObj)) {
-    require_once "clases/Facturas.php";
-    $invObj = new Facturas();
-}
-$invObj->rows_per_page = 0;
+global $eDrivePath;
+$invObj = dao('inv', ["rows_per_page"=>0]);
+$prcObj = dao('prc');
 $eDrivePath="E:\\FACTURAS\\temp\\";
 if (isValueService()) getValueService($invObj);                // is set GET : llave
 else if (isTestService()) getTestService2();             // is set GET : test
@@ -192,17 +189,6 @@ else if (isset($_POST["consultaSAT"])&&isset($_POST["rfcemisor"])&&isset($_POST[
         exit;
     }
 
-    if (!isset($solObj)) {
-        require_once "clases/SolicitudPago.php";
-        $solObj = new SolicitudPago();
-    }
-    if (!isset($prcObj)) {
-        require_once "clases/Proceso.php";
-        $prcObj = new Proceso();
-    }
-    require_once "clases/Trace.php";
-    $trObj = new Trace();
-
     if ($esWin && $esTexto) {
         header("Content-Type: text/plain");
         $dt = new DateTime();
@@ -211,10 +197,6 @@ else if (isset($_POST["consultaSAT"])&&isset($_POST["rfcemisor"])&&isset($_POST[
         header("Content-Disposition: inline; filename=\"".$filename."\"");
     }
 
-    require_once "clases/Conceptos.php";
-    $cptObj = new Conceptos();
-    $cptObj->rows_per_page  = 0;
-    
     $resultado = "";
     if ($esWin && $esHtmlCompleto) $resultado .= "<html><body>";
 
@@ -246,7 +228,7 @@ else if (isset($_POST["consultaSAT"])&&isset($_POST["rfcemisor"])&&isset($_POST[
         //if (intval($tasa)==16) $tasa=1;          // Tipo de Tasa. 16% => 1
         //else $tasa=3;                            //              Otro => 3
         $tasa=1;                                   // Calculo deshabilitado, queda siempre en 1
-        $cDataArr = $cptObj->getData("idFactura=".$fId);
+        $cDataArr = dao('cpt', ["rows_per_page"=>0])->getData("idFactura=".$fId);
 
         $resultado .= str_replace(" ","",$xffolio)." ";   // Folio Factura
         $resultado .= $ffdt->format("ymd")." ";           // Fecha de generacion de factura
@@ -291,7 +273,7 @@ else if (isset($_POST["consultaSAT"])&&isset($_POST["rfcemisor"])&&isset($_POST[
         $mensaje="";
         if (isset($cliente)) $nombreArchivo.=$cliente;
         if (isset($proveedor)) $nombreArchivo.=str_replace("-","",$proveedor);
-        $meses=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+        $meses=mesesMexico(true);
         if ($esStatusExportadas) $suffix = "X"; // Solo para distinguir exportadas que no se encimen con las no exportadas
         else $suffix = ""; // las No exportadas y Todas si se empalman, pues con ambas cambia el status de las no exportadas
         $suffix .= "IChk";
@@ -304,7 +286,7 @@ else if (isset($_POST["consultaSAT"])&&isset($_POST["rfcemisor"])&&isset($_POST[
             $numAnio = substr($fechaInicio,6);
             $mensaje.="<!-- Con Fecha Inicio, mes=$numMes, año=$numAnio -->\n";
             if (isset($meses[$idx])) {
-                $mes = $meses[$idx];
+                $mes = ucfirst($meses[$idx]);
             }
         }
         if (isset($fechaFin)) {
@@ -317,7 +299,7 @@ else if (isset($_POST["consultaSAT"])&&isset($_POST["rfcemisor"])&&isset($_POST[
                 //if (isset($mes)) {
                 //    if ($mes!==$meses[$idx]) $mes.=$meses[$idx];
                 //} else
-                    $mes=$meses[$idx];
+                    $mes=ucfirst($meses[$idx]);
             } else {
                 //if (isset($mes)) {
                 //    if ($mes!==$mesFin) $mes.=$mesFin;
@@ -432,7 +414,7 @@ else if (isset($_POST["consultaSAT"])&&isset($_POST["rfcemisor"])&&isset($_POST[
                 
             }
         } catch (Exception $e) {
-            $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__];
+            $baseData=["file"=>getShortPath(__FILE__),"action"=>"exportar"];
             doclog("Error en transferencia de archivos: Falla al exportar texto","solpago",$baseData+["line"=>__LINE__,"invId"=>$fId,"error"=>getErrorData($e)]);
             $mensaje .= $pgrA."Error al cargar resultado por FTP.$pgrU\n<!-- ".$e->getMessage()." -->"."\n";
         }
@@ -448,7 +430,7 @@ else if (isset($_POST["consultaSAT"])&&isset($_POST["rfcemisor"])&&isset($_POST[
         
     if (!empty($trace1)) {
         $traceText = "EXPORT: ".implode(",",$trace1);
-        $trObj->agrega($traceText);
+        dao('trc')->agrega($traceText);
 //            clog2($traceText);
     }
     foreach($statusMap as $nuevoStatusN=>$listId) {
@@ -456,7 +438,7 @@ else if (isset($_POST["consultaSAT"])&&isset($_POST["rfcemisor"])&&isset($_POST[
         $fieldArray = ["id"=>$listId, "status"=>$nuevoStatus, "statusn"=>$nuevoStatusN];
         $success = $invObj->saveRecord($fieldArray);
         if ($success) {
-            $solObj->updateStatus($listId, Facturas::STATUS_EXPORTADO);
+            dao('sol')->updateStatus($listId, Facturas::STATUS_EXPORTADO);
             foreach($listId as $fId) {
                 $prcObj->cambioFactura($fId, $nuevoStatus, $username, false, "Facturas.Exp:".$oldStatusDesc[$fId]);
             }
@@ -469,17 +451,7 @@ else if (isset($_POST["consultaSAT"])&&isset($_POST["rfcemisor"])&&isset($_POST[
     sessionInit();
     $username = (isset($_SESSION['user'])?$_SESSION['user']->nombre:null);
 
-    if (!isset($solObj)) {
-        require_once "clases/SolicitudPago.php";
-        $solObj = new SolicitudPago();
-    }
-    if (!isset($prcObj)) {
-        require_once "clases/Proceso.php";
-        $prcObj = new Proceso();
-    }
-    
-    require_once "clases/Grupo.php";
-    if (!isset($gpoObj)) $gpoObj = new Grupo();
+    $solObj = dao('sol');
     
     $idFactList = $_GET["respaldar"];
     $idFArr = explode(",",$idFactList);
@@ -516,7 +488,7 @@ else if (isset($_POST["consultaSAT"])&&isset($_POST["rfcemisor"])&&isset($_POST[
                     $idx++;
                     $mensaje.="<LI><!-- id=$idFact -->";
                     $rutaLocal = $fData['ubicacion'];
-                    $alias = $gpoObj->getAliasByRFC($fData['rfcGrupo']);
+                    $alias = dao('gpo')->getAliasByRFC($fData['rfcGrupo']);
                     if ($alias==="CASABLANCA") $alias="LAMINADOS";
                     $esPago = ($fData['tipoComprobante']==='p');
                     $urlAvance = $ftp_servidor;
@@ -717,8 +689,8 @@ $logtext .= "\nTARNAME = $tarname\n";
         foreach($idFArr as $idFact) {
 $logtext .= "\nID FACT = $idFact";
             $fData = $invObj->getData("id=$idFact");
-            if (!empty($fData) && count($fData>0)) $fData = $fData[0];
             if (!empty($fData)) {
+                $fData = $fData[0];
                 //$empresas = str_replace("archivos", "empresas", $fData['ubicacion']);
                 $esPago = ($fData['tipoComprobante']==='p');
                 $empresas = str_replace("archivos", "COMPRASXML", $fData['ubicacion']);
@@ -863,8 +835,7 @@ function flush_buffers($doStart=true) {
     if ($doStart) ob_start();
 }
 function actualizaTipoComprobante() {
-    global $invObj;
-    //$invObj->rows_per_page = 0;
+    $invObj = dao('inv'/*, ["rows_per_page"=>0]*/); 
     header("Content-Type: text/plain");
     $url = $_SERVER['HTTP_ORIGIN'].$_SERVER['WEB_MD_PATH'];
     $path = $_SERVER['DOCUMENT_ROOT'];
@@ -910,9 +881,7 @@ function actualizaTipoComprobante() {
     echo $invObj->log;
 }
 function actualizaTipoYTasa() {
-    global $invObj;
-    //$invObj->rows_per_page = 0;
-    $factData = $invObj->getData();
+    $factData = dao('inv')->getData();
     
     header("Content-Type: text/plain");
 
@@ -929,7 +898,7 @@ function actualizaTipoYTasa() {
         $tipoCambio = $start->getAttribute("TipoCambio");
         echo str_pad($tipoCambio,5);
         $listaTraslado = $xml->getElementsByTagNameNS($ns, "Traslado");
-        if ($listaTraslado.length>0) {
+        if ($listaTraslado->length>0) {
             $traslado = $listaTraslado->item(0);
             $tasa = $traslado->getAttribute("tasa");
             echo $tasa;
@@ -939,8 +908,7 @@ function actualizaTipoYTasa() {
     }
 }
 function guardaTipoYTasa() {
-    global $invObj;
-    //$invObj->rows_per_page = 0;
+    $invObj = dao('inv'/*, ["rows_per_page"=>0]*/); 
     $factData = $invObj->getData();
     header("Content-Type: text/plain");
     $idx=0;
@@ -958,7 +926,7 @@ function guardaTipoYTasa() {
         else $tipoCambio = floatVal("1.0");
         echo str_pad($tipoCambio,5);
         $trasladoArr = $xml->getElementsByTagNameNS($ns, "Traslado");
-        if ($trasladoArr.length>0) {
+        if ($trasladoArr->length>0) {
             $traslado=$trasladoArr->item(0);
             $tasa = $traslado->getAttribute("tasa");
         }
@@ -1033,24 +1001,15 @@ function cambiaStatus() {
         if ($statusn<0) {
             errNDie("Status no indicado",["errmsg"=>"Status no indicado"]);
         } else {
-            global $invObj;
-            //$invObj->rows_per_page = 0;
             $status=Facturas::statusnToDetailStatus($statusn,$tipocomp);
             $fieldArray=["id"=>$invId,"statusn"=>$statusn,"status"=>$status];
             if ($statusn===0) {
                 $fieldArray["fechaAprobacion"]=null;
             }
+            $invObj = dao('inv');
             if ($invObj->saveRecord($fieldArray)) {
-                if (!isset($solObj)) {
-                    require_once "clases/SolicitudPago.php";
-                    $solObj = new SolicitudPago();
-                }
-                if (!isset($prcObj)) {
-                    require_once "clases/Proceso.php";
-                    $prcObj = new Proceso();
-                }
-                $solObj->updateStatus($invId, $statusn);
-                $prcObj->cambioFactura($invId, $status, "admin", false, "ADMIN FIX STATUS");
+                dao("sol")->updateStatus($invId, $statusn);
+                dao("prc")->cambioFactura($invId, $status, "admin", false, "ADMIN FIX STATUS");
                 echo json_encode(["result"=>"exito","message"=>"Status cambiado a $status"]);
             } else {
                 echo json_encode(["result"=>"error","errmsg"=>"Error al cambiar status","errors"=>$invObj->errors]);
@@ -1061,8 +1020,7 @@ function cambiaStatus() {
 function actualizaSaldoPago() {
     logProcesoRoot("INI actualizaSaldoPago");
     // TODO: Actualizar saldoReciboPago en recibos de pago, sumar monto de Pagos en cada recibo y guardar en el campo saldoReciboPago de dicho comprobante
-    global $invObj;
-    //$invObj->rows_per_page=0;
+    $invObj = dao('inv', ["rows_per_page"=>0]);
     $data = $invObj->getData("tipoComprobante='p' AND saldoReciboPago is NULL and statusn&1",0,"id,ubicacion,nombreInterno"); // 1574
     echo json_encode([["eName"=>"TABLE","className"=>"centered","eChilds"=>[["eName"=>"THEAD","eChilds"=>["eName"=>"TR","eChilds"=>[["eName"=>"TH","eText"=>"#".count($data)],["eName"=>"TH","eText"=>"ID"],["eName"=>"TH","eText"=>"UBICACION"],["eName"=>"TH","eText"=>"NOMBREINTERNO"],["eName"=>"TH","eText"=>"SALDORECIBOPAGO"],["eName"=>"TH","eText"=>"STATUS"]]]],["eName"=>"TBODY","id"=>"rootTableBody"]]]])."|*ICHK*|";
     require_once("clases/CFDI.php");
@@ -1104,15 +1062,11 @@ function actualizaSaldoPago() {
 }
 function actualizaFacturasSinUsoCFDI() {
     clearstatcache();
-    global $invObj;
     $where="version in ('3.3','4.0') AND nombreInterno IS NOT NULL AND usoCFDI IS NULL";
-    $totalData=$invObj->getData($where,0,"count(1) n");
+    $totalData=dao('inv', ["rows_per_page"=>0])->getData($where,0,"count(1) n");
     $total=+$totalData[0]["n"];
-    $invObj->rows_per_page=3380;
-    $invObj->clearOrder();
-    $invObj->addOrder("id", "desc");
     $fieldNames=["id","codigoProveedor","tipoComprobante","ubicacion","nombreInterno","usoCFDI","status","statusn"];
-    $data = $invObj->getData($where,0,implode(",",$fieldNames));
+    $data = dao('inv', ["rows_per_page"=>1000, "orderlist"=>["id"=>"desc"]])->getData($where,0,implode(",",$fieldNames));
     $hdrs=[["eName"=>"TH","eText"=>"#".count($data)]];
     foreach($fieldNames as $fld) {
         switch($fld) {
@@ -1132,6 +1086,7 @@ function actualizaFacturasSinUsoCFDI() {
     require_once("clases/CFDI.php");
     set_time_limit(60*30); // 30 minutos
     $beginTime=lapse(true);
+    $invObj=dao('inv');
     for($i=0; isset($data[$i]); $i++) {
         $val=[];
         $state=NULL;
@@ -1164,8 +1119,11 @@ function actualizaFacturasSinUsoCFDI() {
             } else {
                 if(isset(CFDI::getLastError()["exception"])) {
                     $ex=CFDI::getLastError()["exception"];
-                    if ($ex->getCode()===CFDI::CFDI_VER32_EXCEPTION) $state="VER32";
-                    else $state="CFDI NULO";
+                    if ($ex->getCode()===CFDI::EXCEPTION_BADVERSION) {
+                        $state=CFDI::getExceptionParameter("version");
+                        if ($state===null) $state="VERSION DESCONOCIDA";
+                        else $state="VERSION $state";
+                    } else $state="CFDI FALLIDO";
                 } else $state="CFDI NULO";
                 $errmsg=CFDI::getLastError()["log"];
             }
@@ -1189,8 +1147,7 @@ function actualizaFacturasSinFolio() {
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__];
     // TODO: Actualizar nombre de archivos sin folio que tengan los ultimos 10 caracteres en lugar de los ultimos 4
     clearstatcache();
-    global $invObj;
-    //$invObj->rows_per_page=0;
+    $invObj = dao('inv', ["rows_per_page"=>0]);
     $fieldNames=["id","uuid","codigoProveedor","tipoComprobante","ubicacion","nombreInterno","nombreInternoPDF","status","statusn"];
     $data = $invObj->getData("folio IS NULL AND uuid IS NOT NULL",0,implode(",",$fieldNames)); // 1574
     logProcesoRoot($invObj->log);
@@ -1234,11 +1191,7 @@ function actualizaFacturasSinFolio() {
             }
         }
         if (isset($val["codigoProveedor"])) {
-            if (!isset($prvObj)) {
-                require_once("clases/Proveedores.php");
-                $prvObj=new Proveedores();
-            }
-            $val["codigoProveedor"]=$prvObj->getValue("codigo",$val["codigoProveedor"],"rfc");
+            $val["codigoProveedor"]=dao("prv")->getValue("codigo",$val["codigoProveedor"],"rfc");
         }
         //logProcesoRoot(json_encode($val));
         if (empty($state)) {
@@ -1258,86 +1211,86 @@ function actualizaFacturasSinFolio() {
                     //logProcesoRoot("__*___");
                     $fileSuffix=substr($uuid,-10);
                     $emisor=$cfdiObj->get("emisor");
-                    $rfcEmisor=utf8_encode($emisor["@rfc"]);
+                    $rfcEmisor=$emisor["@rfc"];
                     $nombreXML=$rfcEmisor."_".$fileSuffix;
                     $nombrePDF=$fileSuffix.$rfcEmisor;
-// SHIFT -24 spaces
-if ($val["nombreInterno"]!==$nombreXML) {
-//logProcesoRoot("___*__");
-if (file_exists("../$val[ubicacion]$val[nombreInterno].xml")) {
-    if (rename("../$val[ubicacion]$val[nombreInterno].xml","../$val[ubicacion]$nombreXML.xml")) {
-        sleep(3);
-        if (empty($fieldarray)) $fieldarray["id"]=$val["id"];
-        $fieldarray["nombreInterno"]=$nombreXML;
-        $sn=+$val["statusn"];
-        if (Facturas::estaRespaldado($sn)) {
-            $sn-=Facturas::actionToStatusN("Respaldado");
-            $status=Facturas::statusnToDetailStatus($sn,$tc);
-            $fieldarray["statusn"]=$sn;
-            $fieldarray["status"]=$status;
-            $cambioStatus=true;
-        }
-    } else $state="FALLO RENAME XML";
-} else if (file_exists("../$val[ubicacion]$nombreXML.xml")) {
-    if (empty($fieldarray)) $fieldarray["id"]=$val["id"];
-    $fieldarray["nombreInterno"]=$nombreXML;
-    $sn=+$val["statusn"];
-    if (Facturas::estaRespaldado($sn)) {
-        $sn-=Facturas::actionToStatusN("Respaldado");
-        $status=Facturas::statusnToDetailStatus($sn,$tc);
-        $fieldarray["statusn"]=$sn;
-        $fieldarray["status"]=$status;
-        $cambioStatus=true;
-    }
-} else $state = "OTRO XML";
-}
-if(!empty($val["nombreInternoPDF"])&&$val["nombreInternoPDF"]!==$nombrePDF){
-if (file_exists("../$val[ubicacion]$val[nombreInternoPDF].pdf")) {
-    if (rename("../$val[ubicacion]$val[nombreInternoPDF].pdf","../$val[ubicacion]$nombrePDF.pdf")) {
-        sleep(3);
-        if (empty($fieldarray)) $fieldarray["id"]=$val["id"];
-        $fieldarray["nombreInternoPDF"]=$nombrePDF;
-        doclog("RENOMBRAR PDF", "pdf", $baseData+["line"=>__LINE__,"oldxml"=>$val["nombreInterno"],"newxml"=>$nombreXML,"oldpdf"=>$val["nombreInternoPDF"],"newpdf"=>$nombrePDF]);
-        if (!$cambioStatus) {
-            $sn=+$val["statusn"];
-            if (Facturas::estaRespaldado($sn)) {
-                $sn-=Facturas::actionToStatusN("Respaldado");
-                $status=Facturas::statusnToDetailStatus($sn,$tc);
-                $fieldarray["statusn"]=$sn;
-                $fieldarray["status"]=$status;
-                $cambioStatus=true;
-            }
-        }
-    } else {
-        if ($state==="FALLO RENAME XML") $state.=" Y PDF";
-        else {
-            if (!empty($state)) $state.=" Y ";
-            $state.="FALLO RENAME PDF";
-        }
-    }
-} else if (file_exists("../$val[ubicacion]$nombrePDF.pdf")) {
-    if (empty($fieldarray)) $fieldarray["id"]=$val["id"];
-    $fieldarray["nombreInternoPDF"]=$nombrePDF;
-    doclog("RENOMBRAR PDF", "pdf", $baseData+["line"=>__LINE__,"xml"=>$xmlname,"pdf"=>$pdfname]);
-    if (!$cambioStatus) {
-        $sn=+$val["statusn"];
-        if (Facturas::estaRespaldado($sn)) {
-            $sn-=Facturas::actionToStatusN("Respaldado");
-            $status=Facturas::statusnToDetailStatus($sn,$tc);
-            $fieldarray["statusn"]=$sn;
-            $fieldarray["status"]=$status;
-            $cambioStatus=true;
-        }
-    }
-} else {
-    if ($state==="OTRO XML") $state.=" Y PDF";
-    else {
-        if (!empty($state)) $state.=" Y ";
-        $state.="OTRO PDF";
-    }
-}
-}
-                    // SHIFT BACK +24 spaces
+                    // OLD: SHIFT -24 spaces
+                    if ($val["nombreInterno"]!==$nombreXML) {
+                        //logProcesoRoot("___*__");
+                        if (file_exists("../$val[ubicacion]$val[nombreInterno].xml")) {
+                            if (rename("../$val[ubicacion]$val[nombreInterno].xml","../$val[ubicacion]$nombreXML.xml")) {
+                                sleep(3);
+                                if (empty($fieldarray)) $fieldarray["id"]=$val["id"];
+                                $fieldarray["nombreInterno"]=$nombreXML;
+                                $sn=+$val["statusn"];
+                                if (Facturas::estaRespaldado($sn)) {
+                                    $sn-=Facturas::actionToStatusN("Respaldado");
+                                    $status=Facturas::statusnToDetailStatus($sn,$tc);
+                                    $fieldarray["statusn"]=$sn;
+                                    $fieldarray["status"]=$status;
+                                    $cambioStatus=true;
+                                }
+                            } else $state="FALLO RENAME XML";
+                        } else if (file_exists("../$val[ubicacion]$nombreXML.xml")) {
+                            if (empty($fieldarray)) $fieldarray["id"]=$val["id"];
+                            $fieldarray["nombreInterno"]=$nombreXML;
+                            $sn=+$val["statusn"];
+                            if (Facturas::estaRespaldado($sn)) {
+                                $sn-=Facturas::actionToStatusN("Respaldado");
+                                $status=Facturas::statusnToDetailStatus($sn,$tc);
+                                $fieldarray["statusn"]=$sn;
+                                $fieldarray["status"]=$status;
+                                $cambioStatus=true;
+                            }
+                        } else $state = "OTRO XML";
+                    }
+                    if(!empty($val["nombreInternoPDF"])&&$val["nombreInternoPDF"]!==$nombrePDF){
+                        if (file_exists("../$val[ubicacion]$val[nombreInternoPDF].pdf")) {
+                            if (rename("../$val[ubicacion]$val[nombreInternoPDF].pdf","../$val[ubicacion]$nombrePDF.pdf")) {
+                                sleep(3);
+                                if (empty($fieldarray)) $fieldarray["id"]=$val["id"];
+                                $fieldarray["nombreInternoPDF"]=$nombrePDF;
+                                doclog("RENOMBRAR PDF", "pdf", $baseData+["line"=>__LINE__,"oldxml"=>$val["nombreInterno"],"newxml"=>$nombreXML,"oldpdf"=>$val["nombreInternoPDF"],"newpdf"=>$nombrePDF]);
+                                if (!$cambioStatus) {
+                                    $sn=+$val["statusn"];
+                                    if (Facturas::estaRespaldado($sn)) {
+                                        $sn-=Facturas::actionToStatusN("Respaldado");
+                                        $status=Facturas::statusnToDetailStatus($sn,$tc);
+                                        $fieldarray["statusn"]=$sn;
+                                        $fieldarray["status"]=$status;
+                                        $cambioStatus=true;
+                                    }
+                                }
+                            } else {
+                                if ($state==="FALLO RENAME XML") $state.=" Y PDF";
+                                else {
+                                    if (!empty($state)) $state.=" Y ";
+                                    $state.="FALLO RENAME PDF";
+                                }
+                            }
+                        } else if (file_exists("../$val[ubicacion]$nombrePDF.pdf")) {
+                            if (empty($fieldarray)) $fieldarray["id"]=$val["id"];
+                            $fieldarray["nombreInternoPDF"]=$nombrePDF;
+                            doclog("RENOMBRAR PDF", "pdf", $baseData+["line"=>__LINE__,"xml"=>$xmlname,"pdf"=>$pdfname]);
+                            if (!$cambioStatus) {
+                                $sn=+$val["statusn"];
+                                if (Facturas::estaRespaldado($sn)) {
+                                    $sn-=Facturas::actionToStatusN("Respaldado");
+                                    $status=Facturas::statusnToDetailStatus($sn,$tc);
+                                    $fieldarray["statusn"]=$sn;
+                                    $fieldarray["status"]=$status;
+                                    $cambioStatus=true;
+                                }
+                            }
+                        } else {
+                            if ($state==="OTRO XML") $state.=" Y PDF";
+                            else {
+                                if (!empty($state)) $state.=" Y ";
+                                $state.="OTRO PDF";
+                            }
+                        }
+                    }
+                    // OLD: SHIFT BACK +24 spaces
                     if (empty($state) && !empty($fieldarray) && $invObj->saveRecord($fieldarray)) {
                         $state="EXITO";
                         if (isset($fieldarray["nombreInterno"])) {
@@ -1347,16 +1300,8 @@ if (file_exists("../$val[ubicacion]$val[nombreInternoPDF].pdf")) {
                         }
                         if (isset($fieldarray["nombreInternoPDF"])) $state.=" PDF";
                         if ($cambioStatus) {
-                            if (!isset($solObj)) {
-                                require_once "clases/SolicitudPago.php";
-                                $solObj = new SolicitudPago();
-                            }
-                            if (!isset($prcObj)) {
-                                require_once "clases/Proceso.php";
-                                $prcObj = new Proceso();
-                            }
-                            $solObj->updateStatus($val["id"], -Facturas::STATUS_RESPALDADO);
-                            if ($prcObj->cambioFactura($val["id"], $status, "admin", false, "Root Process"))
+                            dao("sol")->updateStatus($val["id"], -Facturas::STATUS_RESPALDADO);
+                            if (dao("prc")->cambioFactura($val["id"], $status, "admin", false, "Root Process"))
                                 $state .= " Y PROCESO";
                             else
                                 $state .= " SIN PROCESO";
@@ -1374,8 +1319,11 @@ if (file_exists("../$val[ubicacion]$val[nombreInternoPDF].pdf")) {
                     $ex=CFDI::getLastError()["exception"];
                     //logProcesoRoot("___x__");
                     //logProcesoRoot($ex->getCode());
-                    if ($ex->getCode()===CFDI::CFDI_VER32_EXCEPTION) $state="VER32";
-                    else $state="CFDI NULO";
+                    if (isset($ex) && $ex->getCode()===CFDI::EXCEPTION_BADVERSION) {
+                        $state=CFDI::getExceptionParameter("version");
+                        if ($state===null) $state="VERSION DESCONOCIDA";
+                        else $state="VERSION $state";
+                    } else $state="CFDI FALLIDO";
                     //logProcesoRoot("____x_");
                 } else $state="CFDI NULO";
                 //logProcesoRoot("x");
@@ -1412,15 +1360,12 @@ if (file_exists("../$val[ubicacion]$val[nombreInternoPDF].pdf")) {
 function actualizaSolicitudesSinFolio() {
     flush_buffers();
     echo json_encode([["eName"=>"TABLE","className"=>"centered pad2c","eChilds"=>[["eName"=>"THEAD","eChilds"=>["eName"=>"TR","eChilds"=>[["eName"=>"TH","eText"=>"#"],["eName"=>"TH","eText"=>"ID"],["eName"=>"TH","eText"=>"EMPRESA"],["eName"=>"TH","eText"=>"FECHA"],["eName"=>"TH","eText"=>"FOLIO"]]]],["eName"=>"TBODY","id"=>"rootTableBody"]]]])."|*ICHK*|";
-    global $solObj, $query;
-    if (!isset($solObj)) {
-        require_once "clases/SolicitudPago.php";
-        $solObj=new SolicitudPago();
-    }
-    $solObj->rows_per_page=100;
+    global $query;
+    $solObj = dao("sol", ["rows_per_page"=>100]);
     $solData = $solObj->getData("s.folio IS NULL",0,"s.id solId, g.id gpoId, g.alias, g.cut, s.fechaInicio","s inner join grupo g on s.idEmpresa=g.id");
     foreach ($solData as $idx => $row) {
         $pfx=$row["cut"].substr($row["fechaInicio"],2,2).substr($row["fechaInicio"],5,2);
+        $desc="";
         $folio=$solObj->getFolio($pfx, $desc);
         $callQuery=$query;
         if (isset($folio)) {
@@ -1458,7 +1403,7 @@ function actualizaSolicitudesSinFolio() {
     flush_buffers(false);
 }
 function actualizaPDFSinPrefijo() {
-    //global $invObj;
+    //$invObj=dao('inv');
     //$invObj->rows_per_page = 0;
     // TODO: Actualizar PDFs de egresos y pagos que los archivos no tengan prefijo NC_ o RP_
 }
@@ -1499,7 +1444,7 @@ function doESASAPayment() {
     if (!file_exists("{$paymPath}$_POST[filename]")) {
         errNDie("Inexistente",$baseData+["line"=>__LINE__]);
     }
-    global $invObj;
+    //$invObj = dao('inv');
     //$invObj->rows_per_page = 0;
     $fmt = (new DateTime())->format("yMd H:i:s");
     if (filesize($plogPath)>0) $logPrefix="-----";
@@ -1630,7 +1575,7 @@ function doESASAPayment() {
                 $colValues[1]=substr($colValues[1],2);
                 $_folio=$colValues[1];
                 $_codprv=$colValues[0];
-                $factData = $invObj->getData("folio='$_folio' && codigoProveedor='$_codprv'",0,"id,fechaFactura,rfcGrupo,total,status,statusn,(statusn&32)>0 pagado");
+                $factData = dao('inv')->getData("folio='$_folio' && codigoProveedor='$_codprv'",0,"id,fechaFactura,rfcGrupo,total,status,statusn,(statusn&32)>0 pagado");
                 if (isset($factData[0]["id"])) {
                     $factData=$factData[0];
                     $colValues[8]=$factData["id"];
@@ -1758,8 +1703,7 @@ function isAppendPDFService() {
 function getAppendPDFService() {
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__]+$_POST;
     sessionInit();
-    global $invObj;
-    //$invObj->rows_per_page = 0;
+    $invObj = dao('inv'/*, ["rows_per_page"=>0] */);
     if (isset($_POST["id"]))         $id         = $_POST["id"];
     if (isset($_POST["nombre"]))     $nombre     = $_POST["nombre"];
     if (isset($_POST["folio"]))      $folio      = $_POST["folio"];
@@ -1827,7 +1771,7 @@ function getAppendPDFService() {
                     doclog(isset($invData[0]["nombreInternoPDF"][0])?"REEMPLAZAR PDF":"ASIGNAR PDF", "pdf", $baseData+["line"=>__LINE__,"pdf"=>$pdfName,"dateSuffix"=>$dateSuffix]);
                     echo "$http_origin$ubicacion{$pdfName}.pdf";
                 } else {
-                    doclog("Error en move_uploaded_file", "error", $baseData+["line"=>__LINE__,"pdf"=>$pdfName,"dateSuffix"=>$dateSuffix,"files"=>$_FILES,"lastError"=>$error_get_last()]);
+                    doclog("Error en move_uploaded_file", "error", $baseData+["line"=>__LINE__,"pdf"=>$pdfName,"dateSuffix"=>$dateSuffix,"files"=>$_FILES,"lastError"=>error_get_last()]);
                     echo "Error al cargar archivo";
                 }
             } else {
@@ -1856,20 +1800,20 @@ function doSaveInvoiceInPaymReq() {
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__]+$_POST;
     sessionInit();
     if (!hasUser()) errNDie("Sin sesion",$baseData+["line"=>__LINE__]);
-    global $solObj, $invObj, $query;
+    global $query;
     $solId=$_POST["solId"]??"";
     $solFol=$_POST["solFol"]??"";
     $invId=$_POST["invId"]??"";
     $invFol=$_POST["invFol"]??"";
     if (!isset($invId[0])) errNDie("Factura $invFol no identificada",$baseData+["line"=>__LINE__]);
     if (!isset($solId[0])) errNDie("Solicitud $solFol no identificada",$baseData+["line"=>__LINE__]);
-    if (!isset($invObj)) { require_once "clases/Facturas.php"; $invObj=new Facturas(); }
+    $invObj=dao("inv");
     $invData=$invObj->getData("id=$invId");
     if (!isset($invData[0])) errNDie("Factura $invFol no encontrada",$baseData+["line"=>__LINE__]);
     $invData=$invData[0];
     if (!isset($invFol[0])) $invFol=$invData["folio"];
     else if ($invFol!==$invData["folio"]) errNDie("Folio de factura $invFol no corresponde",$baseData+["line"=>__LINE__, "dbInvFolio"=>$invData["folio"]]);
-    if (!isset($solObj)) { require_once "clases/SolicitudPago.php"; $solObj=new SolicitudPago(); }
+    $solObj = dao("sol");
     $solData=$solObj->getData("id=$solId",0,"id,folio,idFactura");
     if (!isset($solData[0])) errNDie("Solicitud $solFol no encontrada",$baseData+["line"=>__LINE__]);
     $solData=$solData[0];
@@ -1914,12 +1858,9 @@ function doSaveInvoiceInPaymReq() {
         }
     } // else doclog("Factura $invFol guardada con éxito", "solpago", $baseData+["line"=>__LINE__,"query"=>$query]);
 // FACTURASB: ini. Guardar numAutorizadas=1
-    global $ctrObj, $ctfObj;
-    if (!isset($ctfObj)) { require_once "clases/Contrafacturas.php"; $ctfObj = new Contrafacturas(); }
-    if (!isset($ctrObj)) { require_once "clases/Contrarrecibos.php"; $ctrObj = new Contrarrecibos(); }
-    $ctfData=$ctfObj->getData("idFactura=$invId");
+    $ctfData=dao("ctf")->getData("idFactura=$invId");
     if (isset($ctfData[0]["id"])) {
-        if (!$ctrObj->saveRecord(["id"=>$ctfData[0]["idContrarrecibo"],"numAutorizadas"=>1])) {
+        if (!dao("ctr")->saveRecord(["id"=>$ctfData[0]["idContrarrecibo"],"numAutorizadas"=>1])) {
             $ctrQuery=$query;
             $errno=DBi::getErrno();
             $error=DBi::getError();
@@ -1937,16 +1878,12 @@ function doSaveInvoiceInPaymReq() {
         ;
     }
     // toDo: Agregar Proceso de Factura Autorizada // + Contra recibo
-    global $prcObj;
-    if (!isset($prcObj)) { require_once "clases/Proceso.php"; $prcObj=new Proceso(); }
-    if (!$prcObj->cambioFactura($invId, $invStatus, getUser()->nombre, false, "Anexada a Solicitud $solFol")) {
+    if (!dao("prc")->cambioFactura($invId, $invStatus, getUser()->nombre, false, "Anexada a Solicitud $solFol")) {
         doclog("Error al guardar proceso","solpago",$baseData+["line"=>__LINE__,"query"=>$query,"errors"=>DBi::$errors]);
     }
     // toDo: respaldar archivos a avance
 // FACTURSAB: end
-    global $firObj;
-    if (!isset($firObj)) { require_once "clases/Firmas.php"; $firObj=new Firmas(); }
-    if (!$firObj->saveRecord(["idUsuario"=>getUser()->id,"modulo"=>"solpago","idReferencia"=>$solId,"accion"=>"completa"])) {
+    if (!dao("fir")->saveRecord(["idUsuario"=>getUser()->id,"modulo"=>"solpago","idReferencia"=>$solId,"accion"=>"completa"])) {
         doclog("Error al guardar firma","solpago",$baseData+["line"=>__LINE__,"query"=>$query,"errors"=>DBi::$errors]);
         //DBi::rollback();
         //DBi::autocommit(true);
@@ -1963,15 +1900,12 @@ function doVerifyInv4PaymReq() {
     sessionInit();
     if (!hasUser()) echoJsNDie("refresh","No User");
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__,"usuario"=>getUser()->nombre]+$_POST;
-    global $solObj, $invObj, $ordObj, $gpoObj, $prvObj, $cptObj, $query;
+    global $query;
     $solId=$_POST["solId"]??"0";
     $gpoId=$_POST["gpoId"]??"0";
     $prvId=$_POST["prvId"]??"0";
     $invIdf=$_POST["invIdf"]??"0";
-    if (!isset($solObj)) {
-        require_once "clases/SolicitudPago.php";
-        $solObj=new SolicitudPago();
-    }
+    $solObj=dao("sol");
     $solData=$solObj->getData("id=$solId",0,"id,folio,idFactura,idOrden,idEmpresa");
     if (!isset($solData[0]["id"])) { errNDie("No fue posible identificar la solicitud de pago",$baseData+["line"=>__LINE__,"query"=>$query,"numrows"=>$solObj->numrows]+$_POST); }
     $solData=$solData[0];
@@ -1980,38 +1914,28 @@ function doVerifyInv4PaymReq() {
         if (isset($invId[0])) { errNDie("La solicitud ya tiene una factura",$baseData+["line"=>__LINE__,"solIdFactura"=>$invId]+$_POST); }
     }
     if ("$gpoId"!=="$solData[idEmpresa]") { errNDie("Empresa incorrecta ($gpoId <> $solData[idEmpresa])",$baseData+["line"=>__LINE__,"solIdEmpresa"=>$solData["idEmpresa"]]+$_POST); }
-    if (!isset($gpoObj)) {
-        require_once "clases/Grupo.php";
-        $gpoObj=new Grupo();
-    }
+    $gpoObj=dao("gpo");
     $gpoData=$gpoObj->getData("id=$gpoId",0,"rfc");
     if (!isset($gpoData[0]["rfc"])) { errNDie("No fue posible identificar la empresa del corporativo",$baseData+["line"=>__LINE__,"query"=>$query,"numrows"=>$gpoObj->numrows]); }
     $gpoData=$gpoData[0];
-    if (!isset($ordObj)) {
-        require_once "clases/OrdenesCompra.php";
-        $ordObj=new OrdenesCompra();
-    }
+    $ordObj=dao("ord");
     $ordData=$ordObj->getData("id=$solData[idOrden]");
     if (!isset($ordData[0]["id"])) { errNDie("No fue posible identificar la orden de compra",$baseData+["line"=>__LINE__,"query"=>$query,"numrows"=>$ordObj->numrows]); }
     $ordData=$ordData[0];
     if ("$gpoId"!=="$ordData[idEmpresa]") { errNDie("Empresa ambigua ($gpoId <> $ordData[idEmpresa])",$baseData+["line"=>__LINE__,"webGpoId"=>$gpoId,"dbOGpoId"=>$ordData["idEmpresa"]]); }
     if ("$prvId"!=="$ordData[idProveedor]") { errNDie("Proveedor ambiguo ($prvId <> $ordData[idProveedor])",$baseData+["line"=>__LINE__,"webPrvId"=>$prvId,"dbOPrvId"=>$ordData["idProveedor"]]); }
-    if (!isset($prvObj)) {
-        require_once "clases/Proveedores.php";
-        $prvObj=new Proveedores();
-    }
+    $prvObj=dao("prv");
     $prvData=$prvObj->getData("id=$prvId",0,"codigo");
     if (!isset($prvData[0]["codigo"])) { errNDie("No fue posible identificar al proveedor",$baseData+["line"=>__LINE__,"query"=>$query,"numrows"=>$prvObj->numrows]); }
     $prvData=$prvData[0];
 
-    $ba=unpack("C*", $invIdf);
+    $ba=unpack("C*", string: $invIdf);
     doclog("BYTE ARRAY", "test", ["original"=>$invIdf,"byteArray"=>$ba]);
 
     $invIdf=str_replace("‐", "-", $invIdf);
     //NO SIRVIO//$invIdf=normalize_to_utf8_chars($invIdf);
     $invUIdf=strtoupper($invIdf);
-    $invObj->clearOrder();
-    $invObj->addOrder("ciclo","desc");
+    $invObj = dao("inv", ["orderlist"=>["ciclo"=>"desc"]]);
     $invData=$invObj->getData("codigoProveedor='$prvData[codigo]' and rfcGrupo='$gpoData[rfc]' and (folio='$invIdf' or uuid like '%{$invUIdf}%')",0,"id,ciclo,pedido,uuid,serie,folio,subtotal,total,moneda,status,statusn");
     $query = preg_replace('/[\x00-\x1F\x7F\xA0]/u', '', normalize_to_utf8_chars($query));
     if (!isset($invData[0]["id"])) { errNDie("Debe realizar Alta de Factura para que se reconozca el folio",$baseData+["line"=>__LINE__,"query"=>$query,"numrows"=>$invObj->numrows]); }
@@ -2044,11 +1968,7 @@ function doVerifyInv4PaymReq() {
     DBi::autocommit(false);
     if (!$solObj->saveRecord(["id"=>$solId,"idFactura"=>$invData["id"]])) { DBi::rollback(); DBi::autocommit(true); errNDie("Ocurrió un error al guardar la solicitud",$baseData+["line"=>__LINE__,"query"=>$query,"numrows"=>$invObj->numrows]); }
     */
-    if (!isset($cptObj)) {
-        require_once "clases/Conceptos.php";
-        $cptObj=new Conceptos();
-    }
-    $cptData=$cptObj->getData("idFactura=$invData[id]",0,"");
+    $cptData=dao("cpt")->getData("idFactura=$invData[id]",0,"");
     if (!isset($cptData[0])) {
         errNDie("Debe realizar Alta de Factura para que se reconozca el folio",$baseData+["line"=>__LINE__,"cptData"=>$cptData]);
     }
@@ -2110,7 +2030,7 @@ function getAppendInvoiceService() {
     if (!hasUser()) echoJsNDie("refresh","No User");
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__,"usuario"=>getUser()->nombre]+$_POST;
     //"folio":"000","uuid":"3789D010D1","gpoId":"5","prvId":"2296"
-    global $invObj, $query;
+    global $query;
     $whereList=["f.tipoComprobante='i'","f.version in ('3.3','4.0')","f.statusn is not null"]; // ,"f.statusn is not null","f.ciclo='2021'" o este año
     // Por algún motivo se había aceptado buscar facturas en status Temporal, pero no deberían aceptarse pues no han sido dadas de alta. Esperar a ver si resultan quejas...
     $pfx="";
@@ -2170,9 +2090,9 @@ function getAppendInvoiceService() {
         $uuid=strtoupper($uuid);
         $whereList=["f.uuid like '%{$uuid}%'"];
         $extraSelect=", f.tipoComprobante, f.version";
-        $invObj->rows_per_page=1000;
+        $invObj = dao("inv", ["rows_per_page"=>1000]);
     } else {
-        $invObj->rows_per_page=10;
+        $invObj = dao("inv", ["rows_per_page"=>10]);
         $extraSelect="";
     }
     $preQryTime=microtime(true);
@@ -2203,12 +2123,7 @@ function getAppendInvoiceService() {
             errNDie("La factura no tiene PDF, debe agregarlo primero",$baseData+["line"=>__LINE__,"invId"=>$idt["invId"]]);
         }
         $cd=$idt["cd"];
-        global $cptObj;
-        if(!isset($cptObj)) {
-            require_once "clases/Conceptos.php";
-            $cptObj = new Conceptos();
-        }
-        $idt["conceptos"]=$cptObj->getData("idFactura=$idt[invId]",0,"id,idFactura,codigoArticulo codigo,cantidad,unidad,claveunidad,claveprodserv,descripcion,precioUnitario valorunitario,importe");
+        $idt["conceptos"]=dao("cpt", ["rows_per_page"=>0])->getData("idFactura=$idt[invId]",0,"id,idFactura,codigoArticulo codigo,cantidad,unidad,claveunidad,claveprodserv,descripcion,precioUnitario valorunitario,importe");
         require_once "clases/catalogoSAT.php";
         foreach ($idt["conceptos"] as $cIdx => $cnc) {
             $idt["conceptos"][$cIdx]["satunidad"]=CatalogoSAT::getValue(CatalogoSAT::CAT_CLAVEUNIDAD,"codigo",$cnc["claveunidad"],"nombre");
@@ -2238,12 +2153,7 @@ function getAppendInvoiceService() {
             if ($statusn&Facturas::STATUS_PAGADO) errNDie("La factura indicada ya está pagada",$idt+$baseData+["line"=>__LINE__,"query"=>$query]);
             if ($statusn&Facturas::STATUS_CONTRA_RECIBO) errNDie("La factura indicada ya tiene contra recibo",$idt+$baseData+["line"=>__LINE__,"query"=>$query]);
         }
-        global $solObj;
-        if(!isset($solObj)) {
-            require_once "clases/SolicitudPago.php";
-            $solObj=new SolicitudPago();
-        }
-        if ($solObj->exists("idFactura={$idt["invId"]}")) errNDie("La factura indicada ya tiene solicitud",$idt+$baseData+["line"=>__LINE__,"query"=>$query]);
+        if (dao('sol')->exists("idFactura={$idt["invId"]}")) errNDie("La factura indicada ya tiene solicitud",$idt+$baseData+["line"=>__LINE__,"query"=>$query]);
         if (!isset($idt["statusn"][0])) {
             errNDie("No existe una factura con los datos indicados",$baseData+["line"=>__LINE__,"query"=>$query]);
         }
@@ -2289,8 +2199,7 @@ function getSaveFilesService() {
         if (!isset($pdfObj)) errNDie(isset(PDF::$errmsg[0])?PDF::$errmsg:"El archivo PDF no fue creado",$baseData+["line"=>__LINE__]+PDF::$errdata);
     } else errNDie("Es necesario incluir el archivo PDF de su factura para generar una Solicitud");
     if (isset($xmlFileData)) {
-        global $invObj;
-        //$invObj->rows_per_page = 0;
+        $invObj=dao("inv"/*, ["rows_per_page"=>0]*/);
         try {
             $result=$invObj->altaTemporal($xmlFileData,$pdfFileData??null,"i");
             if ($result["existe"]??false) {
@@ -2362,8 +2271,7 @@ function isReqPaymAuth() {
     return "requestPaymentAuthorization"===($_POST["action"]??"");
 }
 function doReqPaymAuth() {
-    global $invObj, $ordObj, $solObj, $tokObj, $gpoObj, $prvObj, $ugObj, $usrObj, $perObj, $query;
-    //$invObj->rows_per_page = 0;
+    global $query;
     sessionInit();
     if (!hasUser()) echoJsNDie("refresh","No User");
     $userId=getUser()->id;
@@ -2384,20 +2292,12 @@ function doReqPaymAuth() {
     $gpoId=$_POST["gpoId"]??"";
     if (!isset($gpoId[0]))
         errNDie("Falta indicar la empresa",$baseData+["line"=>__LINE__]);
-    if (!isset($gpoObj)) {
-        require_once "clases/Grupo.php";
-        $gpoObj=new Grupo();
-    }
-    $gpoData=$gpoObj->getData("id=$gpoId",0,"cut,alias,razonSocial");
+    $gpoData=dao('gpo')->getData("id=$gpoId",0,"cut,alias,razonSocial");
     if (isset($gpoData[0])) $gpoData=$gpoData[0];
     $prvId=$_POST["prvId"];
     if (!isset($prvId[0]))
         errNDie("Falta indicar el proveedor",$baseData+["line"=>__LINE__]);
-    if (!isset($prvObj)) {
-        require_once "clases/Proveedores.php";
-        $prvObj=new Proveedores();
-    }
-    $proveedor=$prvObj->getData("id=$prvId",0,"razonSocial,status,verificado,cumplido");
+    $proveedor=dao('prv')->getData("id=$prvId",0,"razonSocial,status,verificado,cumplido");
     $rowStatusProveedor="";
     if (isset($proveedor[0])) $proveedor=$proveedor[0];
     $prvVerif=+$proveedor["verificado"];
@@ -2436,16 +2336,15 @@ function doReqPaymAuth() {
         $rowStatusProveedor="El proveedor est&aacute; ".strtoupper($prvStatus);
     }
     if (isset($rowStatusProveedor[0])) $rowStatusProveedor="<tr><th style='text-align:left;'>Status:</th><td colspan='3' style='text-align:left;background-color:rgba(255,0,0,0.1);color:darkred;font-weight:bold;'>".$rowStatusProveedor."</td></tr>";
-    if(!isset($solObj)) {
-        require_once "clases/SolicitudPago.php";
-        $solObj=new SolicitudPago();
-    }
     DBi::autocommit(false);
     $solData=["fechaPago"=>$dbpaydate,"idUsuario"=>$userId,"idEmpresa"=>$gpoId];
     $observaciones=$_POST["observaciones"]??"";
     if (isset($observaciones[0])) $solData["observaciones"]=$observaciones;
     $invId=$_POST["invId"]??"";
     $ordRef=$_POST["ordRef"]??"";
+    $invObj=dao("inv");
+    $solObj=dao("sol");
+    $prcObj=dao("prc");
     if (isset($invId[0])) {
         // VALIDA SOLICITUD DE PAGO
         if ($solObj->exists("idFactura='$invId'")) {
@@ -2493,12 +2392,7 @@ function doReqPaymAuth() {
         else $remision="S/REMISION";
         $invFieldArray=["id"=>$invId,"pedido"=>$pedido,"remision"=>$remision];
         $invObj->saveRecord($invFieldArray);
-
-        global $cptObj;
-        if(!isset($cptObj)) {
-            require_once "clases/Conceptos.php";
-            $cptObj = new Conceptos();
-        }
+        
         $conceptos=$_POST["conceptos"]??[];
         foreach ($conceptos as $idx=>$concepto) {
             $cantidad=+($concepto["cantidad"]??"0");
@@ -2513,12 +2407,12 @@ function doReqPaymAuth() {
             }
             if (isset($concepto["cptId"])) {
                 $cptFieldArray=["id"=>$concepto["cptId"],"codigoArticulo"=>$codigo];
-                $cptObj->updateRecord($cptFieldArray);
+                dao('cpt')->updateRecord($cptFieldArray);
             } else {
                 if (isset($concepto["descripcion"][299]))
                     $concepto["descripcion"]=substr($concepto["descripcion"], 0, 296)."...";
                 $cptFieldArray=["idFactura"=>$invId,"codigoArticulo"=>$codigo,"cantidad"=>$cantidad,"unidad"=>$unidad,"claveUnidad"=>$concepto["claveunidad"],"claveProdServ"=>$concepto["claveprodserv"],"descripcion"=>$concepto["descripcion"],"precioUnitario"=>$concepto["valorunitario"],"importe"=>$concepto["importe"]]; // ,"version"=>"3.3","status"=>"activo"
-                $cptObj->insertRecord($cptFieldArray);
+                dao('cpt')->insertRecord($cptFieldArray);
             }
         }
         $vistaFactura="table-row";
@@ -2529,11 +2423,6 @@ function doReqPaymAuth() {
         $newStatus=Facturas::statusnToDetailStatus($newStatusN);
         $invFieldArray=["id"=>$invId,"statusn"=>$newStatusN,"status"=>$newStatus];
         if ($invObj->saveRecord($invFieldArray)) {
-            global $prcObj;
-            if (!isset($prcObj)) {
-                require_once "clases/Proceso.php";
-                $prcObj=new Proceso();
-            }
             $prcObj->cambioFactura($invId, $newStatus, $userName, false, "Genera Solicitud");
             $prcId=$prcObj->lastId;
         }
@@ -2615,10 +2504,7 @@ function doReqPaymAuth() {
         $importe = preg_replace("/[^0-9.]/", "", $importe);
         $moneda=$_POST["moneda"]??"MXN";
         if (!isset($moneda[0])) $moneda="MXN";
-        if (!isset($ordObj)) {
-            require_once "clases/OrdenesCompra.php";
-            $ordObj=new OrdenesCompra();
-        }
+        $ordObj=dao('ord');
         if ($ordObj->exists("folio='$ordRef'")) {
             DBi::rollback();
             DBi::autocommit(true);
@@ -2689,9 +2575,8 @@ function doReqPaymAuth() {
     }
     if (isset($solFolio)&&$solFolio!==false)
         $solData["folio"]=$solFolio;
-    if (isset($prcObj) && isset($prcId)) {
-        $prcObj->saveRecord(["id"=>$prcId, "detalle"=>"Genera Solicitud $solFolio"]);
-    }
+    if (isset($prcId)) $prcObj->saveRecord(["id"=>$prcId, "detalle"=>"Genera Solicitud $solFolio"]);
+    $usrObj=dao('usr');
 
     // IDENTIFICA USUARIOS AUTORIZADORES
     $authList=$_POST["authList"]??"";
@@ -2702,23 +2587,14 @@ function doReqPaymAuth() {
             if (is_string($authList))
                 $authList=explode(",", $authList);
         } else {
-            if (!isset($perObj)) {
-                require_once "clases/Perfiles.php";
-                $perObj=new Perfiles();
-            }
-            $perData=$perObj->getData("nombre='Autoriza Pagos'",0,"id");
+            $perData=dao('per')->getData("nombre='Autoriza Pagos'",0,"id");
             if (!isset($perData[0])||!isset($perData[0]["id"])) {
                 DBi::rollback();
                 DBi::autocommit(true);
                 errNDie("Falló en encontrar perfil de autorización",$baseData+["line"=>__LINE__]);
             }
             $perfilId=$perData[0]["id"];
-            if(!isset($ugObj)) {
-                require_once "clases/Usuarios_Grupo.php";
-                $ugObj=new Usuarios_Grupo();
-            }
-            global $query;
-            $ugData=$ugObj->getData("idPerfil=$perfilId and idGrupo=$gpoId",0,"idUsuario");
+            $ugData=dao('ug')->getData("idPerfil=$perfilId and idGrupo=$gpoId",0,"idUsuario");
             if(!isset($ugData[0])||!isset($ugData[0]["idUsuario"])) {
                 DBi::rollback();
                 DBi::autocommit(true);
@@ -2731,10 +2607,6 @@ function doReqPaymAuth() {
             DBi::rollback();
             DBi::autocommit(true);
             errNDie("Falló en obtener autorizador",$baseData+["line"=>__LINE__]);
-        }
-        if (!isset($usrObj)) {
-            require_once "clases/Usuarios.php";
-            $usrObj=new Usuarios();
         }
         // Jaime Lobatón podrá autorizar cualquier solicitud 
         $bossData=$usrObj->getData("nombre='jlobaton'",0,"id,persona,email");
@@ -2810,10 +2682,7 @@ function doReqPaymAuth() {
         $baseKeyMap["RESPUESTA"]=ob_get_clean();
 
         $rutaToken="consultas/Facturas.php?action=responsePaymentAuthorization&token=";
-        if(!isset($tokObj)) {
-            require_once "clases/Tokens.php";
-            $tokObj = new Tokens();
-        }
+        $tokObj = dao('tok');
         $mensajeBase=file_get_contents(getBasePath()."templates/correoSolPago2.html");
 
         $moduleList=["autorizaPago","rechazaPago"];
@@ -2822,7 +2691,7 @@ function doReqPaymAuth() {
         // GUARDA TOKEN
         $tokList=$tokObj->creaAccion($solId,$userIdList,$moduleList,$usageKey);
         $sent=false;
-        $mailSettings=["gpoId"=>$gpoId, "domain"=>$gpoObj->getDomainKey($gpoId), "solFolio"=>$solFolio];
+        $mailSettings=["gpoId"=>$gpoId, "domain"=>dao('gpo')->getDomainKey($gpoId), "solFolio"=>$solFolio];
         foreach ($usrMailData as $idx=>$usrInfo) {
             if (!isset($tokList[$usrInfo["id"]])) {
                 DBi::rollback();
@@ -2865,13 +2734,9 @@ function isRespPaymAuth() {
     return "responsePaymentAuthorization"===($_REQUEST["action"]??"");
 }
 function doRespPaymAuth() {
-    global $tokObj,$solObj,$invObj,$ordObj,$prcObj,$query;
-    //$invObj->rows_per_page = 0;
+    global $query;
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__];
-    if(!isset($tokObj)) {
-        require_once "clases/Tokens.php";
-        $tokObj = new Tokens();
-    }
+    $tokObj = dao('tok');
     if (isset($_GET["token"])) {
         $token=$_GET["token"];
         $beInteractive=true;
@@ -2951,7 +2816,7 @@ function doRespPaymAuth() {
                 $tokErrMsg0=$tokObj->errors[0]??"";
                 if(isset($tokErrMsg0[0]) && !isset($tokObj->errors[1]) && substr($tokErrMsg0,-11)==="previamente") {
                     echo getPaymNoteView("Solicitud $tokErrMsg0",$solId,"",true,true,false);
-                    doclog("Se ignora solicitud de autorización","error",$baseData+["line"=>__LINE__,"msg"=>$msg,"errors"=>$tokObj->errors,"dberrors"=>DBi::$errors]+$tokObj->data);
+                    doclog("Se ignora solicitud de autorización","error",$baseData+["line"=>__LINE__,"msg"=>$tokErrMsg0,"errors"=>$tokObj->errors,"dberrors"=>DBi::$errors]+$tokObj->data);
                 } else if (isset($tokObj->data["usos"]) && (+$tokObj->data["usos"])<=0) {
                     if (isset($tokObj->data["ocupado"])) {
                         $msg=substr($tokObj->data["ocupado"]["modulo"],0,-4)."da"; // autoriza-Pago, rechaza-Pago
@@ -2974,10 +2839,7 @@ function doRespPaymAuth() {
         DBi::autocommit(true);
         die();
     }
-    if (!isset($solObj)) {
-        require_once "clases/SolicitudPago.php";
-        $solObj = new SolicitudPago();
-    }
+    $solObj = dao('sol');
     $solData=$solObj->getData("id=$solId");
     if (!isset($solData[0])) {
         echo getPaymNoteView("La solicitud ya no existe",$solId,"",true,true,false);
@@ -3011,6 +2873,7 @@ function doRespPaymAuth() {
     }
     $conFactura=(isset($solData["idFactura"]) && !empty($solData["idFactura"]));
     $conOrden=(isset($solData["idOrden"]) && !empty($solData["idOrden"]));
+    $invObj=dao('inv');
     if ($conFactura) {
         $idFactura=$solData["idFactura"];
         $invData=$invObj->getData("id=$idFactura");// and statusn is not null");
@@ -3078,15 +2941,8 @@ function doRespPaymAuth() {
             die();
         }
     }
-    global $usrObj;
-    if (!isset($usrObj)) {
-        require_once "clases/Usuarios.php";
-        $usrObj=new Usuarios();
-    }
-    if (!isset($prcObj)) {
-        require_once "clases/Proceso.php";
-        $prcObj=new Proceso();
-    }
+    $usrObj=dao('usr');
+    $prcObj=dao('prc');
     $autorizada=($modulo==="autorizaPago");
     if (!$autorizada) {
         $solProceso=+$solData["proceso"];
@@ -3113,28 +2969,17 @@ function doRespPaymAuth() {
                 $prcObj->cambioFactura($idFactura, "Rechazado", $username, false, "Solicitud no autorizada");
             }
             doclog("Solicitud con Factura Rechazada","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId,"invId"=>$idFactura]);
-            global $ctrObj,$ctfObj;
-            if (!isset($ctfObj)) {
-                require_once "clases/Contrafacturas.php";
-                $ctfObj = new Contrafacturas();
-            }
+            $ctrObj=dao('ctr');
+            $ctfObj=dao('ctf');
             $ctfData=$ctfObj->getData("idFactura=$idFactura",0,"idContrarrecibo");
             if (isset($ctfData[0]["idContrarrecibo"])) {
                 $ctrId=$ctfData[0]["idContrarrecibo"];
                 $numCF=+array_column($ctfObj->getData("idContrarrecibo=$ctrId",0,"count(1) n"), "n")[0];
                 $ctfObj->deleteRecord(["idContrarrecibo"=>$ctrId]);
                 doclog("Contrafacturas eliminadas","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId,"invId"=>$idFactura]);
-                if (!isset($ctrObj)) {
-                    require_once "clases/Contrarrecibos.php";
-                    $ctrObj = new Contrarrecibos();
-                }
                 $ctrObj->deleteRecord(["id"=>$ctrId]);
-                if (!isset($firObj)) {
-                    require_once "clases/Firmas.php";
-                    $firObj=new Firmas();
-                }
+                $firObj=dao('fir');
                 if (!$firObj->saveRecord(["modulo"=>"contrarrecibo","idReferencia"=>$ctrId,"idUsuario"=>$usrId,"accion"=>"elimina","motivo"=>"Completo: $numCF facturas"])) {
-                    
                     doclog("No fue posible agregar firma de eliminacion de contra recibo",$baseData+["line"=>__LINE__,"query"=>$query,"errors"=>$firObj->errors,"dberrors"=>DBi::$errors,"log"=>$firObj->log]);
                 }
                 doclog("Contra recibo eliminado","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId,"invId"=>$idFactura]);
@@ -3143,11 +2988,7 @@ function doRespPaymAuth() {
             $tokObj->deleteRecord(["refId"=>$solId,"modulo"=>["transfiereArchivos","procesaCompras"]]);
             $isErrResp=false;
         } else if ($conOrden) {
-            if (!isset($ordObj)) {
-                require_once "clases/OrdenesCompra.php";
-                $ordObj=new OrdenesCompra();
-            }
-            $ordObj->saveRecord(["id"=>$solData["idOrden"],"status"=>-1]);
+            dao('ord')->saveRecord(["id"=>$solData["idOrden"],"status"=>-1]);
             doclog("Solicitud con Orden Rechazada","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId,"ordId"=>$solData["idOrden"]]);
             // ToDo: Validar si es falso para mandar error;
             $isErrResp=false;
@@ -3185,12 +3026,7 @@ function doRespPaymAuth() {
             DBi::autocommit(true);
             die();
         }
-        global $gpoObj;
-        if (!isset($gpoObj)) {
-            require_once "clases/Grupo.php";
-            $gpoObj = new Grupo();
-        }
-        $gpoData=$gpoObj->getData("rfc='$invData[rfcGrupo]'");
+        $gpoData=dao('gpo')->getData("rfc='$invData[rfcGrupo]'");
         if (!isset($gpoData[0]["rfc"])) {
             echo getPaymNoteView("No se encuentra el registro de la empresa cliente",$solId,$solFolio,true,true,$beInteractive);
             doclog("Solicitud de pago interrumpida, la empresa cliente no está registrada","error",$baseData+["line"=>__LINE__,"solId"=>$solId,"invId"=>$idFactura,"rfcGrupo"=>$invData["rfcGrupo"]]);
@@ -3203,11 +3039,7 @@ function doRespPaymAuth() {
         $gpoData=$gpoData[0];
         $currTokenData=$tokObj->obtenStatusData($token);
         $tokObj->restauraStatusData($prevTokenData);
-        global $ctrObj;
-        if (!isset($ctrObj)) {
-            require_once "clases/Contrarrecibos.php";
-            $ctrObj = new Contrarrecibos();
-        }
+        $ctrObj=dao('ctr');
         $idCr=false;
         $times=10;
         $alias=$gpoData["alias"];
@@ -3245,12 +3077,7 @@ function doRespPaymAuth() {
         //DBi::autocommit(false);
         $tokObj->restauraStatusData($currTokenData);
         if ($invStatusN>=Facturas::STATUS_RECHAZADO) {
-            global $firObj;
-            if (!isset($firObj)) {
-                require_once "clases/Firmas.php";
-                $firObj=new Firmas();
-            }
-            if ($firObj->exists("modulo='solpago' and accion='cancela' and idReferencia=$solId")) {
+            if (dao('fir')->exists("modulo='solpago' and accion='cancela' and idReferencia=$solId")) {
                 echo getPaymNoteView("La solicitud ha sido cancelada por solicitante",$solId,$solFolio,true,true,$beInteractive);
                 doclog("Solicitud de pago invalida, la factura ha sido cancelada","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId,"invId"=>$idFactura]);
                 DBi::rollback();
@@ -3266,11 +3093,7 @@ function doRespPaymAuth() {
 
         $fechaRevision=date("Y-m-d H:i:s");
         $prvCode = $invData["codigoProveedor"];
-        if (!isset($prvObj)) {
-            require_once "clases/Proveedores.php";
-            $prvObj = new Proveedores();
-        }
-        $prvData=$prvObj->getData("codigo='$prvCode'");
+        $prvData=dao('prv')->getData("codigo='$prvCode'");
         if (!isset($prvData[0]["codigo"])) {
             echo getPaymNoteView("No se encuentra el registro del proveedor",$solId,$solFolio,true,true,$beInteractive);
             doclog("Solicitud de pago interrumpida, el proveedor no está registrado","error",$baseData+["line"=>__LINE__,"solId"=>$solId,"invId"=>$idFactura,"codigoProveedor"=>$prvCode]);
@@ -3302,11 +3125,6 @@ function doRespPaymAuth() {
             die();
         }
         $idCtr=$ctrObj->lastId;
-        global $ctfObj;
-        if (!isset($ctfObj)) {
-            require_once "clases/Contrafacturas.php";
-            $ctfObj = new Contrafacturas();
-        }
         $fieldArray = [ "idContrarrecibo"=>$idCtr,
                         "idFactura"=>$idFactura,
                         "pedido"=>$invData["pedido"],
@@ -3323,7 +3141,7 @@ function doRespPaymAuth() {
                         "retencion"=>$invData["impuestoRetenido"],
                         "moneda"=>$invData["moneda"],
                         "autorizadaPor"=>$usrId];
-        if (!$ctfObj->saveRecord($fieldArray)) {
+        if (!dao('ctf')->saveRecord($fieldArray)) {
             echo getPaymNoteView("Creación de contra recibo incompleta", $solId,$solFolio,true,true,$beInteractive);
             doclog("Solicitud de pago interrumpida, falló creación de contra factura","error",$baseData+["line"=>__LINE__,"solId"=>$solId,"invId"=>$idFactura,"folioCR"=>$idCr,"query"=>$query,"dberrors"=>DBi::$errors]);
             DBi::rollback();
@@ -3364,10 +3182,7 @@ function doRespPaymAuth() {
         doclog("Solicitud de Pago AUTORIZADA con Factura en Proceso de Compras","solpago",["solId"=>$solId, "invId"=>$idFactura, "usrId"=>$solIdUsuario]);
     } else if ($conOrden) {
         $idOrden=$solData["idOrden"];
-        if (!isset($ordObj)) {
-            require_once "clases/OrdenesCompra.php";
-            $ordObj=new OrdenesCompra();
-        }
+        $ordObj=dao('ord');
         if ($solStatus&SolicitudPago::STATUS_CANCELADA) $newOrdStatus="2";
         else $newOrdStatus=new DBExpression("status|2");
         $ordObj->saveRecord(["id"=>$idOrden,"status"=>$newOrdStatus]);
@@ -3380,12 +3195,7 @@ function doRespPaymAuth() {
             die();
         }
         $ordData=$ordData[0];
-        global $gpoObj;
-        if (!isset($gpoObj)) {
-            require_once "clases/Grupo.php";
-            $gpoObj = new Grupo();
-        }
-        $gpoData=$gpoObj->getData("id='$ordData[idEmpresa]'");
+        $gpoData=dao('gpo')->getData("id='$ordData[idEmpresa]'");
         if (!isset($gpoData[0]["rfc"])) {
             echo getPaymNoteView("No se encuentra el registro de la empresa cliente",$solId,$solFolio,true,true,$beInteractive);
             doclog("Solicitud de pago interrumpida, la empresa cliente no está registrada","error",$baseData+["line"=>__LINE__,"solId"=>$solId,"ordId"=>$idOrden,"idEmpresa"=>$ordData["idEmpresa"]]);
@@ -3396,12 +3206,7 @@ function doRespPaymAuth() {
         $gpoData=$gpoData[0];
         $alias=$gpoData["alias"];
         //ToDo_SOLICITUD: Obtener prvData por idProveedor
-        global $prvObj;
-        if (!isset($prvObj)) {
-            require_once "clases/Proveedores.php";
-            $prvObj = new Proveedores();
-        }
-        $prvData=$prvObj->getData("id='$ordData[idProveedor]'");
+        $prvData=dao('prv')->getData("id='$ordData[idProveedor]'");
         if (!isset($prvData[0]["rfc"])) {
             echo getPaymNoteView("No se encuentra el registro del proveedor",$solId,$solFolio,true,true,$beInteractive);
             doclog("Solicitud de pago interrumpida, el proveedor no está registrado","error",$baseData+["line"=>__LINE__,"solId"=>$solId,"ordId"=>$idOrden,"idProveedor"=>$ordData["idProveedor"]]);
@@ -3417,9 +3222,7 @@ function doRespPaymAuth() {
             $invoicePath=$_SERVER['DOCUMENT_ROOT'];
             $pdfpath=$ordData["rutaArchivo"];
             $pdfname=$ordData["nombreArchivo"].".pdf";
-            setlocale(LC_TIME,"es_MX.UTF-8","es_MX","esl");
-            //$formattedDate=Facturas::$stmpFmt->format(time());
-            $formattedDate=strftime("%e %b, %Y");
+            $formattedDate=$_now["ebY"];
             try {
                 $fullname=$invoicePath.$pdfpath.$pdfname;
                 $stampname=$invoicePath.$pdfpath."ST_".$pdfname;
@@ -3505,7 +3308,7 @@ function doRespPaymAuth() {
     DBi::commit();
     DBi::autocommit(true);
     $asunto="Respuesta de Autorizacion de Pago $solFolio";
-    $mailSettings=["domain"=>$gpoObj->getDomainKey($gpoData["id"]??"")];
+    $mailSettings=["domain"=>dao('gpo')->getDomainKey($gpoData["id"]??"")];
     foreach ($usrData as $idx => $usrItem) {
         $baseKeyMap=["%RESPUESTA%"=>$respuesta,"isInteractive"=>"0"]+$usrItem["keyMap"];
         $toObj=["address"=>$usrItem["email"],"name"=>replaceAccents($usrItem["persona"])];
@@ -3553,7 +3356,8 @@ function doResetBeforeAuth() {
     $module=$_POST["module"]??"";
     $qryList=[];
     if ($module==="rechazaPago") {
-        global $solObj,$query; if (!isset($solObj)) { require_once "clases/SolicitudPago.php"; $solObj = new SolicitudPago(); }
+        global $query; 
+        $solObj = dao('sol');
         $solData=$solObj->getData("id=$solId",0,"idFactura, idOrden, status");
         if (!isset($solData[0])) {
             errNDie("Solicitud no encontrada",$baseData+["line"=>__LINE__,"query"=>$query]);
@@ -3566,14 +3370,14 @@ function doResetBeforeAuth() {
         $qryList[]=["query"=>$query]+$solData;
         DBi::autocommit(false);
         if (isset($idOrden[0])) {
-            global $ordObj; if (!isset($ordObj)) { require_once "clases/OrdenesCompra.php"; $ordObj = new OrdenesCompra(); }
+            $ordObj = dao('ord');
             if (!$ordObj->saveRecord(["id"=>$idOrden,"status"=>isset($idFactura[0])?"1":"0"])&&!empty(DBi::$errno)) {
                 $lastQuery=$query; DBi::rollback(); DBi::autocommit(true);
                 errNDie("No fue posible actualizar Orden de Compra",$baseData+["line"=>__LINE__,"query"=>$lastQuery,"errors"=>$ordObj->errors,"dberrors"=>DBi::$errors,"log"=>$ordObj->log]);
             }
             $qryList[]=["query"=>$query];
         } else if (isset($idFactura[0])) {
-            global $invObj;
+            $invObj = dao('inv');
             $invData=$invObj->getData("id=$idFactura",0,"statusn,status,tipoComprobante");
             if (!isset($invData[0])) {
                 $lastQuery=$query; DBi::rollback(); DBi::autocommit(true);
@@ -3584,7 +3388,7 @@ function doResetBeforeAuth() {
             $statusn=+$invData["statusn"];
             if ($statusn<128) {
                 DBi::rollback(); DBi::autocommit(true);
-                errNDie("La factura no está cancelada",$baseData+["line"=>__LINE__,"idSolicitud"=>$solId,"idFactura"=>$idFactura,"statusn"=>$statusn,"status"=>$status]);
+                errNDie("La factura no está cancelada",$baseData+["line"=>__LINE__,"idSolicitud"=>$solId,"idFactura"=>$idFactura,"statusn"=>$statusn]);
             }
             $statusn-=128;
             $invStatus=Facturas::statusnToDetailStatus($statusn,$invData["tipoComprobante"]);
@@ -3593,17 +3397,10 @@ function doResetBeforeAuth() {
                 errNDie("No fue posible actualizar Factura",$baseData+["line"=>__LINE__,"query"=>$lastQuery,"errors"=>$invObj->errors,"dberrors"=>DBi::$errors,"log"=>$invObj->log]);
             }
             $lastQuery=$query;
-            global $prcObj;
-            if (!isset($prcObj)) {
-                require_once "clases/Proceso.php";
-                $prcObj=new Proceso();
-            }
-            $prcObj->cambioFactura($idFactura, $invStatus, getUser()->nombre, false, "Restaura solicitud rechazada");
+            dao('prc')->cambioFactura($idFactura, $invStatus, getUser()->nombre, false, "Restaura solicitud rechazada");
             $qryList[]=["query"=>$lastQuery];
         }
-        global $tokObj; if (!isset($tokObj)) { require_once "clases/Tokens.php"; $tokObj = new Tokens(); }
-        $tokObj->clearOrder();
-        $tokObj->addOrder("id","desc");
+        $tokObj=dao('tok', ["orderlist"=>["id"=>"desc"]]);
         $tokData=$tokObj->getData("refId=$solId and modulo in ('autorizaPago','rechazaPago','transfiereArchivos','procesaCompras','procesaConta','anexaComprobante','procesaPago')");
         if (!isset($tokData[0])) {
             $lastQuery=$query; DBi::rollback(); DBi::autocommit(true);
@@ -3620,12 +3417,9 @@ function doResetBeforeAuth() {
         //    errNDie("Cambiando TOKENS1 $tokModule",$baseData+["line"=>__LINE__]);
         //} else if ($tokModule==="procesa") { DBi::rollback(); DBi::autocommit(true);
         //    errNDie("Cambiando TOKENS2 $tokModule",$baseData+["line"=>__LINE__]);
-            global $firObj; if (!isset($firObj)) { require_once "clases/Firmas.php"; $firObj=new Firmas(); }
+            $firObj=dao('fir');
             $usrId=getUser()->id;
-            if ($usrId===1) {
-                global $usrObj; if (!isset($usrObj)) { require_once "clases/Usuarios.php"; $usrObj=new Usuarios(); }
-                $usrId=$usrObj->getValue("nombre","SISTEMAS","id");
-            }
+            if ($usrId===1) $usrId=dao('usr')->getValue("nombre","SISTEMAS","id");
             if (!$firObj->saveRecord(["idReferencia"=>$solId,"idUsuario"=>$usrId,"accion"=>"restaura","motivo"=>"Falta indicar quien solicita"])) {
                 $lastQuery=$query; DBi::rollback(); DBi::autocommit(true);
                 errNDie("No fue posible agregar firma de restauración",$baseData+["line"=>__LINE__,"query"=>$lastQuery,"errors"=>$firObj->errors,"dberrors"=>DBi::$errors,"log"=>$firObj->log]);
@@ -3666,13 +3460,10 @@ function isTransferPaymAuth() {
     return "requestTransferInvoiceFiles"===($_REQUEST["action"]??"");
 }
 function doTransferPaymAuth() {
-    global $tokObj, $query;
+    global $query;
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__];
     $encabezado="EXPORTAR FACTURA EN SOLICITUD";
-    if(!isset($tokObj)) {
-        require_once "clases/Tokens.php";
-        $tokObj = new Tokens();
-    }
+    $tokObj = dao('tok');
     if (isset($_GET["token"])) {
         $token=$_GET["token"];
         $beInteractive=true;
@@ -3740,33 +3531,18 @@ function doTransferPaymAuth() {
                     $logtxt.="IDX$idx)USR ES ADMIN! ";
                     break;
                 } else if ($esAvance) {
-                    global $solObj;
-                    if (!isset($solObj)) {
-                        require_once "clases/SolicitudPago.php";
-                        $solObj = new SolicitudPago();
-                    }
-                    $solData=$solObj->getData("id=$solId");
+                    $solData=dao('sol')->getData("id=$solId");
                     if (isset($solData[0]["idEmpresa"])) {
                         $idEmpresa=$solData[0]["idEmpresa"];
                     }
-                    global $perObj;
-                    if (!isset($perObj)) {
-                        require_once "clases/Perfiles.php";
-                        $perObj=new Perfiles();
-                    }
-                    $perData=$perObj->getData("nombre='Compras' and estado=1",0,"id");
+                    $perData=dao('per')->getData("nombre='Compras' and estado=1",0,"id");
                     if (isset($perData[0]["id"][0])) $idPerfil=$perData[0]["id"];
                     if (isset($idEmpresa)&&isset($idPerfil)) {
-                        global $ugObj;
-                        if(!isset($ugObj)) {
-                            require_once "clases/Usuarios_Grupo.php";
-                            $ugObj=new Usuarios_Grupo();
-                        }
-                        $ugData=$ugObj->getData("idUsuario=$usrId and idGrupo=$idEmpresa and idPerfil=$idPerfil",0,"idUsuario");
+                        $ugData=dao('ug')->getData("idUsuario=$usrId and idGrupo=$idEmpresa and idPerfil=$idPerfil",0,"idUsuario");
                         if (isset($ugData[0]["idUsuario"])) {
                             $validTokenIdx=$idx;
                             $logtxt.="IDX$idx)USR ES AVANCE VALIDO! ";
-                            $break;
+                            break;
                         } else {
                             $logtxt.="IDX$idx)USR ES AVANCE SIN PERMISO! ";
                         }
@@ -3845,11 +3621,7 @@ function doTransferPaymAuth() {
         DBi::autocommit(true);
         die();
     }
-    global $solObj;
-    if (!isset($solObj)) {
-        require_once "clases/SolicitudPago.php";
-        $solObj = new SolicitudPago();
-    }
+    $solObj=dao('sol');
     $solData=$solObj->getData("id=$solId");
     if (!isset($solData[0])) {
         echo getRespGralView($encabezado,"La solicitud ya no existe",$solId,"",true,false,true);
@@ -3879,7 +3651,7 @@ function doTransferPaymAuth() {
         die();
     }
     $idFactura=$solData["idFactura"];
-    global $invObj;
+    $invObj=dao('inv');
     $invData=$invObj->getData("id=$idFactura");
     if (!isset($invData[0])) {
         echo getRespGralView($encabezado,"La factura en la solicitud se ha eliminado",$solId,$solFolio,true,false);
@@ -3941,12 +3713,7 @@ function doTransferPaymAuth() {
         DBi::autocommit(true);
         die();
     }
-    global $gpoObj;
-    if (!isset($gpoObj)) {
-        require_once "clases/Grupo.php";
-        $gpoObj = new Grupo();
-    }
-    $gpoData=$gpoObj->getData("rfc='$invData[rfcGrupo]'");
+    $gpoData=dao('gpo')->getData("rfc='$invData[rfcGrupo]'");
     if (!isset($gpoData[0]["alias"][0])) {
         echo getRespGralView($encabezado,"No se encuentra el registro de la empresa cliente",$solId,$solFolio,true,false);
         doclog("Error en transferencia de archivos: La empresa cliente no está registrada","error",$baseData+["line"=>__LINE__,"solId"=>$solId,"invId"=>$idFactura,"rfcGrupo"=>$invData["rfcGrupo"]]);
@@ -3991,13 +3758,7 @@ function doTransferPaymAuth() {
 
     $textoAExportar.="$invFolio $fechaYMD $invPedido 1 $codProv 0 0 0 $tipoCambio ";
 
-    global $cptObj;
-    if (!isset($cptObj)) {
-        require_once "clases/Conceptos.php";
-        $cptObj = new Conceptos();
-    }
-    $cptObj->rows_per_page=0;
-    $cptData=$cptObj->getData("idFactura=".$idFactura);
+    $cptData=dao('cpt', ["rows_per_page"=>0])->getData("idFactura=".$idFactura);
     foreach ($cptData as $idx => $cptRow) {
         $textoAExportar.="$cptRow[codigoArticulo] $tasa $cptRow[cantidad] $cptRow[precioUnitario] ";
     }
@@ -4080,12 +3841,7 @@ function doTransferPaymAuth() {
     // ToDo_SOLICITUD: crear $newInvStatusN y $newSolStatus para conservar status actual y nuevo, para poder compararlos y saber cuando no hace falta guardar nuevamente.
     $invStatusN|=Facturas::STATUS_RESPALDADO;
     if ($invObj->saveRecord(["id"=>$idFactura,"status"=>"Respaldado","statusn"=>$invStatusN])) {
-        global $prcObj;
-        if (!isset($prcObj)) {
-            require_once "clases/Proceso.php";
-            $prcObj=new Proceso();
-        }
-        $prcObj->cambioFactura($idFactura, "Respaldado", getUser()->nombre, false, "Solicitud iniciando proceso compras");
+        dao('prc')->cambioFactura($idFactura, "Respaldado", getUser()->nombre, false, "Solicitud iniciando proceso compras");
     }
     $solStatus|=SolicitudPago::STATUS_RESPALDADA;
     $solObj->saveRecord(["id"=>$solId,"status"=>$solStatus]);
@@ -4112,13 +3868,10 @@ function isProcessPaymReq() {
     return "responseSetValidRequest"===($_REQUEST["action"]??"");
 }
 function doProcessPaymReq() {
-    global $tokObj, $query;
+    global $query;
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__];
     $encabezado="SOLICITUD EN PROCESO COMPRAS";
-    if(!isset($tokObj)) {
-        require_once "clases/Tokens.php";
-        $tokObj = new Tokens();
-    }
+    $tokObj = dao("tok");
     if (isset($_GET["token"])) {
         $token=$_GET["token"];
         $beInteractive=true;
@@ -4186,33 +3939,18 @@ function doProcessPaymReq() {
                     $logtxt.="IDX$idx)USR ES ADMIN! ";
                     break;
                 } else if ($esCompras) {
-                    global $solObj;
-                    if (!isset($solObj)) {
-                        require_once "clases/SolicitudPago.php";
-                        $solObj = new SolicitudPago();
-                    }
-                    $solData=$solObj->getData("id=$solId");
+                    $solData=dao('sol')->getData("id=$solId");
                     if (isset($solData[0]["idEmpresa"])) {
                         $idEmpresa=$solData[0]["idEmpresa"];
                     }
-                    global $perObj;
-                    if (!isset($perObj)) {
-                        require_once "clases/Perfiles.php";
-                        $perObj=new Perfiles();
-                    }
-                    $perData=$perObj->getData("nombre='Compras' and estado=1",0,"id");
+                    $perData=dao('per')->getData("nombre='Compras' and estado=1",0,"id");
                     if (isset($perData[0]["id"][0])) $idPerfil=$perData[0]["id"];
                     if (isset($idEmpresa)&&isset($idPerfil)) {
-                        global $ugObj;
-                        if(!isset($ugObj)) {
-                            require_once "clases/Usuarios_Grupo.php";
-                            $ugObj=new Usuarios_Grupo();
-                        }
-                        $ugData=$ugObj->getData("idUsuario=$usrId and idGrupo=$idEmpresa and idPerfil=$idPerfil",0,"idUsuario");
+                        $ugData=dao('ug')->getData("idUsuario=$usrId and idGrupo=$idEmpresa and idPerfil=$idPerfil",0,"idUsuario");
                         if (isset($ugData[0]["idUsuario"])) {
                             $validTokenIdx=$idx;
                             $logtxt.="IDX$idx)USR ES COMPRAS VALIDO! ";
-                            $break;
+                            break;
                         } else {
                             $logtxt.="IDX$idx)USR ES COMPRAS SIN PERMISO!";
                         }
@@ -4291,11 +4029,7 @@ function doProcessPaymReq() {
         DBi::autocommit(true);
         die();
     }
-    global $solObj;
-    if (!isset($solObj)) {
-        require_once "clases/SolicitudPago.php";
-        $solObj = new SolicitudPago();
-    }
+    $solObj=dao('sol');
     $solData=$solObj->getData("id=$solId");
     if (!isset($solData[0])) {
         echo getRespGralView($encabezado,"La solicitud ya no existe",$solId,"",true,false,true);
@@ -4334,7 +4068,7 @@ function doProcessPaymReq() {
         die();
     }
     $idFactura=$solData["idFactura"];
-    global $invObj;
+    $invObj=dao('inv');
     $invData=$invObj->getData("id=$idFactura");
     if (!isset($invData[0])) {
         echo getRespGralView($encabezado,"La factura en la solicitud se ha eliminado",$solId,$solFolio,true,false);
@@ -4389,11 +4123,7 @@ function doProcessPaymReq() {
         DBi::autocommit(true);
         die();
     }
-    global $usrObj;
-    if (!isset($usrObj)) {
-        require_once "clases/Usuarios.php";
-        $usrObj=new Usuarios();
-    }
+    $usrObj=dao('usr');
     $fromObj=["address"=>getUser()->email,"name"=>replaceAccents(getUser()->persona)];
     $respuesta="<h2>La solicitud $solFolio ha sido procesada por ".$fromObj["name"]."</h2>";
     $usrData=$usrObj->getData("ug.idPerfil=".SolicitudPago::PERFIL_GESTIONA." and ug.idGrupo={$solIdEmpresa}",0,"u.id,u.nombre,u.persona,u.email","u inner join usuarios_grupo ug on u.id=ug.idUsuario");
@@ -4424,9 +4154,7 @@ function doProcessPaymReq() {
     }
     DBi::commit();
     DBi::autocommit(true);
-    global $gpoObj;
-    if (!isset($gpoObj)) { require_once "clases/Grupo.php"; $gpoObj=new Grupo(); }
-    $mailSettings=["domain"=>$gpoObj->getDomainKey($solData["idEmpresa"]??"")];
+    $mailSettings=["domain"=>dao('gpo')->getDomainKey($solData["idEmpresa"]??"")];
     foreach ($usrData as $idx=>$usrElem) {
         $tokContable=$tokList[$usrElem["id"]]["procesaConta"];
         $keyMap=["%PROCESAR%"=>$tokContable];
@@ -4442,13 +4170,10 @@ function isRdy2Pay() {
     return "readyToPayRequest"===($_REQUEST["action"]??"");
 }
 function doRdy2Pay() {
-    global $tokObj, $query;
+    global $query;
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__];
     $encabezado="SOLICITUD EN PROCESO CONTABLE";
-    if(!isset($tokObj)) {
-        require_once "clases/Tokens.php";
-        $tokObj = new Tokens();
-    }
+    $tokObj = dao("tok");
     if (isset($_GET["token"])) {
         $token=$_GET["token"];
         $beInteractive=true;
@@ -4548,11 +4273,7 @@ function doRdy2Pay() {
         DBi::autocommit(true);
         die();
     }
-    global $solObj;
-    if (!isset($solObj)) {
-        require_once "clases/SolicitudPago.php";
-        $solObj = new SolicitudPago();
-    }
+    $solObj=dao('sol');
     $solData=$solObj->getData("id=$solId");
     if (!isset($solData[0])) {
         echo getRespGralView($encabezado,"La solicitud ya no existe",$solId,"",true,false,true);
@@ -4597,7 +4318,7 @@ function doRdy2Pay() {
         die();
     }
     $idFactura=$solData["idFactura"];
-    global $invObj;
+    $invObj=dao('inv');
     $invData=$invObj->getData("id=$idFactura");
     if (!isset($invData[0])) {
         echo getRespGralView($encabezado,"La factura en la solicitud se ha eliminado",$solId,$solFolio,true,false);
@@ -4654,19 +4375,14 @@ function doRdy2Pay() {
     }
     $ffolio=$invData["folio"];
     $fuuid=substr($invData["uuid"]??"", -10);
-    global $usrObj;
-    if (!isset($usrObj)) {
-        require_once "clases/Usuarios.php";
-        $usrObj=new Usuarios();
-    }
+    $usrObj=dao('usr');
     if (isset($invData["nombreInternoPDF"][0])) {
         $usrData=$usrObj->getData("id=$solData[idUsuario]",0,"persona");
         require_once "clases/PDF.php";
         $invoicePath=$_SERVER['DOCUMENT_ROOT'];
         $pdfpath=$invData["ubicacion"];
         $pdfname=$invData["nombreInternoPDF"].".pdf";
-        setlocale(LC_TIME,"es_MX.UTF-8","es_MX","esl");
-        $formattedDate=strftime("%e %b, %Y");
+        $formattedDate=$_now["ebY"];
         try {
             $fullname=$invoicePath.$pdfpath.$pdfname;
             $stampname=$invoicePath.$pdfpath."ST_".$pdfname;
@@ -4748,9 +4464,7 @@ function doRdy2Pay() {
     }
     DBi::commit();
     DBi::autocommit(true);
-    global $gpoObj;
-    if (!isset($gpoObj)) { require_once "clases/Grupo.php"; $gpoObj=new Grupo(); }
-    $mailSettings=["domain"=>$gpoObj->getDomainKey($idGrupo)];
+    $mailSettings=["domain"=>dao('gpo')->getDomainKey($idGrupo)];
     foreach ($usrData as $idx=>$usrElem) {
         $tokenAnexar=$tokAList[$usrElem["id"]]["anexaComprobante"];
         $tokenPagar=$tokPList[$usrElem["id"]]["procesaPago"];
@@ -4767,13 +4481,10 @@ function isAttachPaymProof() {
     return "requestProofOfPayment"===($_REQUEST["action"]??"");
 }
 function doAttachPaymProof() {
-    global $tokObj, $query;
+    global $query;
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__];
     $encabezado="SOLICITUD EN COMPROBACION DE PAGO";
-    if(!isset($tokObj)) {
-        require_once "clases/Tokens.php";
-        $tokObj = new Tokens();
-    }
+    $tokObj = dao("tok");
     if (isset($_GET["token"])) {
         $token=$_GET["token"];
         $beInteractive=true;
@@ -4870,11 +4581,7 @@ function doAttachPaymProof() {
         DBi::autocommit(true);
         die();
     }
-    global $solObj;
-    if (!isset($solObj)) {
-        require_once "clases/SolicitudPago.php";
-        $solObj = new SolicitudPago();
-    }
+    $solObj=dao('sol');
     $solData=$solObj->getData("id=$solId");
     if (!isset($solData[0])) {
         doclog("Error al Anexar Comprobante: la solicitud no existe","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId]);
@@ -4911,7 +4618,7 @@ function doAttachPaymProof() {
             doclog("Error al Anexar Comprobante: la solicitud no está lista para Pago","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId]);
             echo getRespGralView($encabezado,"La solicitud no está lista para Pago",$solId,$solFolio,true,false);
             DBi::rollback(); DBi::autocommit(true); die(); }
-        global $invObj; $invData=$invObj->getData("id=$idFactura");
+        $invData=dao('inv')->getData("id=$idFactura");
         if (!isset($invData[0])) {
             doclog("Error al Anexar Comprobante: No se encontró la factura","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId,"invId"=>$idFactura]);
             echo getRespGralView($encabezado,"La factura en la solicitud se ha eliminado",$solId,$solFolio,true,false);
@@ -4949,8 +4656,7 @@ function doAttachPaymProof() {
         $cpName="CP_".$tmpName;
     } else if ($conOrden) {
         $ordId=$solData["idOrden"];
-        if (!isset($ordObj)) { require_once "clases/OrdenesCompra.php"; $ordObj=new OrdenesCompra(); }
-        $ordData = $ordObj->getData("id=$ordId");
+        $ordData = dao('ord')->getData("id=$ordId");
         if (!isset($ordData[0])) {
             doclog("Error al Anexar Comprobante: La orden de compra no existe","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId,"ordId"=>$ordId]);
             echo getRespGralView($encabezado,"La orden de compra no existe",$solId,$solFolio,true,false);
@@ -4977,8 +4683,7 @@ function doAttachPaymProof() {
         $cpId=$ordId; $cpPlace="o"; $cpName="CP_".$ordData["nombreArchivo"];
     } else if ($conContra) {
         $ctrId=$solData["idContrarrecibo"];
-        if (!isset($ctrObj)) { require_once "clases/Contrarrecibos.php"; $ctrObj=new Contrarrecibos(); }
-        $ctrData = $ctrObj->getData("id=$ctrId");
+        $ctrData = dao('ctr')->getData("id=$ctrId");
         if (!isset($ctrData[0])) {
             doclog("Error al Anexar Comprobante: El contra recibo no existe","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId,"ctrId"=>$ctrId]);
             echo getRespGralView($encabezado,"El contra recibo no existe",$solId,$solFolio,true,false);
@@ -5071,8 +4776,6 @@ else{
     console.log('REQUEST SENT');
 }
 }</SCRIPT><H2>Anexar Comprobante de Pago</H2><DIV><input type='file' name='cp' id='cp' accept='.pdf' onchange='checkChange();'><input type='hidden' id='cpSolId' value='$solId'><input type='hidden' id='cpId' value='$cpId'><input type='hidden' id='cpPlace' value='$cpPlace'><input type='hidden' id='cpName' value='$cpName'>{$cpPathHtml}&nbsp;<input type='button' onclick='snd();' value='Enviar'></DIV><DIV id='msj'></DIV><HR>"; // <img src=\"data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\" onload=\"const cpEl=ebyid('cp');console.log('PDF File Selection');cladd('dialogbox', 'invisible');cpEl.click();cpEl.value='1';setTimeout(()=>{clrem('dialogbox','invisible');console.log('CP value='+ebyid('cp').value);}, 3000);ekil(this);\">
-    //$solObj->saveRecord(["id"=>$solId,"proceso"=>SolicitudPago::PROCESO_ANEXADA]);
-    //$solObj->firma($solId,"anexa");
     DBi::commit();
     DBi::autocommit(true);
     echo getRespGralView($encabezado,$htmlMessage,$solId,$solFolio,false,$beInteractive,false);
@@ -5099,14 +4802,14 @@ function doAttachProofDoc() {
         die(json_encode(array('message'=>'ERROR: NO TYPE', 'code'=>1338)));
     }
     $log="type='$type'";
-    if ($type[0]==="f") { global $invObj; $log.=",table='Facturas'";
-        $tabObj=$invObj; $fileField="comprobantePagoPDF";
+    if ($type[0]==="f") { $log.=",table='Facturas'";
+        $tabObj=dao('inv'); $fileField="comprobantePagoPDF";
         $pathField="ubicacion"; $divName="invDocs";
-    } else if ($type[0]==="o") { global $ordObj; if (!isset($ordObj)) { require_once "clases/OrdenesCompra.php"; $ordObj=new OrdenesCompra(); } $log.=",table='OrdenesCompra'";
-        $tabObj=$ordObj; $fileField="comprobantePago";
+    } else if ($type[0]==="o") { $log.=",table='OrdenesCompra'";
+        $tabObj=dao('ord'); $fileField="comprobantePago";
         $pathField="rutaArchivo"; $divName="ordDocs";
-    } else if ($type[0]==="c") { global $ctrObj; if (!isset($ctrObj)) { require_once "clases/Contrarrecibos.php"; $ctrObj=new Contrarrecibos(); } $log.=",table='Contrarrecibos'";
-        $tabObj=$ctrObj; $fileField="comprobantePago";
+    } else if ($type[0]==="c") { $log.=",table='Contrarrecibos'";
+        $tabObj=dao('ctr'); $fileField="comprobantePago";
         $pathField=""; $divName="ctrDocs"; $pathName=$_POST["path"]??"";
     } else {
         doclog("AttachProofDoc: Tipo de cfdi invalido","solpago",$baseData+["line"=>__LINE__,"log"=>$log]+$_POST+$_FILES);
@@ -5182,11 +4885,7 @@ function doAttachProofDoc() {
             //echo $http_origin.$fullName;
         } else {
             $log.=",MOVED!";
-            global $solObj;
-            if (!isset($solObj)) {
-                require_once "clases/SolicitudPago.php";
-                $solObj = new SolicitudPago();
-            }
+            $solObj=dao('sol');
             if (!$solObj->saveRecord(["id"=>$solId,"proceso"=>SolicitudPago::PROCESO_ANEXADA]) && !empty(DBi::$errno)) {
                 $log.=",NOTSAVEDSOL! QRY: $query, ERR ".DBi::$errno.": ".DBi::$error;
                 doclog("AttachProofDoc: ERROR: Solicitud no guardada","solpago",$baseData+["line"=>__LINE__,"log"=>$log,"DBOErrors"=>$tabObj->errors,"DBiErrors"=>DBi::$errors]+$_POST+$_FILES);
@@ -5195,7 +4894,6 @@ function doAttachProofDoc() {
                 die(json_encode(array('message'=>'ERROR: NOSAVE REQUEST', 'code'=>1346, 'errno'=>DBi::$errno, 'error'=>DBi::$error, 'fullName'=>$fullName, 'query'=>$query)));
                 //echo $http_origin.$fullName;
             }
-
             $solObj->firma($solId,"anexa");
         }
     } else {
@@ -5212,7 +4910,7 @@ function isPayingRequest() {
     return "responseSetPaidRequest"===($_REQUEST["action"]??"");
 }
 function doPayingRequest() {
-    global $tokObj, $query;
+    global $query;
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__];
     $encabezado="SOLICITUD PROGRAMADA PARA PAGO";
     if (isset($_POST["ignore"])/*&&$_POST["ignore"]===true*/) {
@@ -5227,10 +4925,7 @@ function doPayingRequest() {
         echo getRespGralView($encabezado,"La solicitud ha sido ignorada",$solId,$solFolio,false,false,false);
         die();
     }
-    if(!isset($tokObj)) {
-        require_once "clases/Tokens.php";
-        $tokObj = new Tokens();
-    }
+    $tokObj = dao("tok");
     if (isset($_GET["token"])) {
         $token=$_GET["token"];
         $beInteractive=true;
@@ -5327,11 +5022,7 @@ function doPayingRequest() {
         DBi::autocommit(true);
         die();
     }
-    global $solObj;
-    if (!isset($solObj)) {
-        require_once "clases/SolicitudPago.php";
-        $solObj = new SolicitudPago();
-    }
+    $solObj=dao("sol");
     $solData=$solObj->getData("id=$solId");
     if (!isset($solData[0])) {
         doclog("PAYINGREQUEST Error: la solicitud no existe","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId]);
@@ -5384,9 +5075,9 @@ function doPayingRequest() {
         DBi::autocommit(true);
         die();
     }
+    $invObj=dao("inv");
     if ($conFactura) {
         $idFactura=$solData["idFactura"];
-        global $invObj;
         $invData=$invObj->getData("id=$idFactura");
         if (!isset($invData[0])) {
             doclog("PAYINGREQUEST Error: No se encontró la factura","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId,"invId"=>$idFactura]);
@@ -5453,17 +5144,11 @@ function doPayingRequest() {
                 die();
             } // else // LA FACTURA YA ESTA MARCADA COMO PAGADA
         } else {
-            global $prcObj;
-            if(!isset($prcObj)) { require_once "clases/Proceso.php"; $prcObj = new Proceso(); }
-            $prcObj->cambioFactura($idFactura, "Pagado", $username, false, "Solicitud $solFolio con Factura");
+            dao('prc')->cambioFactura($idFactura, "Pagado", $username, false, "Solicitud $solFolio con Factura");
         }
     } else if ($conOrden) {
         $ordId=$solData["idOrden"];
-        global $ordObj;
-        if (!isset($ordObj)) {
-            require_once "clases/OrdenesCompra.php";
-            $ordObj=new OrdenesCompra();
-        }
+        $ordObj=dao("ord");
         $ordData = $ordObj->getData("id=$ordId");
         if (!isset($ordData[0])) {
             doclog("PAYINGREQUEST Error: La orden de compra no existe","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId,"ordId"=>$ordId]);
@@ -5504,12 +5189,7 @@ function doPayingRequest() {
             die();
         }
         $idProveedor=$ordData["idProveedor"];
-        global $prvObj;
-        if (!isset($prvObj)) {
-            require_once "clases/Proveedores.php";
-            $prvObj = new Proveedores();
-        }
-        $prvData=$prvObj->getData("id=$idProveedor",0,"codigo");
+        $prvData=dao('prv')->getData("id=$idProveedor",0,"codigo");
         $codigoProveedor=$prvData[0]["codigo"]??"";
         if (!$ordObj->saveRecord(["id"=>$ordId,"status"=>new DBExpression("status|4")])) {
             doclog("PAYINGREQUEST Error: La orden no pudo guardarse","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId,"ordId"=>$ordId,"query"=>$query,"dberrors"=>DBi::$errors]);
@@ -5521,12 +5201,7 @@ function doPayingRequest() {
         }
     } else if ($conContra) {
         $ctrId=$solData["idContrarrecibo"];
-        global $ctrObj;
-        if (!isset($ctrObj)) {
-            require_once "clases/Contrarrecibos.php";
-            $ctrObj=new Contrarrecibos();
-        }
-        $ctrData=$ctrObj->getData("id=$ctrId");
+        $ctrData=dao('ctr')->getData("id=$ctrId");
         if (!isset($ctrData[0])) {
             doclog("PAYINGREQUEST Error: El contra recibo no existe","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId,"ctrId"=>$ctrId]);
             echo getRespGralView($encabezado,"El contra recibo no existe",$solId,$solFolio,true,false);
@@ -5543,13 +5218,7 @@ function doPayingRequest() {
             DBi::autocommit(true);
             die();
         }
-        global $ctfObj;
-        if (!isset($ctfObj)) {
-            require_once "clases/Contrafacturas.php";
-            $ctfObj=new Contrafacturas();
-        }
-        $ctfObj->rows_per_page=0;
-        $ctfData=$ctfObj->getData("idContrarrecibo=$ctrId and autorizadaPor is not null");
+        $ctfData=dao('ctf', ["rows_per_page"=>0])->getData("idContrarrecibo=$ctrId and autorizadaPor is not null");
         if (!isset($ctfData[0])) {
             global $query;
             doclog("PAYINGREQUEST Error: El contra recibo no tiene contra facturas autorizadas","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId,"ctrId"=>$ctrId,"query"=>$query]);
@@ -5568,7 +5237,6 @@ function doPayingRequest() {
             DBi::autocommit(true);
             die();
         }
-        global $invObj;
         $invData=$invObj->getData($invWhere,0,"id,statusn");
         $fixedInvoice=0;
         foreach ($invData as $idx => $invRow) {
@@ -5577,9 +5245,7 @@ function doPayingRequest() {
             if ($invStatusN<16) {
                 if ($invObj->saveRecord(["id"=>$invId,"status"=>"Pagado","statusn"=>$invStatusN+32])) {
                     $fixedInvoice++;
-                    global $prcObj;
-                    if(!isset($prcObj)) { require_once "clases/Proceso.php"; $prcObj = new Proceso(); }
-                    $prcObj->cambioFactura($invId, "Pagado", $username, false, "Sol $solFolio x Contra $ctrData[aliasGrupo]-$ctrData[folio] Marcado");
+                    dao('prc')->cambioFactura($invId, "Pagado", $username, false, "Sol $solFolio x Contra $ctrData[aliasGrupo]-$ctrData[folio] Marcado");
                 } else {
                     global $query;
                     doclog("PAYINGREQUEST Error: No fue posible actualizar una factura","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId,"ctrId"=>$ctrId,"idx"=>$idx,"statusn"=>$invStatusN,"factura"=>$invRow]);
@@ -5621,11 +5287,7 @@ function doPayingRequest() {
         DBi::autocommit(true);
         die();
     }
-    global $usrObj;
-    if (!isset($usrObj)) {
-        require_once "clases/Usuarios.php";
-        $usrObj=new Usuarios();
-    }
+    $usrObj=dao("usr");
     $fromObj=["address"=>getUser()->email,"name"=>replaceAccents(getUser()->persona)];
     $respuesta="<h2>La solicitud ".($solFolio??$solId)." ha sido pagada</h2>";
     $usrData=$usrObj->getData("id=$solIdUsuario",0,"nombre,persona,email");
@@ -5655,9 +5317,7 @@ function doPayingRequest() {
     }
     $usrObj->saveRecord(["id"=>$solIdUsuario,"banderas"=>new DBExpression("banderas|2")]);
     $mensaje=getSolFormaView($template,$solId,$solFolio,$baseKeyMap);
-    global $gpoObj;
-    if (!isset($gpoObj)) { require_once "clases/Grupo.php"; $gpoObj=new Grupo(); }
-    $mailSettings=["gpoId"=>$solData["idEmpresa"], "domain"=>$gpoObj->getDomainKey($solData["idEmpresa"])];
+    $mailSettings=["gpoId"=>$solData["idEmpresa"], "domain"=>dao('gpo')->getDomainKey($solData["idEmpresa"])];
     sendMail($asunto,$mensaje,$fromObj,$toObj,null,null,$mailSettings); // (8) PAGO DE SOLICITUD. Finanzas a Solicitante
     echo getRespGralView($asunto,"La solicitud ha sido pagada",$solId,$solFolio,false,$beInteractive,false);
 } // FIN (8) PAGO DE SOLICITUD //
@@ -5672,11 +5332,7 @@ function doResendEmail() {
     if (!isset($solId[0])) {
         errNDie("No se especifica id de solicitud",$_POST,"mail");
     }
-    global $solObj;
-    if (!isset($solObj)) {
-        require_once "clases/SolicitudPago.php";
-        $solObj = new SolicitudPago();
-    }
+    $solObj=dao("sol");
     $solData=$solObj->getData("id=$solId");
     if (!isset($solData[0])) {
         errNDie("La solicitud no existe",$_POST,"mail");
@@ -5689,33 +5345,19 @@ function doResendEmail() {
     if (!isset($gpoId[0])) {
         errNDie("No se pudo obtener la empresa de la solicitud",$solData,"mail");
     }
+    $tokObj=dao("tok");
     if (isset($_POST["authId"])) {
-        global $perObj;
-        if (!isset($perObj)) {
-            require_once "clases/Perfiles.php";
-            $perObj = new Perfiles();
-        }
-        $perData = $perObj->getData("nombre=\"Autoriza Pagos\"", 0, "id");
+        $perData = dao('per')->getData("nombre=\"Autoriza Pagos\"", 0, "id");
         if (!isset($perData[0])||!isset($perData[0]["id"])) {
             errNDie("No se encontró perfil de autorización",null,"mail");
         }
         $perId=$perData[0]["id"];
         $authId=$_POST["authId"];
-        global $upObj;
-        if (!isset($upObj)) {
-            require_once "clases/Usuarios_Perfiles.php";
-            $upObj = new Usuarios_Perfiles();
-        }
-        $upData = $upObj->getData("idUsuario=$authId and idPerfil=$perId",0,"count(1) n");
+        $upData = dao('up')->getData("idUsuario=$authId and idPerfil=$perId",0,"count(1) n");
         if (!isset($upData[0])||!isset($upData[0]["n"])) {
             errNDie("No tiene permiso para autorizar solicitudes",null,"mail");
         }
         $authList=[$authId];
-        global $tokObj;
-        if (!isset($tokObj)) {
-            require_once "clases/Tokens.php";
-            $tokObj = new Tokens();
-        }
         $tokData=$tokObj->getData("refId=$solId and modulo in (\"autorizaPago\",\"rechazaPago\") and status=\"activo\" and usrId=$authId",0,"token,modulo");
         if (!isset($tokData[0])) {
             $moduleList=["autorizaPago","rechazaPago"];
@@ -5731,27 +5373,17 @@ function doResendEmail() {
         $authId=$authList[0];
         // ToDo: Modificar para que se reciba solo un authId y solo a este se reenviará el correo. Hay que validar que exista token para ese usuario. Ya si no se recibe por alguna razón se tomará el primero de solData.authList (evitando 2639, como se implementó)
     } else {
-        global $perObj;
-        if (!isset($perObj)) {
-            require_once "clases/Perfiles.php";
-            $perObj=new Perfiles();
-        }
-        $perData=$perObj->getData("nombre='Autoriza Pagos'",0,"id");
+        $perData=dao('per')->getData("nombre='Autoriza Pagos'",0,"id");
         if (!isset($perData[0])||!isset($perData[0]["id"])) {
             errNDie("No se encontró perfil de autorización",null,"mail");
         }
         $perfilId=$perData[0]["id"];
-        global $ugObj;
-        if (!isset($ugObj)) {
-            require_once "clases/Usuarios_Grupo.php";
-            $ugObj=new Usuarios_Grupo();
-        }
         $ugQuery="idPerfil=$perfilId and idGrupo=$gpoId";
         $authId=$_POST["authId"]??"";
         if (isset($authId[0])) {
             $ugQuery.=" and idUsuario=$authId";
         }
-        $ugData=$ugObj->getData($ugQuery,0,"idUsuario");
+        $ugData=dao('ug')->getData($ugQuery,0,"idUsuario");
         if (!isset($ugData[0]["idUsuario"])) {
             errNDie("No se encontró permiso Autoriza Pagos",$_POST,"mail");
         }
@@ -5771,11 +5403,6 @@ function doResendEmail() {
     include "templates/solforma.php";
     $baseKeyMap["RESPUESTA"]=ob_get_clean();
     $rutaToken="consultas/Facturas.php?action=responsePaymentAuthorization&token=";
-    global $tokObj;
-    if (!isset($tokObj)) {
-        require_once "clases/Tokens.php";
-        $tokObj = new Tokens();
-    }
     $mensajeBase=file_get_contents(getBasePath()."templates/correoSolPago2.html");
     $tokData=$tokObj->getData("refId=$solId and modulo in (\"autorizaPago\",\"rechazaPago\") and status=\"activo\" and usrId=$authId",0,"token,modulo");
     foreach ($tokData as $idx=>$tokInfo) {
@@ -5792,6 +5419,7 @@ function doResendEmail() {
     $keyMap=array_merge($baseKeyMap,["AUTORIZAR"=>$rutaToken.$tokenAutorizar,"RECHAZAR"=>$rutaToken.$tokenRechazar]);
     $mensaje = preg_replace("/%\w+%/","",str_replace(array_map(function($elem){return "%".$elem."%";},array_keys($keyMap)),array_values($keyMap), $mensajeBase));
     $solUserId=$solData["idUsuario"];
+    $usrObj=dao("usr");
     $usrFromData=$usrObj->getData("id=$solUserId",0,"persona,email");
     if (!isset($usrFromData[0]["email"]))
         errNDie("No se encontro usuario solicitante",$solData,"mail");
@@ -5808,9 +5436,7 @@ function doResendEmail() {
     //$toString="{$to['name']} <{$to['address']}>";
     $subject="Solicitud de Autorizacion de Pago $solFolio";
     //$mailDesc="'$subject' de $fromString para $toString";
-    global $gpoObj;
-    if (!isset($gpoObj)) { require_once "clases/Grupo.php"; $gpoObj=new Grupo(); }
-    $mailSettings=["gpoId"=>$gpoId, "domain"=>$gpoObj->getDomainKey($gpoId),"solId"=>$solId,"solfolio"=>$solFolio];
+    $mailSettings=["gpoId"=>$gpoId, "domain"=>dao("gpo")->getDomainKey($gpoId),"solId"=>$solId,"solfolio"=>$solFolio];
     //doclog("Enviando correo $mailDesc","mail");
     sendMail($subject,$mensaje,$from,$to,null,null,$mailSettings); // RESEND. Solicitante a Ultimo Autorizador
     // toDo: Enviar correo a solicitante: "Solicitud de Autorización reenviada"
@@ -5826,7 +5452,7 @@ function isPayingMultiple() {
     return "payingMultipleRequest"===($_REQUEST["action"]??"");
 }
 function doPayingMultiple() {
-    global $query, $invObj, $ordObj, $prvObj, $usrObj;
+    global $query;
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__];
     sessionInit();
     if (!hasUser()) {
@@ -5890,10 +5516,7 @@ function doPayingMultiple() {
             doclog("Error al anexar y pagar: sin archivo","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId]);
             continue;
         }
-        if (!isset($solObj)) {
-            require_once "clases/SolicitudPago.php";
-            $solObj=new SolicitudPago();
-        }
+        $solObj=dao("sol");
         $solData=$solObj->getData("id=$solId");
         if (!isset($solData)) {
             $info[$solId]["error"][]="La solicitud $solId ya no existe";
@@ -5944,7 +5567,8 @@ function doPayingMultiple() {
                 doclog("Error al anexar y pagar: factura no contable","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId]);
                 continue;
             }
-            $invData=$invObj->getData("id=$idFactura");
+            $tabObj=dao('inv');
+            $invData=$tabObj->getData("id=$idFactura");
             if (!isset($invData[0])) {
                 $info[$solId]["error"][]="La factura en la solicitud $solId ha sido eliminada";
                 doclog("Error al anexar y pagar: sin factura","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId,"invId"=>$idFactura]);
@@ -5985,7 +5609,6 @@ function doPayingMultiple() {
             }
             $codigoProveedor=$invData["codigoProveedor"];
             $tabDesc="Factura";
-            $tabObj=$invObj;
             $cpId=$idFactura;
             if (isset($file)) {
                 $tmpName=$invData["nombreInternoPDF"];
@@ -6002,11 +5625,8 @@ function doPayingMultiple() {
                 doclog("Aviso al anexar y pagar: Cambió tipo a Orden de Compra","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId,"oldTipo"=>$solTipoFO,"newTipo"=>"O"]);
                 $solTipoFO="O";
             }
-            if (!isset($ordObj)) {
-                require_once "clases/OrdenesCompra.php";
-                $ordObj=new OrdenesCompra();
-            }
-            $ordData=$ordObj->getData("id=$idOrden");
+            $tabObj=dao("ord");
+            $ordData=$tabObj->getData("id=$idOrden");
             if (!isset($ordData[0])) {
                 $info[$solId]["error"][]="La orden en la solicitud $solId ha sido eliminada";
                 doclog("Error al anexar y pagar: sin orden","solpago",$baseData+["line"=>__LINE__,"solId"=>$solId,"ordId"=>$idOrden]);
@@ -6036,14 +5656,9 @@ function doPayingMultiple() {
                 continue;
             }
             $idProveedor=$ordData["idProveedor"];
-            if (!isset($prvObj)) {
-                require_once "clases/Proveedores.php";
-                $prvObj = new Proveedores();
-            }
-            $prvData=$prvObj->getData("id=$idProveedor");
+            $prvData=dao("prv")->getData("id=$idProveedor");
             $codigoProveedor=$prvData[0]["codigo"]??"";
             $tabDesc="Orden de compra";
-            $tabObj=$ordObj;
             $cpId=$idOrden;
             if (isset($file)) {
                 $fileFieldName="comprobantePago";
@@ -6101,10 +5716,7 @@ function doPayingMultiple() {
             }
             $solObj->firma($solId,"anexa");
         }
-        if (!isset($usrObj)) {
-            require_once "clases/Usuarios.php";
-            $usrObj=new Usuarios();
-        }
+        $usrObj=dao("usr");
         $fromObj=["address"=>getUser()->email, "name"=>replaceAccents(getUser()->persona)];
         $idUsuario=$solData["idUsuario"];
         /* TEST */$idUsuario=2146;
@@ -6138,9 +5750,7 @@ function doPayingMultiple() {
             $toObj=[$toObj,["address"=>$uprData["email"],"name"=>$uprData["persona"]]];
         }
         $usrObj->saveRecord(["id"=>$idUsuario,"banderas"=>new DBExpression("banderas|2")]);
-        global $gpoObj;
-        if (!isset($gpoObj)) { require_once "clases/Grupo.php"; $gpoObj=new Grupo(); }
-        $mailSettings=["domain"=>$gpoObj->getDomainKey($solData["idEmpresa"])];
+        $mailSettings=["domain"=>dao("gpo")->getDomainKey($solData["idEmpresa"])];
         sendMail($asunto,$mensaje,$fromObj,$toObj,null,null,$mailSettings); // Pagos Múltiples. Finanzas a Solicitantes
         $info[$solId]["log"]="Solicitud Marcada Pagada";
     }
@@ -6172,15 +5782,13 @@ function doCancelInvoiceInRequest() {
     $empresa=$_POST["gpoRS"]??"";
     $codigo=$_POST["prCod"]??"";
     $proveedor=$_POST["prvRS"]??"";
-    global $usrObj, $invObj, $ctrObj, $ctfObj, $prcObj, $solObj, $query;
-    /*if (!isset($invObj)) { require_once "clases/Facturas.php"; $invObj = new Facturas(); }*/
-    $invData=$invObj->getData("id=$invId");
+    global $query;
+    $invData=dao("inv")->getData("id=$invId");
     if (!isset($invData[0]["uuid"][0])) {
         $em="";
         if (isset($alias[0])) {
             $em.="empresa $alias";
-            global $gpoObj;if(!isset($gpoObj)){require_once "clases/Grupo.php";$gpoObj=new Grupo();}
-            $gpoData=$gpoObj->getData("alias='{$alias}'",0,"id");
+            $gpoData=dao("gpo")->getData("alias='{$alias}'",0,"id");
             //$gpoId=array_column(, "id")[0];
             if (isset($gpoData[0]["id"])) $gpoId=$gpoData[0]["id"];
         }
@@ -6201,7 +5809,7 @@ function doCancelInvoiceInRequest() {
             if (isset($invData["folio"][10])) $folio=substr($folio,-10);
         } else $folio="[".substr($invData["uuid"], -10)."]";
     }
-    if(!isset($usrObj)) { require_once "clases/Usuarios.php"; $usrObj = new Usuarios(); }
+    $usrObj = dao("usr");
     $uprData=$usrObj->getData("nombre='$codigo'",0,"persona,email");
     if (!isset($uprData[0]["email"][0])) {
         doclog("Proveedor de CFDI no reconocido","cancelinv",$_POST);
@@ -6216,8 +5824,7 @@ function doCancelInvoiceInRequest() {
     if ($invStatusN>=Facturas::STATUS_PAGADO && !$esSistemas) { // ToDo: ignorar si es administrador o sistemas. Permitir rechazar facturas pagadas
         errNDie("No puede cancelar una factura pagada, solicite cancelacion a Sistemas.",$baseData+$_POST);
     }
-    if (!isset($solObj)) { require_once "clases/SolicitudPago.php"; $solObj=new SolicitudPago(); }
-    $solData=$solObj->getData("idFactura=$invId");
+    $solData=dao("sol")->getData("idFactura=$invId");
     if (isset($solData[0]["id"])) {
         errNDie("No puede cancelar una factura integrada a una solicitud",$baseData+$_POST);
     }
@@ -6232,20 +5839,19 @@ function doCancelInvoiceInRequest() {
                 errNDie("No puede cancelar una factura con contra recibo, debe separarla primero.",$baseData+$_POST);
                 break;
             case "b"; // Eliminar factura de su contra recibo, si el contra recibo no tiene otras facturas eliminarlo tambien
-                if (!isset($ctfObj)) { require_once "clases/Contrafacturas.php"; $ctfObj = new Contrafacturas(); }
+                $ctfObj = dao("ctf");
                 $ctfData=$ctfObj->getData("idFactura=$invId");
                 if (isset($ctfData[0]["id"])) {
                     $ctfData=$ctfData[0];
                     $ctfId=$ctfData["id"];
                     $ctfTot=+$ctfData["total"];
                     $crId=$ctfData["idContrarrecibo"];
-                    if (!isset($ctrObj)) { require_once "clases/Contrarrecibos.php"; $ctrObj = new Contrarrecibos(); }
+                    $ctrObj = dao("ctr");
                     $ctrData=$ctrObj->getData("id=$crId");
                     if (isset($ctrData[0])) {
                         $aliasG=$ctrData[0]["aliasGrupo"];
                         $ctrFolio=$aliasG."-".$ctrData[0]["folio"];
-                        global $gpoObj;if(!isset($gpoObj)){require_once "clases/Grupo.php";$gpoObj=new Grupo();}
-                        $gpoData=$gpoObj->getData("alias='{$aliasG}'",0,"id");
+                        $gpoData=dao("gpo")->getData("alias='{$aliasG}'",0,"id");
                         //$gpoId=array_column(, "id")[0];
                         if (isset($gpoData[0]["id"])) $gpoId=$gpoData[0]["id"];
                     }
@@ -6258,7 +5864,6 @@ function doCancelInvoiceInRequest() {
                         errNDie("No se pudo eliminar la factura del contra recibo",$baseData+["query"=>$ctfQry,"errno"=>$ern,"error"=>$err]+$_POST);
                     }
                     $cfsData=$ctfObj->getData("idContrarrecibo=$crId");
-                    if (!isset($firObj)) { require_once "clases/Firmas.php"; $firObj=new Firmas(); }
                     if (isset($cfsData[0])) {
                         $ctfOp="-";
                         if ($ctfTot<0) {
@@ -6276,7 +5881,7 @@ function doCancelInvoiceInRequest() {
                             errNDie("Error al actualizar contra recibo",$baseData+["query"=>$ctrQry,"errno"=>$ern,"error"=>$err]+$_POST);
                         }
                         if (isset($ctrFolio)) $mmsg.="<br>El contra-recibo $ctrFolio fue modificado.";
-                        if (!$firObj->saveRecord(["idUsuario"=>getUser()->id,"modulo"=>"contrarrecibo","idReferencia"=>$crId,"accion"=>"elimina","motivo"=>"Elimina $ctfData[folioFactura] en contrarrecibo $ctrFolio"])) doclog("Error al agregar Firma de Contra recibo modificado","cancelinv",$baseData+["query"=>$query,"errno"=>DBi::$errno,"error"=>DBi::$error]+$_POST);
+                        if (!dao('fir')->saveRecord(["idUsuario"=>getUser()->id,"modulo"=>"contrarrecibo","idReferencia"=>$crId,"accion"=>"elimina","motivo"=>"Elimina $ctfData[folioFactura] en contrarrecibo $ctrFolio"])) doclog("Error al agregar Firma de Contra recibo modificado","cancelinv",$baseData+["query"=>$query,"errno"=>DBi::$errno,"error"=>DBi::$error]+$_POST);
                         // toDo: agregar firma de facturas eliminadas del contra recibo
                     } else {
                         if (!$ctrObj->deleteRecord(["id"=>$crId])) {
@@ -6289,7 +5894,7 @@ function doCancelInvoiceInRequest() {
                         }
                         if (isset($ctrFolio)) $mmsg.="<br>El contra-recibo $ctrFolio fue eliminado.";
                         // toDo: agregar firma de todas las facturas eliminadas del contra recibo
-                        if (!$firObj->saveRecord(["idUsuario"=>getUser()->id,"modulo"=>"contrarrecibo","idReferencia"=>$crId,"accion"=>"elimina","motivo"=>"Elimina $ctfData[folioFactura] y contrarrecibo $ctrFolio"])) doclog("Error al agregar Firma de Contra recibo eliminado","cancelinv",$baseData+["query"=>$query,"errno"=>DBi::$errno,"error"=>DBi::$error]+$_POST);
+                        if (!dao('fir')->saveRecord(["idUsuario"=>getUser()->id,"modulo"=>"contrarrecibo","idReferencia"=>$crId,"accion"=>"elimina","motivo"=>"Elimina $ctfData[folioFactura] y contrarrecibo $ctrFolio"])) doclog("Error al agregar Firma de Contra recibo eliminado","cancelinv",$baseData+["query"=>$query,"errno"=>DBi::$errno,"error"=>DBi::$error]+$_POST);
                     }
                     // Enviar copia del correo a contabilidad, indicando el contra recibo y si fue modificado o eliminado
                     //$upgData=$usrObj->getData("up.idPerfil=".SolicitudPago::PERFIL_GESTIONA,0,"u.id,u.nombre,u.persona,u.email","u inner join usuarios_perfiles up on u.id=up.idUsuario");
@@ -6309,7 +5914,7 @@ function doCancelInvoiceInRequest() {
         }
     }
     doclog("Ready to cancel","read",["post"=>$_POST,"data"=>$invData]);
-    if (!$invObj->saveRecord(["id"=>$invId,"status"=>"{$accion}do","statusn"=>new DBExpression("statusn|".Facturas::STATUS_RECHAZADO)])) {
+    if (!dao('inv')->saveRecord(["id"=>$invId,"status"=>"{$accion}do","statusn"=>new DBExpression("statusn|".Facturas::STATUS_RECHAZADO)])) {
         global $query;
         $invQuery=$query;
         $invErrors=DBi::$errors;
@@ -6318,10 +5923,6 @@ function doCancelInvoiceInRequest() {
         errNDie("No fue posible {$accionlw}r el CFDI",$_POST+["query"=>$invQuery,"errors"=>$invErrors],"cancelinv");
     }
     if (getUser()->nombre==="admin") {
-        if (!isset($usrObj)) {
-            require_once "clases/Usuarios.php";
-            $usrObj=new Usuarios();
-        }
         $usrData=null;
         $usrname=$_POST["username"]??"SISTEMAS";
         if ($usrname==="nomail") {
@@ -6345,8 +5946,7 @@ function doCancelInvoiceInRequest() {
         $usrmail=getUser()->email;
     }
     // Proceso con motivo
-    if(!isset($prcObj)) { require_once "clases/Proceso.php"; $prcObj = new Proceso(); }
-    $prcObj->cambioFactura($invId, "{$accion}do", $usrname, false, $detalle="$motivo");
+    dao('prc')->cambioFactura($invId, "{$accion}do", $usrname, false, $detalle="$motivo");
     $mensaje="El CFDI ha sido {$accionlw}do: $motivo";
     // Correo al proveedor
     if (isset($usrmail)) {
@@ -6360,8 +5960,7 @@ function doCancelInvoiceInRequest() {
             $mensaje.=", pero <u>sin correo al proveedor</u>";
             $mmsg.="<br>Proveedor sin correo: $codigo $proveedor";
         }
-        global $gpoObj;
-        if (!isset($gpoObj)) { require_once "clases/Grupo.php"; $gpoObj=new Grupo(); }
+        $gpoObj=dao("gpo");
         $mailSettings=["domain"=>$gpoObj->getDomainKeyByAlias($gpoObj->getAliasByRFC($rfcGpo))];
         sendMail("CFDI $folio {$accion}do","El CFDI con folio '$folio' fue {$accionlw}do:<br><b>$motivo</b>{$mmsg}", false, $toObj, $ccObj??null, $bccObj??null, $mailSettings);
     }
@@ -6382,11 +5981,7 @@ function doCancelPaymentRequest() {
     if (!isset($solId[0])) {
         errNDie("No se especifica id de solicitud",$_POST);
     }
-    global $solObj;
-    if (!isset($solObj)) {
-        require_once "clases/SolicitudPago.php";
-        $solObj = new SolicitudPago();
-    }
+    $solObj=dao("sol");
     $solData=$solObj->getData("id=$solId");
     if (!isset($solData[0])) {
         errNDie("La solicitud no existe",$_POST);
@@ -6408,22 +6003,10 @@ function doCancelPaymentRequest() {
     $usrname = getUser()->nombre;
     $usrFullName=getUser()->persona;
     $usrEMail=getUser()->email;
-    /*
-    global $tokObj;
-    if (!isset($tokObj)) {
-        require_once "clases/Tokens.php";
-        $tokObj = new Tokens();
-    }
-    $tokObj->saveRecord(["refId"=>$solId,"status"=>"activo"]);
-    */
     DBi::query("UPDATE tokens SET status=\"cancelado\", usos=0 WHERE refId=$solId AND status=\"activo\" AND id>0");
     DBi::query("UPDATE tokens SET usos=0 WHERE refId=$solId AND modulo=\"autorizaPago\" AND id>0");
     if (isset($invId)) {
-        global $invObj;
-        /*if (!isset($invObj)) {
-            require_once "clases/Facturas.php";
-            $invObj = new Facturas();
-        }*/
+        $invObj=dao("inv");
         if (!$invObj->saveRecord(["id"=>$invId,"status"=>"Cancelado","statusn"=>new DBExpression("statusn|".Facturas::STATUS_RECHAZADO)])) {
             DBi::rollback();
             DBi::autocommit(TRUE);
@@ -6437,16 +6020,9 @@ function doCancelPaymentRequest() {
         else if (isset($invData["uuid"][0]))
             $invFolio=$invData["uuid"];
         else $invFolio="(sin folio)";
-        global $prcObj;
-        if(!isset($prcObj)) { require_once "clases/Proceso.php"; $prcObj = new Proceso(); }
-        $prcObj->cambioFactura($invId, "Cancelado", $usrname, false, $detalle="Sol $solFolio cancelada");
+        dao('prc')->cambioFactura($invId, "Cancelado", $usrname, false, $detalle="Sol $solFolio cancelada");
     } else if (isset($solData["idOrden"])) {
-        global $ordObj;
-        if (!isset($ordObj)) {
-            require_once "clases/OrdenesCompra.php";
-            $ordObj = new OrdenesCompra();
-        }
-        if (!$ordObj->saveRecord(["id"=>$solData["idOrden"],"status"=>OrdenesCompra::STATUS_CANCELADO])) {
+        if (!dao('ord')->saveRecord(["id"=>$solData["idOrden"],"status"=>OrdenesCompra::STATUS_CANCELADO])) {
             DBi::rollback();
             DBi::autocommit(TRUE);
             errNDie("No fue posible cancelar la orden de compra",$_POST);
@@ -6456,16 +6032,8 @@ function doCancelPaymentRequest() {
         DBi::autocommit(TRUE);
         errNDie("No fue posible cancelar la factura u orden de compra",$_POST);
     }
-    global $firObj;
-    if (!isset($firObj)) {
-        require_once "clases/Firmas.php";
-        $firObj = new Firmas();
-    }
+    $usrObj=dao('usr');
     if (getUser()->nombre==="admin") {
-        if (!isset($usrObj)) {
-            require_once "clases/Usuarios.php";
-            $usrObj=new Usuarios();
-        }
         $usrData = $usrObj->getData("nombre='SISTEMAS'",0,"id,persona,email");
         if (isset($usrData[0])) $usrData=$usrData[0];
         if (isset($usrData["id"])) {
@@ -6475,19 +6043,13 @@ function doCancelPaymentRequest() {
         }
     }
     $motivo=$_POST["motivo"]??"No especificado";
-    $firObj->saveRecord(["idUsuario"=>$usrId,"modulo"=>"solpago","idReferencia"=>$solId,"accion"=>"cancela","motivo"=>$motivo]);
+    dao('fir')->saveRecord(["idUsuario"=>$usrId,"modulo"=>"solpago","idReferencia"=>$solId,"accion"=>"cancela","motivo"=>$motivo]);
     DBi::commit();
     DBi::autocommit(TRUE);
 
-    if (!isset($usrObj)) {
-        require_once "clases/Usuarios.php";
-        $usrObj=new Usuarios();
-    }
     $usrData=$usrObj->getData("id=$solUsrId",0,"persona,email");
     $solUsrAddr=null;
-    global $gpoObj;
-    if (!isset($gpoObj)) { require_once "clases/Grupo.php"; $gpoObj=new Grupo(); }
-    $mailSettings=["domain"=>$gpoObj->getDomainKey($solData["idEmpresa"])];
+    $mailSettings=["domain"=>dao('gpo')->getDomainKey($solData["idEmpresa"])];
     if (isset($usrData[0])) $usrData=$usrData[0];
     if (isset($usrData["persona"][0]) && isset($usrData["email"][0])) {
         $asunto="Solicitud $solFolio Cancelada";
@@ -6527,8 +6089,8 @@ function doSaveReferral() {
         errNDie("Error al Guardar Remision: No hay texto de remision",$baseData+["line"=>__LINE__]);
     }
     $text=$_POST["text"];
-    global $invObj, $query;
-    if (!isset($invObj)) { require_once "clases/Facturas.php"; $invObj=new Facturas(); }
+    global $query;
+    $invObj=dao("inv");
     if (!$invObj->saveRecord(["id"=>$invId,"remision"=>$text])) {
         if (DBi::$errno>0)
             errNDie("Error al Guardar Remision: No se guardaron los datos",$baseData+["line"=>__LINE__,"errno"=>DBi::$errno,"error"=>DBi::$error,"query"=>$query,"log"=>$invObj->log]);
@@ -6555,11 +6117,7 @@ function doSaveRequestObservations() {
         errNDie("Error al Guardar Observaciones: No hay observaciones",$baseData+["line"=>__LINE__]+$_POST);
     }
     $text=$_POST["text"]??"";
-    global $solObj;
-    if (!isset($solObj)) {
-        require_once "clases/SolicitudPago.php";
-        $solObj = new SolicitudPago();
-    }
+    $solObj=dao("sol");
     /*
     $solData=$solObj->getData("id=$solId");
     if (!isset($solData[0])) {
@@ -6632,25 +6190,15 @@ function getPaymNoteView($msg,$solId="",$solFolio="",$isAuth=false,$isErr=true,$
     return getRespGralView("SOLICITUD".($isAuth?" DE AUTORIZACI&Oacute;N":"")." DE PAGO $solFolio",$msg,$solId,$solFolio,$isErr,$isInteractive);
 }
 function sendRejectPaymMail($solId,$solFolio,$idUsuario,$idAutoriza,$idEmpresa) {
-    global $tokObj,$usrObj;
     $msg="La solicitud de pago $solFolio ha sido rechazada";
-    if (!isset($usrObj)) {
-        require_once "clases/Usuarios.php";
-        $usrObj=new Usuarios();
-    }
+    $usrObj=dao('usr');
     $asunto="Respuesta de Autorizacion de Pago $solFolio";
     $authUsrData=$usrObj->getData("id=$idAutoriza",0,"persona,email");
     if (isset($authUsrData[0])&&isset($authUsrData[0]["persona"][0])) {
         $msg.=" por ".replaceAccents($authUsrData[0]["persona"]);
         $msg=getPaymNoteView($msg,$solId,$solFolio,true,false,false);
-        global $gpoObj;
-        if (!isset($gpoObj)) { require_once "clases/Grupo.php"; $gpoObj=new Grupo(); }
-        $mailSettings=["domain"=>$gpoObj->getDomainKey($idEmpresa)];
-        if(!isset($tokObj)) {
-            require_once "clases/Tokens.php";
-            $tokObj=new Tokens();
-        }
-        $tokData=$tokObj->getData("refId=$solId and usrId!=$idAutoriza",0,"distinct usrId");
+        $mailSettings=["domain"=>dao('gpo')->getDomainKey($idEmpresa)];
+        $tokData=dao('tok')->getData("refId=$solId and usrId!=$idAutoriza",0,"distinct usrId");
         foreach ($tokData as $idx => $otherAuth) {
             if (isset($otherAuth["usrId"][0])) {
                 $otherAuthUsrData=$usrObj->getData("id=".$otherAuth["usrId"],0,"persona,email");
@@ -6679,20 +6227,6 @@ function doGenPaymTextFile() {
     $solIdList=$_POST["ids"];
     $textResult="";
     $textError="";
-    require_once "clases/SolicitudPago.php";
-    //require_once "clases/Facturas.php";
-    require_once "clases/OrdenesCompra.php";
-    require_once "clases/Contrarrecibos.php";
-    require_once "clases/Proveedores.php";
-    require_once "clases/Usuarios.php";
-    require_once "clases/Grupo.php";
-    $solObj=new SolicitudPago();
-    $invObj=new Facturas();
-    $ordObj=new OrdenesCompra();
-    $ctrObj=new Contrarrecibos();
-    $prvObj=new Proveedores();
-    $gpoObj=new Grupo();
-    $usrObj=new Usuarios();
     $inicio="PAY485";
     $miBanco="BANAMEX";
     $codigoBanamex="000"; // 3 caracteres, sino rellenar con ceros a la izquierda
@@ -6713,15 +6247,15 @@ function doGenPaymTextFile() {
     $pgI="<p class=\"marblk5\">"; //marblk5_1
     $pgF="</p>";
     foreach ($solIdList as $idx => $solId) {
-        $solData=$solObj->getData("id=$solId");
+        $solData=dao('sol')->getData("id=$solId");
         if (!isset($solData[0])) { $textError.="{$pgI}No se encontró en sistema la solicitud $solId{$pgF}";continue; }
         $solData=$solData[0];
         $solIdf=substr($solData["folio"], -3);
         if (isset($solData["idFactura"])) {
-            $invData=$invObj->getData("id=$solData[idFactura]");
+            $invData=dao('inv')->getData("id=$solData[idFactura]");
             if (!isset($invData[0])) { $textError.="{$pgI}No se encontró en sistema la factura de la solicitud $solId{$pgF}";continue; }
             $invData=$invData[0];
-            $prvData=$prvObj->getData("codigo='$invData[codigoProveedor]'");
+            $prvData=dao('prv')->getData("codigo='$invData[codigoProveedor]'");
             $moneda=$invData["moneda"];
             $monto=$invData["total"];
             $folioFactura=$invData["folio"];
@@ -6729,23 +6263,21 @@ function doGenPaymTextFile() {
             else if (isset($folioFactura[10])) $folioFactura=substr($folioFactura,-10);
             $folioReferencia2="FACT $folioFactura"; // "FACTURA $folioFactura";
         } else if (isset($solData["idOrden"])) {
-            $ordData=$ordObj->getData("id=$solData[idOrden]");
+            $ordData=dao('ord')->getData("id=$solData[idOrden]");
             if (!isset($ordData[0])) { $textError.="{$pgI}No se encontró en sistema la orden de compra de la solicitud $solId{$pgF}";continue; }
             $ordData=$ordData[0];
-            $prvData=$prvObj->getData("id=$ordData[idProveedor]");
+            $prvData=dao('prv')->getData("id=$ordData[idProveedor]");
             $moneda=$ordData["moneda"];
             $monto=$ordData["importe"];
             $folioOrden=$ordData["folio"];
             if (isset($folioOrden[10])) $folioOrden=substr($folioOrden, -10);
             $folioReferencia2="ORDC $folioOrden"; // "ORDEN C ".$ordData["folio"];
         } else if (isset($solData["idContrarrecibo"])) {
-            $ctrData=$ctrObj->getData("id=$solData[idContrarrecibo]",0,"folio,codigoProveedor,total");
+            $ctrData=dao('ctr')->getData("id=$solData[idContrarrecibo]",0,"folio,codigoProveedor,total");
             if (!isset($ctrData[0])) { $textError.="{$pgI}No se encontró en sistema el contra recibo de la solicitud $solId{$pgF}";continue; }
             $ctrData=$ctrData[0];
-            $prvData=$prvObj->getData("codigo='$ctrData[codigoProveedor]'");
-            require_once "clases/Contrafacturas.php";
-            $ctfObj=new Contrafacturas();
-            $ctfData=$ctfObj->getData("idContrarrecibo=$solData[idContrarrecibo]",0,"moneda");
+            $prvData=dao('prv')->getData("codigo='$ctrData[codigoProveedor]'");
+            $ctfData=dao('ctf')->getData("idContrarrecibo=$solData[idContrarrecibo]",0,"moneda");
             if (!isset($ctfData[0])) { $textError.="{$pgI}No se encontró en sistema el contra recibo de la solicitud $solId{$pgF}";continue; }
             $moneda=$ctfData[0]["moneda"];
             $monto=$ctrData["total"];
@@ -6773,7 +6305,7 @@ function doGenPaymTextFile() {
         // clabe banamex tiene 18 digitos
         // tarjeta tiene 16 digitos
         $esBanamex=(strpos(strtoupper($banco), $miBanco)!==FALSE)||(strlen($cuenta)==18 && substr($cuenta, 0,3)===$inicioCuentaBanamex);
-        $usrData=$usrObj->getData("nombre='$prvData[codigo]'");
+        $usrData=dao('usr')->getData("nombre='$prvData[codigo]'");
         if (!isset($usrData[0])) {
             $textError.="{$pgI}Solicitud $solId : El proveedor $prvData[codigo] no tiene cuenta de usuario en el portal InvoiceCheck{$pgF}";
             /*continue;*/
@@ -6782,7 +6314,7 @@ function doGenPaymTextFile() {
             $usrData=$usrData[0];
             $correo=$usrData["email"]??"";
         }
-        $gpoData=$gpoObj->getData("id=$solData[idEmpresa]");
+        $gpoData=dao('gpo')->getData("id=$solData[idEmpresa]");
         if (!isset($gpoData[0])) { $textError.="{$pgI}No se encontró en el sistema la empresa receptora de la solicitud $solId{$pgF}";continue; }
         $gpoData=$gpoData[0];
         $referencia=str_pad("SOL".$today.$gpoData["cut"].$solIdf,6+15," ");
@@ -6870,20 +6402,13 @@ function isAdminFacturaService() {
     return isset($_POST["adminfactura"]);
 }
 function getAdminFacturaService() {
-    global $invObj;
-    //$invObj->rows_per_page = 0;
     $result = [];
     if (isset($_POST["proveedores"])) {
         $prv = $_POST["proveedores"];
         $prvfieldarray=[];
         foreach ($prv as $key=>$value) $prvfieldarray[$key]=$value;
         if (count($prvfieldarray)>0) {
-            if(!isset($prvObj)) {
-                require_once "clases/Proveedores.php";
-                $prvObj = new Proveedores();
-            }
-            $prvObj->pageno=1;
-            $prvObj->rows_per_page=100;
+            $prvObj = dao("prv", ["pageno"=>1,"rows_per_page"=>100]);
             $prvData = $prvObj->getDataByFieldArray($prvfieldarray);
             if ($prvObj->numrows==1) $result["proveedores"]=$prvData[0];
             $codigoProveedor = [];
@@ -6895,12 +6420,7 @@ function getAdminFacturaService() {
         $gpofieldarray=[];
         foreach ($gpo as $key=>$value) $gpofieldarray[$key]=$value;
         if (count($gpofieldarray)>0) {
-            if (!isset($gpoObj)) {
-                require_once "clases/Grupo.php";
-                $gpoObj = new Grupo();
-            }
-            $gpoObj->pageno=1;
-            $gpoObj->rows_per_page=100;
+            $gpoObj = dao("gpo", ["pageno"=>1,"rows_per_page"=>100]);
             $gpoData = $gpoObj->getDataByFieldArray($gpofieldarray);
             if ($gpoObj->numrows==1) $result["grupo"]=$gpoData[0];
             $rfcGrupo = [];
@@ -6912,23 +6432,13 @@ function getAdminFacturaService() {
         $ctrfieldarray=[];
         foreach ($ctr as $key=>$value) $ctrfieldarray[$key]=$value;
         if (count($ctrfieldarray)>0) {
-            if (!isset($ctrObj)) {
-                require_once "clases/Contrarrecibos.php";
-                $ctrObj = new Contrarrecibos();
-            }
-            $ctrObj->pageno=1;
-            $ctrObj->rows_per_page=100;
+            $ctrObj = dao("ctr", ["pageno"=>1,"rows_per_page"=>100]);
             $ctrData = $ctrObj->getDataByFieldArray($ctrfieldarray);
             if ($ctrObj->numrows==1) $result["contrarrecibos"]=$ctrData[0];
             $idCtr = [];
             foreach ($ctrData as $ctrItem) $idCtr[]=$ctrItem["id"];
             if (isset($idCtr[0])) {
-                if (!isset($ctfObj)) {
-                    require_once "clases/Contrafacturas.php";
-                    $ctfObj = new Contrafacturas();
-                }
-                $ctfObj->pageno=1;
-                $ctfObj->rows_per_page=1000;
+                $ctfObj = dao("ctf", ["pageno"=>1,"rows_per_page"=>1000]);
                 $ctfData = $ctfObj->getDataByFieldArray(["idContrarrecibo"=>$idCtr],0,"idContrarrecibo,idFactura");
                 $idCtf = [];
                 $ctrMap = [];
@@ -6945,6 +6455,7 @@ function getAdminFacturaService() {
         }
     }
     $hasFacturas=isset($_POST["facturas"]);
+    $invObj=dao("inv");
     if ($hasFacturas||!empty($codigoProveedor)||!empty($rfcGrupo)||!empty($idCtf)) {
         $fieldarray=[];
         if ($hasFacturas) {
@@ -6970,26 +6481,14 @@ function getAdminFacturaService() {
             $fTC=$fact["tipoComprobante"];
             $result["facturas"]=$fact;
             if (empty($result["proveedores"])) {
-                if(!isset($prvObj)) {
-                    require_once "clases/Proveedores.php";
-                    $prvObj = new Proveedores();
-                }
-                $prvObj->rows_per_page = 0;
+                $prvObj = dao("prv", ["rows_per_page"=>0]);
                 $result["proveedores"] = $prvObj->getData("codigo='".$fact["codigoProveedor"]."'")[0];
             }
             if (empty($result["grupo"])) {
-                if(!isset($gpoObj)) {
-                    require_once "clases/Grupo.php";
-                    $gpoObj = new Grupo();
-                }
-                $gpoObj->rows_per_page = 0;
+                $gpoObj = dao("gpo", ["rows_per_page"=>0]);
                 $result["grupo"] = $gpoObj->getData("rfc='".$fact["rfcGrupo"]."'")[0];
             }
-            if(!isset($prcObj)) {
-                require_once "clases/Proceso.php";
-                $prcObj = new Proceso();
-            }
-            $prcObj->rows_per_page = 0;
+            $prcObj = dao("prc", ["rows_per_page"=>0]);
             $result["proceso"] = $prcObj->getData("identif='$fId'");
             if (isset($result["proceso"][0])) {
                 $users=[];
@@ -7004,11 +6503,7 @@ function getAdminFacturaService() {
                     unset($prcItem);
                 }
                 if (isset($users[0])) {
-                    if(!isset($usrObj)) {
-                        require_once "clases/Usuarios.php";
-                        $usrObj = new Usuarios();
-                    }
-                    $usrObj->rows_per_page = 0;
+                    $usrObj = dao("usr", ["rows_per_page"=>0]);
                     $usrData = $usrObj->getDataByFieldArray(["nombre"=>$users],0,"id,nombre,persona,email,observaciones");
                     $usrList=[];
                     foreach($usrData as $usrItem) {
@@ -7027,25 +6522,12 @@ function getAdminFacturaService() {
                 case "i":
                     //if (!empty($fact["idReciboPago"]))
                 case "e":
-                    if(!isset($cptObj)) {
-                        require_once "clases/Conceptos.php";
-                        $cptObj = new Conceptos();
-                    }
-                    $cptObj->rows_per_page = 0;
+                    $cptObj = dao("cpt", ["rows_per_page"=>0]);
                     $result["conceptos"] = $cptObj->getData("idFactura=$fId");
-                    if(!isset($ctfObj)) {
-                        require_once "clases/Contrafacturas.php";
-                        $ctfObj = new Contrafacturas();
-                    }
-                    $contraReciboId = $ctfObj->getValue("idFactura",$fId,"idContrarrecibo");
+                    $contraReciboId = dao('ctf')->getValue("idFactura",$fId,"idContrarrecibo");
                     if (!empty($contraReciboId)) {
                         if (isset($result["contrarrecibos"]) && $result["contrarrecibos"]["id"]===$contraReciboId) break; // Ya 
-                        if(!isset($ctrObj)) {
-                            require_once "clases/Contrarrecibos.php";
-                            $ctrObj = new Contrarrecibos();
-                        }
-                        $ctrObj->rows_per_page = 0;
-                        $result["contrarrecibos"] = $ctrObj->getData("id=$contraReciboId")[0];
+                        $result["contrarrecibos"] = dao('ctr', ["rows_per_page"=>0])->getData("id=$contraReciboId")[0];
                     }
                     break;
                 case "p":
@@ -7101,10 +6583,8 @@ function getQueryCFDI() {
     if (empty($_POST["id"])) {
         errNDie("Solicitud incompleta, falta el id de la factura");
     }
-    global $invObj;
-    //$invObj->rows_per_page = 0;
     $invId=$_POST["id"];
-    $data = $invObj->getData("id=$invId",0,"mensajeCFDI,estadoCFDI,cancelableCFDI,canceladoCFDI,solicitaCFDI,consultaCFDI");
+    $data = dao('inv')->getData("id=$invId",0,"mensajeCFDI,estadoCFDI,cancelableCFDI,canceladoCFDI,solicitaCFDI,consultaCFDI");
     if (isset($data[0])) {
         $row=$data[0];
         $mensaje=$row["mensajeCFDI"];
@@ -7159,17 +6639,12 @@ function getVerifyCFDI() {
     if (empty($_POST["id"])) {
         errNDie("Solicitud incompleta, falta el id de la factura");
     }
-    global $invObj;
-    //$invObj->rows_per_page = 0;
     // ToDo: update solicitaCFDI=current_timestamp where id=POST[id]
-    //require_once "clases/Facturas.php";
     $invId=$_POST["id"];
     $fieldArray = ["id"=>$invId, "solicitaCFDI"=>new DBExpression("current_timestamp()"), "cancelableCFDI"=>NULL];
-    if ($invObj->saveRecord($fieldArray)) {
-        global $prcObj;
-        if(!isset($prcObj)) { require_once "clases/Proceso.php"; $prcObj = new Proceso(); }
+    if (dao('inv')->saveRecord($fieldArray)) {
         sessionInit();
-        $prcObj->cambioFactura($invId, "SATCheck", hasUser()?getUser()->nombre:"nouser", false, "VerificaSAT");
+        dao("prc")->cambioFactura($invId, "SATCheck", hasUser()?getUser()->nombre:"nouser", false, "VerificaSAT");
         echo json_encode(["result"=>"success","affectedRows"=>DBi::$affected_rows??0,"info"=>DBi::$query_info??"","warnings"=>DBi::$warnings??"","errno"=>DBi::$errno??0,"error"=>DBi::$error??""]);
     } else echo json_encode(["result"=>"error","message"=>"No se actualizó factura $invId","affectedRows"=>DBi::$affected_rows??0,"info"=>DBi::$query_info??"","warnings"=>DBi::$warnings??"","errno"=>DBi::$errno??0,"error"=>DBi::$error??""]);
 }
@@ -7181,7 +6656,7 @@ function doAddWarehouseEntry() {
     if (!hasUser()) reloadNDie("Su sesión ha caducado, ingrese con su usuario nuevamente");
     $invId=$_POST["id"]??"";
     if (!isset($invId[0])) errNDie("No se identifica la factura a modificar");
-    global $invObj;
+    $invObj=dao("inv");
     $invData=$invObj->getData("id=$invId",0,"ea,codigoProveedor prv,folio,right(uuid,10) uuid,date(fechaFactura) fecha,ubicacion");
     if (!isset($invData[0])) errNDie("No existe la factura indicada");
     $invData=$invData[0];
@@ -7224,12 +6699,7 @@ function doAddWarehouseEntry() {
         global $query;
         errNDie("No se pudo guardar Entrada de Almacen",["errors"=>DBi::$errors,"query"=>$query,"absname"=>$absName,"file"=>$file,"data"=>$invData]);
     }
-    global $firObj;
-    if (!isset($firObj)) {
-        require_once "clases/Firmas.php";
-        $firObj=new Firmas();
-    }
-    $firObj->insertRecord(["idUsuario"=>getUser()->id, "modulo"=>"ea", "idReferencia"=>$invId, "accion"=>"agrega", "motivo"=>$relName]);
+    dao("fir")->insertRecord(["idUsuario"=>getUser()->id, "modulo"=>"ea", "idReferencia"=>$invId, "accion"=>"agrega", "motivo"=>$relName]);
     successNDie("Entrada de Almacén agregada satisfactoriamente",["url"=>$relName]);
 }
 function isDelWarehouseEntry() {
@@ -7241,7 +6711,7 @@ function doDelWarehouseEntry() {
     if (!validaPerfil(["Administrador","Sistemas","Elimina Documentos"])) reloadNDie("No tiene permiso para eliminar documentos");
     $invId=$_POST["id"]??"";
     if (!isset($invId[0])) errNDie("No se recibió factura a modificar");
-    global $invObj;
+    $invObj=dao("inv");
     $invData=$invObj->getData("id=$invId",0,"ea,codigoProveedor prv,folio,right(uuid,10) uuid,date(fechaFactura) fecha,ubicacion");
     if (!isset($invData[0])) errNDie("No existe la factura indicada");
     $invData=$invData[0];
@@ -7261,14 +6731,9 @@ function doDelWarehouseEntry() {
     sleep(3);
     if (!$invObj->saveRecord(["id"=>$invId,"ea"=>0])) {
         global $query;
-        errNDie("No se pudo eliminar la Entrada de Almacen",["errors"=>DBi::$errors,"query"=>$query,"file"=>$file,"data"=>$invData,"absname"=>$absName,"failkey"=>"query"]);
+        errNDie("No se pudo eliminar la Entrada de Almacen",["errors"=>DBi::$errors,"query"=>$query,"data"=>$invData,"absname"=>$absName,"failkey"=>"query"]);
     }
-    global $firObj;
-    if (!isset($firObj)) {
-        require_once "clases/Firmas.php";
-        $firObj=new Firmas();
-    }
-    $firObj->insertRecord(["idUsuario"=>getUser()->id, "modulo"=>"ea", "idReferencia"=>$invId, "accion"=>"elimina", "motivo"=>$_POST["motivo"]??""]);
+    dao("fir")->insertRecord(["idUsuario"=>getUser()->id, "modulo"=>"ea", "idReferencia"=>$invId, "accion"=>"elimina", "motivo"=>$_POST["motivo"]??""]);
     successNDie("Entrada de Almacén eliminada satisfactoriamente");
 }
 function isDisableWarehouseEntry() {
@@ -7281,7 +6746,7 @@ function doDisableWarehouseEntry() {
     $invId=$_POST["id"]??"";
     if (!isset($invId[0])) errNDie("No se recibió factura a modificar");
     $currEA=$_POST["ea"]??"";
-    global $invObj;
+    $invObj=dao("inv");
     $invData=$invObj->getData("id=$invId",0,"ea");
     if (!isset($invData[0])) errNDie("No existe la factura indicada");
     $invData=$invData[0];
@@ -7299,12 +6764,7 @@ function doDisableWarehouseEntry() {
         global $query;
         errNDie("No se pudo {$accion}r Entrada de Almacen",["error"=>DBi::$errors,"query"=>$query,"ea"=>$ea]);
     }
-    global $firObj;
-    if (!isset($firObj)) {
-        require_once "clases/Firmas.php";
-        $firObj=new Firmas();
-    }
-    $firObj->insertRecord(["idUsuario"=>getUser()->id, "modulo"=>"ea", "idReferencia"=>$invId, "accion"=>$accion, "motivo"=>$motivo]);
+    dao("fir")->insertRecord(["idUsuario"=>getUser()->id, "modulo"=>"ea", "idReferencia"=>$invId, "accion"=>$accion, "motivo"=>$motivo]);
     successNDie("Entrada de Almacén {$accion}da",["ea"=>$ea]);
 }
 function isAcceptInvoice() {
@@ -7318,7 +6778,8 @@ function doAcceptInvoice() {
     $fId=$_POST["id"]??"";
     if (!isset($fId[0])) errNDie("No se recibió identificador de factura");
     $logData=["id"=>$fId];
-    global $invObj,$query;
+    global $query;
+    $invObj=dao("inv");
     $invData=$invObj->getData(appendPostIntegerToQuery("id", "id", false),0,"tipoComprobante,statusn,status");
     if (!isset($invData[0]["tipoComprobante"])) errNDie("No existe la factura indicada",$_POST+["query"=>$query,"errors"=>DBi::$errors]);
     $invData=$invData[0];
@@ -7353,12 +6814,7 @@ function doAcceptInvoice() {
     $oArticulos=$_POST["fold_articulo"]??[];
     DBi::autocommit(false);
     if (!empty($articulos)) {
-        global $cptObj;
-        if (!isset($cptObj)) {
-            require_once "clases/Conceptos.php";
-            $cptObj = new Conceptos();
-        }
-        $cptObj->rows_per_page  = 0;
+        $cptObj = dao("cpt", ["rows_per_page"=>0]);
         foreach($articulos as $cptId=>$cptCode) {
             $oldCode=$oArticulos[$cptId]??null;
             if (!isset($oldCode)) $logData["concepto[$cptId]"]=$cptCode;
@@ -7391,9 +6847,7 @@ function doAcceptInvoice() {
             $logData["save_factura[$fId]"]="TRUE";
             $saved=true;
             if (isset($fieldArray["statusn"])) {
-                global $prcObj;
-                if(!isset($prcObj)) { require_once "clases/Proceso.php"; $prcObj = new Proceso(); }
-                $prcObj->cambioFactura($fId, $status, getUser()->nombre, false, "acceptInvoice");
+                dao("prc")->cambioFactura($fId, $status, getUser()->nombre, false, "acceptInvoice");
             }
         } else if (isset(DBi::$errors[0])) {
             $logData["save_factura[$fId]"]=json_encode(DBi::$errors);
@@ -7438,21 +6892,19 @@ function isUpdatePaymentReceiptData() {
 }
 function doUpdatePaymentReceiptData() {
     $id=$_POST["id"]??null;
+    $cpyObj=dao("cpy");
     if (isset($id[0])) {
-        global $cpyObj;
-        if (!$cpyObj) { require_once "clases/CPagos.php"; $cpyObj = new CPagos(); }
         $beginTime=microtime(true);
         $res=$cpyObj->fixCP($id);
         $endTime=microtime(true)-$beginTime;
-    }
+    } else $cpyObj->resetAllData();
     successNDie("CHECK",["trace"=>$cpyObj->fixedIdList,"data"=>$cpyObj->data,"time"=>$endTime]);
 }
 function isFixOldCPagos() {
     return ($_POST["action"]??"")==="fixOldCPagos";
 }
 function doFixOldCPagos() {
-    global $cpyObj;
-    if (!$cpyObj) { require_once "clases/CPagos.php"; $cpyObj = new CPagos(); }
+    $cpyObj=dao("cpy");
     $beginTime=microtime(true);
     $cpyObj->fixOldCPagos();
     $endTime=microtime(true)-$beginTime;
@@ -7462,8 +6914,7 @@ function isFixEmptyCPagos() {
     return ($_POST["action"]??"")==="fixEmptyCPagos";
 }
 function doFixEmptyCPagos() {
-    global $cpyObj;
-    if (!$cpyObj) { require_once "clases/CPagos.php"; $cpyObj = new CPagos(); }
+    $cpyObj=dao("cpy");
     sessionInit();
     $beginTime=microtime(true);
     $cpyObj->fixEmptyCPagos();
@@ -7474,9 +6925,8 @@ function isRepairCFDI() {
     return ($_POST["action"]??"")==="repairCFDIs";
 }
 function doRepairCFDI() {
-    global $cpyObj;
     $idList=$_POST["idList"];
-    if (!$cpyObj) { require_once "clases/CPagos.php"; $cpyObj = new CPagos(); }
+    $cpyObj=dao("cpy");
     $beginTime=microtime(true);
     $genList=$cpyObj->getCPIds($idList, 3);
     if (isset($genList[0])) {
@@ -7488,7 +6938,6 @@ function doRepairCFDI() {
     echoJsNDie("empty", "Nada para actualizar");
 }
 function getAdminFindQuery() {
-    global $invObj;
     $query = "";
     if (!empty($_POST["idFactura"]))       $query .= appendPostIntegerToQuery("idFactura", "id", isset($query[0]));
     if (!empty($_POST["rfcGrupo"]))        $query .= appendPostStringToQuery("rfcGrupo", "rfcGrupo", isset($query[0]));
@@ -7503,7 +6952,7 @@ function getAdminFindQuery() {
     if (!empty($_POST["fechaFactura"]))    $query .= appendPostDateToQuery("fechaFactura", "fechaFactura", isset($query[0]));
     if (!empty($_POST["fechaCaptura"]))    $query .= appendPostDateToQuery("fechaCaptura", "fechaCaptura", isset($query[0]));
     if (!empty($_POST["modifiedTime"]))    $query .= appendPostDateToQuery("modifiedTime", "modifiedTime", isset($query[0]));
-    $invObj->rows_per_page = 100;
+    $invObj=dao("inv", ["rows_per_page"=>100]);
     $invData = $invObj->getData($query);
     if (isset($invData[0])) echo("#|ID|F.FACT|PROVEEDOR|CLIENTE|SERIE|FOLIO|PEDIDO|STATUS|EOH|");
     $idx=0;
@@ -7588,11 +7037,8 @@ function getAdminChangeQuery() {
     echo(arr2List($fieldarr));
 }
 function getTestService2() {
-    global $invObj;
-    //$invObj->rows_per_page = 0;
-    echo "Test Service 2: ".get_class($invObj);
+    echo "Test Service 2: ".get_class(dao("inv"));
     $arr = ["AdminQuery"=>getTestAdminQuery(), "AppendPDF"=>getTestAppendPDF(), "Test"=>$_GET["test"], "GET"=>$_GET, "POST"=>$_POST, "FILES"=>$_FILES];
-
     echo arr2List($arr);
 }
 function getTestAdminQuery() {

@@ -141,4 +141,4 @@ if (!isset($_GET["tabla"]) && !isset($_GET["datos"])) {
 
 include_once ("configuracion/finalizacion.php");
 clog1seq(-1);
-clog2end("showFacturas");
+clog2end("showConceptos");

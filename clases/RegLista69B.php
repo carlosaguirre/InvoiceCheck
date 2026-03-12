@@ -7,7 +7,6 @@ class RegLista69B extends DBObject {
     public static $debug=false;
     private static $url="http://omawww.sat.gob.mx/cifras_sat/Documents/";
     private static $base=null;
-    private static $months=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
     private static $catObj=null;
     private static $regObj=null;
     function __construct() {
@@ -85,7 +84,7 @@ class RegLista69B extends DBObject {
         else $i1++;
         $i2=strpos($strDate," ",$i1);          // junio_de
         $mmm=substr($strDate,$i1,$i2-$i1);
-        $mm=substr("00".(array_search($mmm,static::$months,true)+1),-2);         // 06
+        $mm=substr("00".(array_search($mmm,mesesMexico(),true)+1),-2);         // 06
         $info.=",mm[$i1,$i2]=$mmm=>$mm";
         $sp=substr($strDate,$i2,4);
         if ($sp===" de ") $i1=$i2+4;
@@ -139,7 +138,7 @@ class RegLista69B extends DBObject {
         //$regDay=substr($firstLine, $idx1,$idx2-$idx1);
         //$idx1=$idx2+4;
         //$idx2=strpos($firstLine, " ", $idx1);
-        //$regMonth=substr("00".(array_search(substr($firstLine, $idx1,$idx2-$idx1),static::$months,true)+1),-2);
+        //$regMonth=substr("00".(array_search(substr($firstLine, $idx1,$idx2-$idx1),mesesMexico(),true)+1),-2);
 
         //$idx1=$idx2+4;
         //$idx2=strpos($firstLine, ",", $idx1);

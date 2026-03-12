@@ -23,7 +23,6 @@ if (!hasUser()||!validaPerfil("Administrador")) {
 $yearList=[];
 $firstYear=2020;
 for($i=$firstYear; $i<=$currentYear; $i++) $yearList[]=$i;
-$monthList=["01"=>"enero","02"=>"febrero","03"=>"marzo","04"=>"abril","05"=>"mayo","06"=>"junio","07"=>"julio","08"=>"agosto","09"=>"septiembre","10"=>"octubre","11"=>"noviembre","12"=>"diciembre"];
 
 require_once "clases/Facturas.php";
 $invObj=new Facturas();
@@ -99,8 +98,10 @@ require_once "templates/generalScript.php";
         AÑO:<select id="year" onchange="submitMonthTag();"><?php foreach ($yearList as $yr) {
             echo "<option value=\"$yr\"".($yr==$currentYear?" selected":"").">$yr</option>";
         } ?></select>
-        MES:<select id="month" onchange="submitMonthTag();"><?php foreach ($monthList as $m=>$mes) {
-            echo "<option value=\"$m\"".($m==$currentMonth?" selected":"").">$mes</option>";
+        MES:<select id="month" onchange="submitMonthTag();"><?php foreach (mesesMexico(false, 1) as $mi=>$mes) {
+            $m = substr(("00".$mi), -2);
+            $sel = ($m==$currentMonth)?" selected":"";
+            echo "<option value=\"$m\"$sel>$mes</option>";
         } ?></select>
         <input type="hidden" id="monthTag" name="monthTag" value="<?=$monthTag?>">
         <input type="submit" name="process" id="processBtn" value="Procesar">

@@ -6,6 +6,7 @@ function creaCarpetaDescargas($dirname) {
     if(!is_dir("./descargas/$dirname/")) {
         $cmdResult = mkdir("./descargas/$dirname/", 0777, true);
         if (!$cmdResult) {
+            global $errorMessage;
             $errorMessage .= "<P class='fontMedium margin20 centered'>No pudo crearse la carpeta de descargas $dirname.</p>";
         }
     }
@@ -20,8 +21,8 @@ $thisYear = +$today->format("Y");
 // // // // // // // // // // // // //
 $numYears = $thisYear-2016;
 // // // // // // // // // // // // //
-$months = []; $years = [];
-for($i=0;$i<12;$i++) $months[$i+1]=strftime('%B',mktime(0,0,0,$i+1));
+$months = mesesMexico(false, 1);
+$years = [];
 for($i=$numYears;$i>=0;$i--) $years[$thisYear-$i]=($thisYear-$i);
 $monthOptions = getHtmlOptions($months, $thisMonth);
 $yearOptions = getHtmlOptions($years, $thisYear);

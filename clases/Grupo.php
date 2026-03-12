@@ -122,8 +122,8 @@ class Grupo extends DBObject {
         $_SESSION["gpoOptDefVal"]=$value;
         if ($force||empty($_SESSION["gpoIdOpt"])) {
             if(!validaPerfil(["Administrador","Sistemas"])) {
-                global $ugObj,$user; if (!isset($ugObj)) { require_once "clases/Usuarios_Grupo.php"; $ugObj = new Usuarios_Grupo(); }
-                $gpoFullMapWhere=$ugObj->getFullMapWhere($user,$prfs);
+                global $user;
+                $gpoFullMapWhere=dao('ug')->getFullMapWhere($user,$prfs);
             }
             $statusWhere=(isset($gpoFullMapWhere[0])?" AND ":"")."status='activo'";
             $oldRPP=$this->rows_per_page;
@@ -178,12 +178,12 @@ class Grupo extends DBObject {
         $_SESSION["sessOptPrf"]=$pf;
         $gpoFullMapWhere=false;
         if (!$isSys) { if ($isPrv) {
-                global $invObj,$username; if (!isset($invObj)) { require_once "clases/Facturas.php"; $invObj = new Facturas(); }
-                $gpoFullMapWhere=$invObj->getFullMapWhere($username);
+                global $username;
+                $gpoFullMapWhere=dao('inv')->getFullMapWhere($username);
                 doclog("SetOptSessionsG","session",["prfs"=>$prfs,"sessionData"=>$sessionData,"force"=>($force?"TRUE":"FALSE"),"where"=>$gpoFullMapWhere,"perfiles"=>"Proveedor"]);
             } else { //if (validaPerfil("Compras")) {
-                global $ugObj,$query,$user; if (!isset($ugObj)) { require_once "clases/Usuarios_Grupo.php"; $ugObj = new Usuarios_Grupo(); }
-                $gpoFullMapWhere=$ugObj->getFullMapWhere($user,$prfs);
+                global $query,$user;
+                $gpoFullMapWhere=dao('ug')->getFullMapWhere($user,$prfs);
                 doclog("SetOptSessionsG","session",["prfs"=>$prfs,"sessionData"=>$sessionData,"force"=>($force?"TRUE":"FALSE"),"where"=>$gpoFullMapWhere,"perfiles"=>$user->perfiles,"query"=>$query]);
         }   }
         $oldRPP=$this->rows_per_page;

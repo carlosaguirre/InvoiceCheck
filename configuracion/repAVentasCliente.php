@@ -11,8 +11,11 @@ if (!$isLocal&&!$_esSistemas) {
 clog2ini("configuracion.repAVentasCliente");
 clog1seq(1);
 
-require_once "clases/Avance.php";
-$avnObj = new Avance();
+global $avnObj;
+if (!isset($avnObj)) {
+    require_once "clases/Avance.php";
+    $avnObj = new Avance();
+}
 $avnObj->target="avanceFrame";
 
 if (empty($onloadScript)) $onloadScript="";

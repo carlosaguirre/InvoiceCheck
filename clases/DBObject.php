@@ -21,6 +21,8 @@ abstract class DBObject {
     var $fullmap = NULL;
     var $savedValues = array();
     
+    private $oldValues = array();
+
     function __construct() {
         $this->tablename      = "dbobject";
         $this->rows_per_page  = 10;
@@ -496,7 +498,7 @@ abstract class DBObject {
             if (!isset($fieldlist[$item]["pkey"]) && !isset($fieldlist[$item]["skey"])) {
                 if (is_array($value) || in_array($item, $toWhere)) {
                     // ToDo: Verificar funcionalidad, (No está contemplado aún para insert, en ese caso no aceptar)
-                    //       Pensado para Recuperar Solicitudes Canceladas: consultas/Facturas:3385 => $tokObj->saveRecord("refId"=>$solId, "modulo"=>["autorizaPago","rechazaPago"],"status"=>"activo","usos"=>null);
+                    //       Pensado para Recuperar Solicitudes Canceladas: consultas/Facturas:3385 => dao('tok')->saveRecord("refId"=>$solId, "modulo"=>["autorizaPago","rechazaPago"],"status"=>"activo","usos"=>null);
                     // Update tokens set status="activo", usos=null where refId=$solId and modulo in ("autorizaPago","rechazaPago");
                     $additional.=$this->getWhereCondition($item, $value);
                     $addList[]=$item;
@@ -814,8 +816,8 @@ abstract class DBObject {
         if (is_numeric($result)) {
             $this->lastId = $result;
             $this->log.="// Last id = ".$this->lastId."\n";
-        } else if (isset($fieldarray["id"])) {
-            $this->lastId = $fieldarray["id"];
+        //} else if (isset($fieldarray["id"])) {
+        //    $this->lastId = $fieldarray["id"];
         } else if ((empty($update) && !empty($where)) || $this->affectedrows == 1) {
             $tmpQry = $query;
             $tempId = $this->getValue (false, false, 'id', $where);
@@ -1236,6 +1238,20 @@ abstract class DBObject {
         if (!$classname) $classname = get_class($this);
         return $classname;
     } // $this->get_class()
+    public function backupValues($vars) {
+        foreach($vars as $var=>$value) {
+            if (isset($this->$var)) $this->oldValues[$var] = $this->$var;
+        }
+    }
+    public function restoreOldValues($keepOldValues=false) {
+        foreach($this->oldValues as $var=>$value) {
+            $this->$var = $value;
+        }
+        if (!$keepOldValues) $this->oldValues = [];
+    }
+    public function clearOldValues() {
+        $this->oldValues = [];
+    }
 }
 class DBExpression {
     var $value;

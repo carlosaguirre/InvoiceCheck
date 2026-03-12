@@ -18,7 +18,7 @@ if(!$_esSistemas && !$esSolPago && !$esAuthPago && !$esRealizaPago && !$esGestio
 }
 clog2ini("configuracion.listasolp");
 clog1seq(1);
-global $solObj; if (!isset($solObj)) { require_once "clases/SolicitudPago.php"; $solObj=new SolicitudPago(); } $solObj->rows_per_page=0;
+$solObj = dao('sol', ["rows_per_page"=>0]);
 $showList=[];
 $qryList=[];
 $statusList=[];
@@ -44,10 +44,8 @@ $toDay = $diaStr.$mesAnioStr;
 $lastDay = $maxStr.$mesAnioStr;
 $defaultIniDate=$firstDay;
 if ($esRealizaPago) {
-    global $ugObj; if (!isset($ugObj)) { require_once "clases/Usuarios_Grupo.php"; $ugObj=new Usuarios_Grupo(); } //$ugObj->clearOrder(); //$ugObj->addOrder("alias");
-    $ugObj->rows_per_page=0;
     $seccionId=["ParaPago","Pagadas","Procesando","Rechazadas"];
-    $empresas=$ugObj->getIdGroupByNames(getUser(),"Realiza Pagos");
+    $empresas=dao('ug', ["rows_per_page"=>0])->getIdGroupByNames(getUser(),"Realiza Pagos"); // , "orderlist"=>["alias"=>"asc"];
     $solData=$solObj->getData("status<64 and idEmpresa in (".implode(",", $empresas).") and ((idOrden is null and proceso between 2 and 3) or (idFactura is null and status=2 and proceso=0))",0,"date(min(fechaInicio)) fecha");
     $fecha=$solData[0]["fecha"]??"";
     if (isset($fecha[9]))
@@ -195,20 +193,15 @@ if ($_esSistemas) {
     $empresas=null;
 } else if ($esAuthPago) {
     $seccionId=["NoAutorizadas", "Autorizadas", "EnProceso", "ParaPago", "Pagadas", "Rechazadas"];
-    global $ugObj; if (!isset($ugObj)) { require_once "clases/Usuarios_Grupo.php"; $ugObj=new Usuarios_Grupo(); } //$ugObj->clearOrder(); //$ugObj->addOrder("alias");
-    $ugObj->rows_per_page=0;
-    $empresas=$ugObj->getIdGroupByNames(getUser(),"Autoriza Pagos","auth");
+    $empresas=dao('ug', ["rows_per_page"=>0])->getIdGroupByNames(getUser(),"Autoriza Pagos","auth");
 // } else if ($esRealizaPago) { // definido más arriba
 } else if ($esGestionaPago) {
     $seccionId=["SinFactura","EnProceso","NoAutorizadas","Autorizadas","ParaPago","ImpuestoImportacion","ConFactura","Rechazadas"];
-    global $ugObj; if (!isset($ugObj)) { require_once "clases/Usuarios_Grupo.php"; $ugObj=new Usuarios_Grupo(); } //$ugObj->clearOrder(); //$ugObj->addOrder("alias");
-    $ugObj->rows_per_page=0;
-    $empresas=$ugObj->getIdGroupByNames(getUser(),"Gestiona Pagos");
+    $empresas=dao('ug', ["rows_per_page"=>0])->getIdGroupByNames(getUser(),"Gestiona Pagos");
 } else if ($esSolPago||$veSolPago) {
     $seccionId=["SinFactura","Autorizadas","RechazadasHoy","NoAutorizadas","EnProcPago","ImpuestoImportacion","ConFactura","RechazadasAntes"];
-    global $ugObj; if (!isset($ugObj)) { require_once "clases/Usuarios_Grupo.php"; $ugObj=new Usuarios_Grupo(); } //$ugObj->clearOrder(); //$ugObj->addOrder("alias");
-    $ugObj->rows_per_page=0;
-    if ($veSolPago) $empresas=$ubObj->getIdGroupByNames(getUser(),"Consulta Solicitudes","vista");
+    $ugObj = dao('ug', ["rows_per_page"=>0]);
+    if ($veSolPago) $empresas=$ugObj->getIdGroupByNames(getUser(),"Consulta Solicitudes","vista");
     if (!isset($empresas[0]) && $esSolPago)
         $empresas=$ugObj->getIdGroupByNames(getUser(),"Solicita Pagos","vista");
     if (!isset($empresas[0]) && $_esCompras)
@@ -239,9 +232,7 @@ if ($esRealizaPago) {
     $secciones["Autorizadas"]["classname"]=" bgyellow";
     $secciones["SinFactura"]["classname"]=" bgyellow";
 }
-global $prvObj; if (!isset($prvObj)) { require_once "clases/Proveedores.php"; $prvObj=new Proveedores(); }
-$prvObj->rows_per_page=0;
-//$noInvPrvIds=array_column($prvObj->getData("codigo in ('I-999','I-998')",0,"id"), "id");
+//$noInvPrvIds=array_column(dao('prv', ["rows_per_page"=>0])->getData("codigo in ('I-999','I-998')",0,"id"), "id");
 SolicitudPago::init($empresas,$secciones);
 $listaFiltros=SolicitudPago::$listaFiltros;
 $numEmpresas=isset($empresas)?(is_array($empresas)?count($empresas):(empty($empresas)?0:1)):0;

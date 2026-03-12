@@ -15,9 +15,7 @@ if (!$_esDesarrollo) {
 }
 $keyphrase = $_POST["keyphrase"]??""; $checkphrase=null;
 if (isset($keyphrase[0])) {
-    require_once "clases/InfoLocal.php";
-    $infObj = new InfoLocal();
-    $infData = $infObj->getData("nombre in ('upgradeCode','upgradeSeed')",0,"nombre,valor");
+    $infData = dao("inf")->getData("nombre in ('upgradeCode','upgradeSeed')",0,"nombre,valor");
     $dbpass = null; $dbseed = null;
     foreach ($infData as $idx => $infRow) {
         if ($infRow["nombre"]==="upgradeCode")

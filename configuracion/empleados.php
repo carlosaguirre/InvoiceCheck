@@ -24,12 +24,7 @@ $cuentaCLABE=trim($_POST["empl_accuniq"]??"");
 $empresaAlias=trim($_POST["empl_gpoalias"]??"");
 $statusEmpleado=$_POST["empl_status"]??"";
 */
-require_once "clases/Grupo.php";
-$gpoObj=new Grupo();
-$gpoObj->rows_per_page=0;
-$gpoObj->clearOrder();
-$gpoObj->addOrder("alias");
-$gpoData=$gpoObj->getData("status='activo'", 0, "alias,razonSocial");
+$gpoData=dao("gpo", ["rows_per_page"=>0, "orderlist"=>["alias"=>"asc"]])->getData("status='activo'", 0, "alias,razonSocial");
 $grupoArray=[""=>"TODOS"];
 foreach ($gpoData as $gpoItem) {
     $grupoArray[$gpoItem["alias"]]=$gpoItem["alias"]." - ".$gpoItem["razonSocial"];
@@ -61,13 +56,7 @@ if (isset($_POST["empl_browse"])) {
     }
     if (isset($empresaAlias)) $fldarr["empresa"]=$empresaAlias;
     if (isset($statusEmpleado)) $fldarr["status"]=$statusEmpleado;
-    require_once "clases/Empleados.php";
-    $empObj=new Empleados();
-    if (empty($_POST["regPerPage"])) $empObj->rows_per_page=100;
-    else $empObj->rows_per_page=+$_POST["regPerPage"];
-    if (!empty($_POST["pageSwitch"])) {
-        $empObj->pageno=+$_POST["pageSwitch"];
-    }
+    $empObj=dao("emp", ["rows_per_page"=>$_POST["regPerPage"]??100, "pageno"=>$_POST["pageSwitch"]??1, "orderlist"=>["alias"=>"asc"]]);
     $empData=$empObj->getDataByFieldArray($fldarr);
     if (isset($empData[1])) $urlAction="empleados2";
     else $errorMessage .= "<p class='margin20 centered'>Ning&uacute;n registro encontrado con los criterios indicados.</p>";
@@ -88,8 +77,7 @@ if (isset($_POST["empl_browse"])) {
         $errorMessage.="<p class='errorLine'>Se requiere que especifique al menos una <b>Cuenta bancaria</b>.</p>";
         if (!isset($focusId)) $focusId="empl_accountcard";
     }
-    require_once "clases/Empleados.php";
-    $empObj=new Empleados();
+    $empObj=dao("emp");
     DBi::autocommit(FALSE);
     if (empty($idEmpleado)) {
         if (!isset($errorMessage[0])) {
@@ -138,11 +126,7 @@ if (isset($_POST["empl_browse"])) {
         }
     }
     if (!isset($errorMessage[0]) && $doSave) {
-        global $prcObj;
-        if (!isset($prcObj)) {
-            require_once "clases/Proceso.php";
-            $prcObj=new Proceso();
-        }
+        $prcObj = dao('prc');
         if ($prcObj->cambioEmpleado($empLastId??$idEmpleado,$statusEmpleado,getUser()->nombre,"Guardar $nombreEmpleado")) {
             $resultMessage.="<p class='successLine'>Empleado $nombreEmpleado guardado satisfactoriamente.</p>";
         } else {

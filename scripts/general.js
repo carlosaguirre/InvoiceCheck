@@ -394,7 +394,7 @@ function postService(url, parameters, retFunc, errFunc, progressFunc) {
             parameters={parameter:parameters};
         }
     } else parameters={};
-    parameters.xmlHttpPost=xmlHttpPost;
+    parameters.controller=xmlHttpPost;
     xmlHttpPost.parameters=parameters;
     xmlHttpPost.url=url;
     xmlHttpPost.progressIndex=0;
@@ -486,6 +486,227 @@ function postService(url, parameters, retFunc, errFunc, progressFunc) {
     funclog("END","postService");
     return xmlHttpPost; // para manipular solicitud, vg llamar metodo abort()
 }
+/**
+ * fetchService — Fetch-API drop-in replacement for postService.
+ *
+ * Builds the identical FormData layout (same key encoding for scalars,
+ * arrays, objects and File objects) and calls the same callback contract:
+ *   retFunc(responseText, params, readyState, hStatus)
+ *   errFunc(errmsg, params, evt_or_null)
+ *   progressFunc(responseText, params, readyState, hStatus, null)
+ *
+ * Returns the AbortController instance itself, augmented with the request
+ * metadata consumed by prePostService / getPostRetFunc:
+ *   .progressIndex, .inclusiveSeparator, .prgCount, .lastJObj,
+ *   .parameters, .url, .readyState, .status, .statusText, .responseText,
+ *   plus the native .signal and .abort().
+ *
+ * Streaming (hasProgress=true): drives response.body.getReader() and fires
+ *   progressFunc  with readyState=3 for every received chunk (accumulated text).
+ *   retFunc       with readyState=4 when the stream ends.
+ * Non-streaming (hasProgress=false) or fallback when ReadableStream unavailable:
+ *   retFunc       with readyState=4 once the full body is available.
+ */
+function fetchService(url, parameters, retFunc, errFunc, progressFunc) {
+    funclog("INI","fetchService("+url+", "+JSON.stringify(parameters,jsonCircularReplacer())+")");
+    const fd = new FormData();
+    let timeoutMs = 180000;
+    if (parameters) {
+        if (typeof parameters==="object") {
+            for (let key in parameters) if (parameters.hasOwnProperty(key) && typeof parameters[key] !== "function") {
+                let pk = parameters[key];
+                if (pk instanceof File) {
+                    funclog("PARAM",key+"=file("+pk.name+")");
+                    fd.append(key, pk, pk.name);
+                } else if (Array.isArray(pk) || pk instanceof FileList) {
+                    for (let i=0; i<pk.length; i++) {
+                        if (pk[i] instanceof File) {
+                            funclog("PARAM",key+"["+i+"]=file("+pk[i].name+")");
+                            fd.append(key+"["+i+"]",pk[i],pk[i].name);
+                        } else {
+                            if (typeof pk[i]==="object") pk[i]=JSON.stringify(pk[i],jsonCircularReplacer());
+                            funclog("PARAM",key+"["+i+"]="+pk[i]);
+                            fd.append(key+"["+i+"]",pk[i]);
+                        }
+                    }
+                } else if (typeof pk==="object") {
+                    for (let pp in pk) {
+                        let ppVal=pk[pp];
+                        if (ppVal instanceof File) {
+                            funclog("PARAM",key+"["+pp+"]=file("+ppVal.name+")");
+                            fd.append(key+"["+pp+"]",ppVal,ppVal.name);
+                        } else {
+                            if (typeof ppVal==="object") ppVal=JSON.stringify(ppVal,jsonCircularReplacer());
+                            funclog("PARAM",key+"["+pp+"]="+ppVal);
+                            fd.append(key+"["+pp+"]",ppVal);
+                        }
+                    }
+                } else if (key==="timeout") {
+                    funclog("PARAM","TIMEOUT="+pk);
+                    timeoutMs=pk;
+                } else {
+                    funclog("PARAM",key+"="+pk);
+                    fd.append(key, pk);
+                }
+            }
+        } else {
+            funclog("PARAM","parameter="+parameters);
+            fd.append("parameter", parameters);
+            parameters={parameter: parameters};
+        }
+    } else parameters={};
+    const controller = new AbortController();
+    controller.parameters         = parameters;
+    controller.url                = url;
+    controller.progressIndex      = 0;
+    controller.inclusiveSeparator = null;
+    controller.prgCount           = 0;
+    controller.lastJObj           = null;
+    controller.readyState         = 1;
+    controller.status             = 0;
+    controller.statusText         = "";
+    controller.responseText       = "";
+    controller._aborted           = false;
+    controller.signal.addEventListener("abort", function() {
+        controller._aborted = true;
+    }, {once:true});
+    parameters.controller = controller;  // back-reference mirrors postService
+    const hasProgress = !!(parameters.hasProgress);
+    const decoder     = new TextDecoder();
+    // ── timeout (mirrors xmlHttpPost.timeout in postService) ─────────────────
+    const timeoutId = setTimeout(function() {
+        controller.abort();
+        controller.readyState = 4;
+        controller.status = 0;
+        controller.statusText = "Request Timed Out";
+        controller.responseText = "Request Timed Out";
+        parameters.state = 4;
+        parameters.status = 0;
+        if (errFunc && typeof errFunc==="function") {
+            errFunc("Request Timed Out", parameters, null);
+            if (url!=="consultas/Logs.php") logService("fetchService TIMEOUT with errFunc",
+                {oldUrl:url, oldParameters:parameters});
+        } else {
+            console.log("fetchService TIMEOUT: "+url+", PARAMS:", parameters);
+            if (url!=="consultas/Logs.php") logService("fetchService TIMEOUT",
+                {oldUrl:url, oldParameters:parameters});
+        }
+    }, timeoutMs);
+    funclog("OPEN","FETCH POST Request. url: "+url+
+        ", parameters: "+JSON.stringify(parameters,jsonCircularReplacer()));
+    fetch(url, {method:"POST", body:fd, signal:controller.signal})
+        .then(function(response) {
+            controller.status      = response.status;
+            controller.statusText  = response.statusText||"";
+            controller.readyState  = 3;
+            parameters.state  = 3;
+            parameters.status = response.status;
+            if (!response.ok) {
+                return response.text().then(function(text) {
+                    clearTimeout(timeoutId);
+                    if (!text) text=response.statusText||"";
+                    controller.readyState   = 4;
+                    controller.status       = response.status;
+                    controller.statusText   = response.statusText||"";
+                    controller.responseText = text;
+                    parameters.state      = 4;
+                    parameters.status     = response.status;
+                    funclog("RDY","fetchService("+url+") 4/"+response.status+" (HTTP error)");
+                    if (retFunc && typeof retFunc==="function")
+                        retFunc(text, parameters, 4, response.status);
+                    else if (errFunc && typeof errFunc==="function")
+                        errFunc(text||("HTTP "+response.status+" "+response.statusText), parameters, null);
+                    else
+                        console.log("fetchService HTTP ERROR: "+response.status+" "+response.statusText+", PARAMS:", parameters);
+                    if (url!=="consultas/Logs.php") logService("fetchService HTTP ERROR",
+                        {oldUrl:url, oldStatus:response.status, oldParameters:parameters, oldResponseText:text});
+                });
+            }
+            if (hasProgress && response.body && typeof response.body.getReader==="function") {
+                // ── streaming path: fire progress events per chunk ────────────
+                const reader = response.body.getReader();
+                let accumulated = "";
+                (function readChunk() {
+                    reader.read().then(function(chunk) {
+                        if (chunk.done) {
+                            // flush remaining decoder bytes
+                            const tail=decoder.decode(undefined,{stream:false});
+                            if (tail) accumulated+=tail;
+                            clearTimeout(timeoutId);
+                            controller.readyState   = 4;
+                            controller.status       = response.status;
+                            controller.statusText   = response.statusText||"";
+                            controller.responseText = accumulated;
+                            parameters.state      = 4;
+                            parameters.status     = response.status;
+                            funclog("RDY","fetchService("+url+") 4/"+response.status+" (stream done, "+accumulated.length+"B)");
+                            if (retFunc && typeof retFunc==="function")
+                                retFunc(accumulated, parameters, 4, response.status);
+                            return;
+                        }
+                        accumulated += decoder.decode(chunk.value, {stream:true});
+                        controller.responseText = accumulated;
+                        funclog("RDY","fetchService("+url+") 3/"+response.status+" (chunk +"+chunk.value.length+"B)");
+                        if (progressFunc && typeof progressFunc==="function")
+                            progressFunc(accumulated, parameters, 3, response.status, null);
+                        else if (retFunc && typeof retFunc==="function")
+                            retFunc(accumulated, parameters, 3, response.status);
+                        readChunk();
+                    }).catch(function(err) {
+                        clearTimeout(timeoutId);
+                        if (controller._aborted) return;
+                        const errmsg=(err&&err.message)?err.message:String(err);
+                        if (errFunc && typeof errFunc==="function") {
+                            errFunc(errmsg, parameters, null);
+                            if (url!=="consultas/Logs.php") logService("fetchService STREAM ERROR with errFunc",
+                                {oldUrl:url, oldParameters:parameters, errorMessage:errmsg});
+                        } else {
+                            console.log("fetchService STREAM ERROR: "+errmsg+", PARAMS:", parameters);
+                            if (url!=="consultas/Logs.php") logService("fetchService STREAM ERROR",
+                                {oldUrl:url, oldParameters:parameters, errorMessage:errmsg});
+                        }
+                    });
+                })();
+            } else {
+                // ── non-streaming / ReadableStream fallback: full body ────────
+                response.text().then(function(text) {
+                    clearTimeout(timeoutId);
+                    if (!text) text=response.statusText||"";
+                    controller.readyState   = 4;
+                    controller.status       = response.status;
+                    controller.statusText   = response.statusText||"";
+                    controller.responseText = text;
+                    parameters.state      = 4;
+                    parameters.status     = response.status;
+                    funclog("RDY","fetchService("+url+") 4/"+response.status+" ("+text.length+"B)");
+                    if (retFunc && typeof retFunc==="function")
+                        retFunc(text, parameters, 4, response.status);
+                });
+            }
+        })
+        .catch(function(err) {
+            clearTimeout(timeoutId);
+            if (controller._aborted) return;   // timeout already handled above
+            const errmsg=(err&&err.message)?err.message:String(err);
+            controller.readyState = 4;
+            controller.status = 0;
+            controller.statusText = errmsg;
+            controller.responseText = errmsg;
+            parameters.state = 4;
+            parameters.status = 0;
+            if (errFunc && typeof errFunc==="function") {
+                errFunc(errmsg, parameters, null);
+                if (url!=="consultas/Logs.php") logService("fetchService ERROR with errFunc",
+                    {oldUrl:url, oldParameters:parameters, errorMessage:errmsg});
+            } else {
+                console.log("fetchService ERROR: "+errmsg+", PARAMS:", parameters);
+                if (url!=="consultas/Logs.php") logService("fetchService ERROR",
+                    {oldUrl:url, oldParameters:parameters, errorMessage:errmsg});
+            }
+        });
+    funclog("END","fetchService");
+    return controller;  // abort handle: AbortController instance
+}
 function logService(textMessage, data) {
     const parameters={action:"doclog",filebase:"error",message:textMessage};
     if (data) mergeObjects(parameters, data); // parameters.data=data;
@@ -528,7 +749,7 @@ function prePostService(url, parameters, rdyFunc, errFunc, prgFunc) {
         postPrgFunc=getPostRetFunc(prgFunc, errFunc, {...parameters, notReadyFunc: true, validEmptyClosure: false});
     } else
         postRetFunc=getPostRetFunc(rdyFunc, errFunc, {...parameters, errSetAt: 'prePostServiceNOP'});
-    const xmlHttpPost=postService(url,parameters,postRetFunc,postErrFunc,postPrgFunc);
+    const xmlHttpPost=fetchService(url,parameters,postRetFunc,postErrFunc,postPrgFunc);
     if(parameters.hasProgress && parameters.inclusiveSeparator) {
         xmlHttpPost.inclusiveSeparator=parameters.inclusiveSeparator;
         xmlHttpPost.prgCount=0;
@@ -564,7 +785,7 @@ function getPostRetFunc(rdyFunc,errFunc,extra) {
         }
         if (!extra.state) extra.state=readyState;
         if (!extra.status) extra.status=hStatus;
-        const xobj=params.xmlHttpPost;
+        const xobj=params.controller;
         try {
             if (readyState>4 || hStatus>200) throw new Error("SERVICIO NOT AVAILABLE "+statusInfo);
             if (readyState<3 || hStatus<200) { funclog("END","RETFUNC: NOT READY STATUS "+statusInfo); return false; }
@@ -739,7 +960,7 @@ function getPostErrFunc(errFunc,extra) {
         //console.log("INI errfunc errmsg("+errmsg.length+"), params, event=",evt);
         if (!extra) extra={};
         if (!extra.parameters) extra.parameters=params;
-        if (!extra.status && !extra.parameters.status && !extra.xmlHttpPost.parameters.status) return false;
+        if (!extra.status && !extra.parameters.status && !extra.controller.parameters.status) return false;
         if (!extra.event) extra.event=evt;
         if (errFunc) errFunc(errmsg,"",extra);
         postService("consultas/Errores.php",{accion:"savelog",nombre:"getPostErrFunc",texto:errmsg,extra:extra});
@@ -3827,8 +4048,9 @@ function ekil(elem) {
             conlog("PARENT NODE removeChild");
             elem.parentNode.removeChild(elem);
         } else {
-            conlog("delete elem");
-            delete elem;
+        //    conlog("delete elem");
+        //    delete elem;
+            logService("EKIL: element has no parentNode, cannot be removed from DOM", {element: elem});
         }
     }
     //conlog("END function ekil",elem);

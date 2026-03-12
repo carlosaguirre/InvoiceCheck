@@ -51,7 +51,7 @@ if (!hasUser()) {
         case "merge":
             procesaAccion("pdfmerge2");
     }
-} else doclog("ARCHIVO NO ACTION","error",["request"=>$filterArray($_REQUEST,["target"])]);
+} else doclog("ARCHIVO NO ACTION","error",["request"=>filterArray($_REQUEST, ["target"])]);
 
 if (!$preBoot && $_doDB) require_once "configuracion/finalizacion.php";
 if ($_noDie) return;
@@ -69,7 +69,127 @@ function url_exists($params) {
 }
 // END accion=call
 
+function shouldReturnJsonAction() {
+    return isset($_POST["action"]) || !empty($_POST["hasJson"]);
+}
+function respondActionError($message, $data=[]) {
+    if (shouldReturnJsonAction()) echoJSDoc("error", $message, null, $data, "error");
+    else echo "$message<br>";
+}
+
+function dispatchGeneralFileActions($accion, $path, $satPath, $isfPath, $ichPath, $mesPath, &$premsg, &$list) {
+    switch ($accion) {
+        case "descargaZip":
+            $premsg = descarga($satPath, "zip");
+            return 1;
+        case "descargaTar":
+            $premsg = descarga($isfPath, "tar");
+            return 1;
+        case "unzip":
+            $premsg = extrae($satPath, "zip");
+            return 1;
+        case "untar":
+            $premsg = extrae($isfPath, "tar");
+            return 1;
+        case "borraArchivo":
+            if (getUser()->nombre==="sistemas") doclog("Consultas Archivos borraArchivo","archivo",$_POST);
+            $isJson = !empty($_POST['hasJson']);
+            $archivo = $_POST["archivoABorrar"]??"";
+            if (!isset($archivo[0])) {
+                $premsg = "Falta definir archivo a borrar";
+                if ($isJson) { echoJSDoc("error", $premsg, null, ["archivo"=>$archivo], "archivo"); return 2; }
+            } else if(@unlink($path.$archivo)) {
+                $premsg = "Archivo $archivo borrado";
+                if ($isJson) { echoJSDoc("success", $premsg, null, ["archivo"=>$archivo], "archivo"); return 2; }
+            } else {
+                $premsg = "No pudo borrarse el archivo $archivo";
+                if ($isJson) { echoJSDoc("error", $premsg, null, ["archivo"=>$archivo], "archivo"); return 2; }
+            }
+            $zona = $_POST["nombreZona"]??"";
+            $delPath = ($zona=="SAT"?$satPath:($zona=="IS"?$isfPath:($zona=="Arch"?$ichPath:false)));
+            if(!empty($delPath)) {
+                $list = Archivos::dirlist($delPath.$mesPath);
+                $list = Archivos::appendXMLInfo($list, $delPath.$mesPath, $zona);
+            }
+            return 1;
+        case "ordenaSAT":
+            $premsg = organizaXMLs($satPath);
+            return 1;
+        case "ordenaIS":
+            $premsg = organizaEmpresas($isfPath);
+            return 1;
+        case "actualizaSAT":
+            ini_set('max_execution_time', 180);
+            $list = Archivos::dirlist($satPath.$mesPath);
+            $list = Archivos::appendXMLInfo($list, $satPath.$mesPath, "SAT");
+            $num = count($list);
+            $premsg = "Facturas Recibidas del SAT: $num<br>";
+            return 1;
+        case "actualizaIS":
+            $list = Archivos::dirlist($isfPath.$mesPath);
+            $list = Archivos::appendXMLInfo($list, $isfPath.$mesPath, "IS");
+            $num = count($list);
+            $premsg = "Facturas de Invoice Safe: $num<br>";
+            return 1;
+        case "actualizaArch":
+            $list = Archivos::dirlist($ichPath.$mesPath);
+            $list = Archivos::appendXMLInfo($list, $ichPath.$mesPath, "Arch");
+            $num = count($list);
+            $premsg = "Facturas de Invoice Check: $num<br>";
+            return 1;
+        case "actualizaDif":
+            ini_set('max_execution_time', 120);
+            $list = Archivos::comparaListas($mesPath);
+            $list = Archivos::appendXMLInfo($list, $satPath.$mesPath, "Dif", FALSE);
+            $num = count($list);
+            $premsg = "Facturas en SAT pero no en InvoiceCheck ni InvoiceSafe: $num<br>";
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+function dispatchSupportActions($accion) {
+    switch ($accion) {
+        case "rompeSello":
+            rompeSello();
+            return 1;
+        case "recuperaSello":
+            recuperaSello();
+            return 1;
+        case "updateTaxStatusProof": // Actualiza Constancia de Situacion Fiscal
+            updateTaxStatusProof();
+            return 1;
+        case "appendBackgroundDocs":
+            addBGDocs();
+            return 1;
+        case "removeBackgroundPages":
+            removeBGDocs();
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+/**
+ * Dispatcher de acciones para consultas/Archivos.php
+ * Contrato de respuesta recomendado (cuando aplica JSON):
+ *   result: success|error|upkeep|refresh|empty
+ *   message: string
+ *   data: mixed
+ *
+ * Grupos de acciones:
+ * - Descarga/organización: descargaZip, descargaTar, unzip, untar, ordenaSAT, ordenaIS, actualizaSAT, actualizaIS, actualizaArch, actualizaDif, borraArchivo
+ * - Documentos: getDoc, addDoc, repDoc, resDoc, delDoc
+ * - Pagos/PDF: uuidpdf, massReqPaym, pdfbreak, pdfmerge, pdfmerge2
+ * - Otros: rompeSello, recuperaSello, updateTaxStatusProof, appendBackgroundDocs, removeBackgroundPages, extractData
+ */
 function procesaAccion($accion) {
+    $accion = trim((string)$accion);
+    if ($accion==="") {
+        respondActionError("No se recibió la acción a ejecutar", ["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__,"line"=>__LINE__]);
+        return;
+    }
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__,"accion"=>$accion]+$_POST;
     $path = $_SERVER['DOCUMENT_ROOT'];
     $satPath = "descargas/recibidos/";
@@ -79,91 +199,22 @@ function procesaAccion($accion) {
     $anio = $_POST["anio"]??"0000";
     $empresa = $_POST["empresa"]??"empresa";
     $mesPath = $empresa."/$anio/$mes/";
+    $invObj = dao("inv");
+
+    $handled = dispatchGeneralFileActions($accion, $path, $satPath, $isfPath, $ichPath, $mesPath, $premsg, $list);
+    if ($handled===2) return;
+    if ($handled===1) {
+        if(isset($premsg)) echo $premsg."<br>";
+        if(isset($list)) echo arr2List($list, "OL");
+        return;
+    }
+    if (dispatchSupportActions($accion)===1) return;
+
     switch ($accion) {
         case "uuidpdf":
             $result=getUUIDFromPDF();
             echo json_encode($result);
             return;
-        case "descargaZip":
-            $premsg = descarga($satPath, "zip");
-            break;
-        case "descargaTar":
-            $premsg = descarga($isfPath, "tar");
-            break;
-        case "unzip":
-            $premsg = extrae($satPath, "zip");
-            break;
-        case "untar":
-            $premsg = extrae($isfPath, "tar");
-            break;
-        case "borraArchivo":
-            if (getUser()->nombre==="sistemas") doclog("Consultas Archivos borraArchivo","archivo",$_POST);
-            $isJson = !empty($_POST['hasJson']);
-            $archivo = $_POST["archivoABorrar"]??"";
-            if (!isset($archivo[0])) {
-                $premsg = "Falta definir archivo a borrar";
-                if ($isJson) { echoJSDoc("error", $premsg, null, ["archivo"=>$archivo], "archivo"); return; }
-            } else if(@unlink($path.$archivo)) {
-                $premsg = "Archivo $archivo borrado";
-                if ($isJson) { echoJSDoc("success", $premsg, null, ["archivo"=>$archivo], "archivo"); return; }
-            } else {
-                $premsg = "No pudo borrarse el archivo $archivo";
-                if ($isJson) { echoJSDoc("error", $premsg, null, ["archivo"=>$archivo], "archivo"); return; }
-            }
-            $zona = $_POST["nombreZona"]??"";
-            $delPath = ($zona=="SAT"?$satPath:($zona=="IS"?$isfPath:($zona=="Arch"?$ichPath:false)));
-            if(!empty($delPath)) {
-                $list = Archivos::dirlist($delPath.$mesPath);
-                $list = Archivos::appendXMLInfo($list, $delPath.$mesPath, $zona);
-            }
-            break;
-        case "ordenaSAT":
-            $premsg = organizaXMLs($satPath);
-            break;
-        case "ordenaIS":
-            $premsg = organizaEmpresas($isfPath);
-            break;
-        case "actualizaSAT":
-            ini_set('max_execution_time', 180);
-            $list = Archivos::dirlist($satPath.$mesPath);
-            $list = Archivos::appendXMLInfo($list, $satPath.$mesPath, "SAT");
-            $num = count($list);
-            $premsg = "Facturas Recibidas del SAT: $num<br>";
-            break;
-        case "actualizaIS":
-            $list = Archivos::dirlist($isfPath.$mesPath);
-            $list = Archivos::appendXMLInfo($list, $isfPath.$mesPath, "IS");
-            $num = count($list);
-            $premsg = "Facturas de Invoice Safe: $num<br>";
-            break;
-        case "actualizaArch":
-            $list = Archivos::dirlist($ichPath.$mesPath);
-            $list = Archivos::appendXMLInfo($list, $ichPath.$mesPath, "Arch");
-            $num = count($list);
-            $premsg = "Facturas de Invoice Check: $num<br>";
-            break;
-        case "actualizaDif":
-            ini_set('max_execution_time', 120);
-            $list = Archivos::comparaListas($mesPath);
-            $list = Archivos::appendXMLInfo($list, $satPath.$mesPath, "Dif", FALSE);
-            $num = count($list);
-            $premsg = "Facturas en SAT pero no en InvoiceCheck ni InvoiceSafe: $num<br>";
-            break;
-        case "rompeSello":
-            rompeSello();
-            break;
-        case "recuperaSello":
-            recuperaSello();
-            break;
-        case "updateTaxStatusProof": // Actualiza Constancia de Situacion Fiscal
-            updateTaxStatusProof();
-            break;
-        case "appendBackgroundDocs":
-            addBGDocs();
-            break;
-        case "removeBackgroundPages":
-            removeBGDocs();
-            break;
         case "extractData":
             //echo "POST: ".json_encode($_POST)."<br>";
             //echo "FILES: ".json_encode($_FILES);
@@ -239,11 +290,6 @@ function procesaAccion($accion) {
             if ($tipo!=="ea") { echoJSDoc("error", "Debe indicar un tipo de documento válido", null, $baseData+["line"=>__LINE__], "error"); return; }
             $invId=$_POST["id"];
             if(!isset($invId[0])) { echoJSDoc("error", "No se recibió identificador de CFDI", null, $baseData+["line"=>__LINE__], "error"); return; }
-            global $invObj;
-            if (!isset($invObj)) {
-                require_once "clases/Facturas.php";
-                $invObj=new Facturas();
-            }
             $invData=$invObj->getData("id=$invId", 1);
             if (!isset($invData[0]["id"][0])) {
                 global $query;
@@ -323,11 +369,6 @@ function procesaAccion($accion) {
                 echoJSDoc("error", "Ocurrió un error en la descarga del archivo".($hasMsg?": $fmsg":""), null, $baseData+["line"=>__LINE__,"files"=>$_FILES,"errmsg"=>$hasMsg?$fmsg:"Codigo de error desconocido"], "error");
                 return;
             } // cmorysan3: Ocurrió un error en la descarga del archivo. {file:"C:\Apache24\htdocs\invoice\consultas\Archivos.php", function:"procesaAccion", accion:"addDoc", line:"301", errmsg:"La carga de archivo excede la directiva upload_max_filesize en php.ini", action:"addDoc", id:"268296", type:"ea", hasProgress:"false"}
-            global $invObj;
-            if (!isset($invObj)) {
-                require_once "clases/Facturas.php";
-                $invObj=new Facturas();
-            }
             $invData=$invObj->getData("id=$invId", 1);
             if (!isset($invData[0]["id"][0])) {
                 global $query;
@@ -356,12 +397,7 @@ function procesaAccion($accion) {
                 if (!isset($pdf[0])) {
                     $prvRfc=$_POST["rfc"]??"";
                     if (!isset($prvRfc[0])) {
-                        global $prvObj;
-                        if (!isset($prvObj)) {
-                            require_once "clases/Proveedores.php";
-                            $prvObj=new Proveedores();
-                        }
-                        $prvData=$prvObj->getData("codigo='$invData[codigoProveedor]'", 1);
+                        $prvData=dao("prv")->getData("codigo='$invData[codigoProveedor]'", 1);
                         if (!isset($prvData[0]["id"][0])) {
                             global $query;
                             $errors=DBi::$errors;
@@ -401,12 +437,7 @@ function procesaAccion($accion) {
                     return;
                 }
                 doclog("REASIGNAR PDF", "docs", $baseData+["line"=>__LINE__,"pdf"=>$pdf]);
-                global $firObj;
-                if(!isset($firObj)) {
-                    require_once "clases/Firmas.php";
-                    $firObj=new Firmas();
-                }
-                $firObj->insertRecord(["idUsuario"=>getUser()->id, "modulo"=>"cfdi", "idReferencia"=>$invId, "accion"=>"agrega", "motivo"=>$_POST["motivo"]??$pdf]);
+                dao("fir")->insertRecord(["idUsuario"=>getUser()->id, "modulo"=>"cfdi", "idReferencia"=>$invId, "accion"=>"agrega", "motivo"=>$_POST["motivo"]??$pdf]);
                 DBi::commit();
                 DBi::autocommit(TRUE);
                 echoJSDoc("success", "CFDI-PDF Agregado", null, ["pdf"=>$pdf],"docs");
@@ -438,12 +469,7 @@ function procesaAccion($accion) {
                 echoJSDoc("error", "No se pudo agregar Entrada de Almacen", null, $baseData+["line"=>__LINE__,"sysPath"=>$sysPath,"eaPath"=>$eaPath,"eafile"=>$ffile,"moveError"=>error_get_last()], "error");
                 return;
             }
-            global $firObj;
-            if (!isset($firObj)) {
-                require_once "clases/Firmas.php";
-                $firObj=new Firmas();
-            }
-            $firObj->insertRecord(["idUsuario"=>getUser()->id, "modulo"=>"ea", "idReferencia"=>$invId, "accion"=>"agrega", "motivo"=>$eaPath]);
+            dao("fir")->insertRecord(["idUsuario"=>getUser()->id, "modulo"=>"ea", "idReferencia"=>$invId, "accion"=>"agrega", "motivo"=>$eaPath]);
             DBi::commit();
             DBi::autocommit(TRUE);
             echoJSDoc("success", "Entrada de Almacén Agregada", null, ["ea"=>$eaPath], "docs");
@@ -470,12 +496,7 @@ function procesaAccion($accion) {
             if (!isset($invId[0])) {
                 $ordId="".($_POST["oId"]??"");
                 if (!isset($ordId[0])) { echoJSDoc("error", "No se reconoce el documento a reemplazar", null, $baseData+["line"=>__LINE__], "error"); return; }
-                global $ordObj;
-                if (!isset($ordObj)) {
-                    require_once "clases/OrdenesCompra.php";
-                    $ordObj=new OrdenesCompra();
-                }
-                $ordData=$ordObj->getData("id=$ordId", 1);
+                $ordData=dao("ord")->getData("id=$ordId", 1);
                 if (!isset($ordData[0]["id"][0])) {
                     global $query;
                     echoJSDoc("error", "No existe la Orden de Compra", null, $baseData+["line"=>__LINE__,"query"=>$query], "error");
@@ -495,19 +516,9 @@ function procesaAccion($accion) {
                     { echoJSDoc("error", "El documento existente no se puede reemplazar", null, $baseData+["line"=>__LINE__,"ubicacion"=>$upath,"moveError"=>error_get_last(),"nombre"=>$name.".pdf"], "error"); return; }
                 sleep(3);
                 if (move_uploaded_file($ffile["tmp_name"], $filename)===false) { echoJSDoc("error", "El archivo no se pudo cargar", null, $baseData+["line"=>__LINE__,"moveError"=>error_get_last(),"filename"=>$filename], "error"); return; }
-                global $firObj;
-                if (!isset($firObj)) {
-                    require_once "clases/Firmas.php";
-                    $firObj=new Firmas();
-                }
-                $firObj->insertRecord(["idUsuario"=>getUser()->id, "modulo"=>"orden", "idReferencia"=>$ordId, "accion"=>"reemplaza", "motivo"=>$upath.$name]);
+                dao("fir")->insertRecord(["idUsuario"=>getUser()->id, "modulo"=>"orden", "idReferencia"=>$ordId, "accion"=>"reemplaza", "motivo"=>$upath.$name]);
                 echoJSDoc("success", "Archivo reemplazado satisfactoriamente", null, ["orden"=>$filename], "docs");
                 return;
-            }
-            global $invObj;
-            if (!isset($invObj)) {
-                require_once "clases/Facturas.php";
-                $invObj=new Facturas();
             }
             $invData=$invObj->getData("id=$invId", 1);
             if (!isset($invData[0]["id"][0])) {
@@ -573,12 +584,7 @@ function procesaAccion($accion) {
                 { echoJSDoc("error", "El documento existente no se puede reemplazar", null, $baseData+["line"=>__LINE__,"ubicacion"=>$upath,"moveError"=>error_get_last(),"nombre"=>$name.".pdf"], "error"); return; }
             sleep(3);
             if (move_uploaded_file($ffile["tmp_name"], $filename)===false) { echoJSDoc("error", "El archivo no se pudo cargar", null, $baseData+["line"=>__LINE__,"filename"=>$filename,"moveError"=>error_get_last()], "error"); return; }
-            global $firObj;
-            if (!isset($firObj)) {
-                require_once "clases/Firmas.php";
-                $firObj=new Firmas();
-            }
-            $firObj->insertRecord(["idUsuario"=>getUser()->id, "modulo"=>$tipo, "idReferencia"=>$invId, "accion"=>"reemplaza", "motivo"=>$upath.$name]);
+            dao("fir")->insertRecord(["idUsuario"=>getUser()->id, "modulo"=>$tipo, "idReferencia"=>$invId, "accion"=>"reemplaza", "motivo"=>$upath.$name]);
             echoJSDoc("success", "Archivo reemplazado satisfactoriamente", null, [$tipo=>$filename], "docs");
             return;
         case "resDoc": // Recupera archivo borrado
@@ -588,11 +594,6 @@ function procesaAccion($accion) {
             $invId=$_POST["id"];
             $erasedPath=$_POST["path"];
             if(!isset($invId[0])) { echoJSDoc("error", "No se recibió identificador de CFDI", null, $baseData+["line"=>__LINE__], "error"); return; }
-            global $invObj;
-            if (!isset($invObj)) {
-                require_once "clases/Facturas.php";
-                $invObj=new Facturas();
-            }
             $invData=$invObj->getData("id=$invId", 1);
             if (!isset($invData[0]["id"][0])) {
                 global $query;
@@ -624,11 +625,6 @@ function procesaAccion($accion) {
             if ($tipo!=="cfdi"&&$tipo!=="ea") { echoJSDoc("error", "El tipo de documento no es válido", null, $baseData+["line"=>__LINE__], "error"); return; }
 
             if(!isset($invId[0])) { echoJSDoc("error", "No se recibió identificador de CFDI", null, $baseData+["line"=>__LINE__], "error"); return; }
-            global $invObj;
-            if (!isset($invObj)) {
-                require_once "clases/Facturas.php";
-                $invObj=new Facturas();
-            }
             $invData=$invObj->getData("id=$invId", 1);
             if (!isset($invData[0]["id"][0])) {
                 global $query;
@@ -652,12 +648,7 @@ function procesaAccion($accion) {
                         rename($originalPath,$deletedPath);
                         sleep(3);
                     }
-                    global $firObj;
-                    if (!isset($firObj)) {
-                        require_once "clases/Firmas.php";
-                        $firObj=new Firmas();
-                    }
-                    $firObj->insertRecord(["idUsuario"=>getUser()->id, "modulo"=>"cfdi", "idReferencia"=>$invId, "accion"=>"elimina", "motivo"=>$_POST["motivo"]??""]);
+                    dao("fir")->insertRecord(["idUsuario"=>getUser()->id, "modulo"=>"cfdi", "idReferencia"=>$invId, "accion"=>"elimina", "motivo"=>$_POST["motivo"]??""]);
                     echoJSDoc("success", "PDF Eliminado", null, ["deletedPath"=>$deletedPath], "docs");
                     return;
                 }
@@ -690,22 +681,12 @@ function procesaAccion($accion) {
                 if (file_exists($delEAPath)) unlink($delEAPath);
                 rename($eaPath,$delEAPath);
                 sleep(3);
-                global $firObj;
-                if (!isset($firObj)) {
-                    require_once "clases/Firmas.php";
-                    $firObj=new Firmas();
-                }
                 $usrId=getUser()->id;
                 if (getUser()->name==="admin") {
-                    global $usrObj;
-                    if (!isset($usrObj)) {
-                        require_once "clases/Usuarios.php";
-                        $usrObj=new Usuarios();
-                    }
-                    $usrData = $usrObj->getData("nombre='SISTEMAS'", 1, "id");
+                    $usrData = dao("usr")->getData("nombre='SISTEMAS'", 1, "id");
                     if (isset($usrData[0]["id"][0])) $usrId=$usrData[0]["id"];
                 }
-                $firObj->insertRecord(["idUsuario"=>$usrId, "modulo"=>"ea", "idReferencia"=>$invId, "accion"=>"elimina", "motivo"=>$_POST["motivo"]??""]);
+                dao("fir")->insertRecord(["idUsuario"=>$usrId, "modulo"=>"ea", "idReferencia"=>$invId, "accion"=>"elimina", "motivo"=>$_POST["motivo"]??""]);
                 echoJSDoc("success", "PDF Eliminado", null, ["delEA"=>$ubicacion.$delEAName], "docs");
                 return;
             }
@@ -760,7 +741,7 @@ function procesaAccion($accion) {
                                             if ($pos2!==false && $pos2>$pos) $isRefLine=0;
                                         }
                                     }
-                                    if ($isRefLine===0 && $substr($line, 0, 3)==="SOL") {
+                                    if ($isRefLine===0 && substr($line, 0, 3)==="SOL") {
                                         $txt=substr($line, 3);
                                         $fecha = substr($txt, 0, 4);
                                         $gpoCut = substr($txt, 6, 3);
@@ -800,6 +781,7 @@ function procesaAccion($accion) {
                 if (is_string($value)) $value=json_decode($value,true);
                 $value["name"]="CPB_".str_replace("-", "", $value["folio"]).".pdf";
                 if (file_exists($localPath.$value["name"])) {
+                    //
                     try {
                         $newName=payRequest(...array_values($value));
                         DBi::commit();
@@ -813,29 +795,29 @@ function procesaAccion($accion) {
             }
             DBi::autocommit(true);
             $returnData=["folios"=>array_column($data, "folio"),"data"=>$data,"onePages"=>$onePages,"txtPages"=>$txtPages,"foundPages"=>$foundPages];
-            if ($foundFiles==0) { echoJSDoc("error", "No se encontró ningún comprobante de pago relacionado", null, $returnData, "error"); return; }
+            if ($foundFiles==0) { echoJSDoc("error", "No se encontró ningún comprobante de pago relacionado", null, $returnData, "error"); break; } // return; }
             $dataLen=count($data);
-            if ($foundFiles===$dataLen) { echoJSDoc("success", "Comprobantes encontrados ya generados se ligaron a las solicitudes marcadas", null, $returnData, "archivo"); return; }
+            if ($foundFiles===$dataLen) { echoJSDoc("success", "Comprobantes encontrados ya generados se ligaron a las solicitudes marcadas", null, $returnData, "archivo"); break; } // return; }
             $isSingle=($foundFiles===1);
             $pl_s =$isSingle?"":"s";
             $pl_es=$isSingle?"":"es";
             $pl_n =$isSingle?"o":"aron";
             echoJSDoc("success", "Se lig$pl_n $foundFiles comprobante$pl_s de la$pl_s solicitud$pl_es marcada$pl_s.", null, $returnData, "archivo");
-            return;
+            break; // return;
         case "pdfbreak":
             $onePageFiles=breakPDFFiles(getFixedFileArray($_FILES["files"]));
-            if ($onePageFiles===null) return;
+            if ($onePageFiles===null) break; // return;
             require_once "clases/PDFTools.php";
-            $localPath=PDFTools::getLocalPath();
+            $localPath=PDFTools::getSavePath();
             $webPath=PDFTools::getWebPath();
             $localFiles = array_map(fn($item) => $localPath.$item, $onePageFiles);
             $webFiles = array_map(fn($item) => $webPath.$item, $onePageFiles);
             $textFiles=pdfToTextFiles($localFiles);
-            if ($textFiles===null) return;
+            if ($textFiles===null) break; // return;
             sleep(1);
             $data=showMeTextFileData($textFiles);
             echoJSDoc("success", "exito", null, ["webnames"=>$webFiles, "text"=>$data]);
-            return;
+            break; // return;
         case "pdfmerge2":
             try {
                 $dt=new DateTime();
@@ -854,18 +836,13 @@ function procesaAccion($accion) {
             } catch (Exception $ex) {
                 echoJSDoc("error", "Ocurrió un error", null, $baseData+["line"=>__LINE__,"error"=>getErrorData($ex)], "error");
             }
-            return;
+            break; // return;
         case "pdfmerge":
             try {
                 $dt = new DateTime();
                 $mergeName="merge".$dt->format("ymdHis").".pdf";
                 $mergeList=[];
                 if (isset($_POST["factIds"][0])) {
-                    global $invObj;
-                    if (!isset($invObj)) {
-                        require_once "clases/Facturas.php";
-                        $invObj=new Facturas();
-                    }
                     $invObj->rows_per_page=0;
                     $invData=$invObj->getDataByFieldArray(["id"=>$_POST["factIds"]], 0, "concat(ubicacion,nombreInternoPDF,'.pdf') link,ea");
                     $mergeList=array_column($invData, "link");
@@ -873,7 +850,7 @@ function procesaAccion($accion) {
                 if (isset($_POST["mergeList"][0])) {
                     $mergeList+=$_POST["mergeList"];
                 }
-                if (empty($mergeList)) { echoJSDoc("error", "Falta indicar una lista de archivos",null, $baseData+["line"=>__LINE__], "error"); return; }
+                if (empty($mergeList)) { echoJSDoc("error", "Falta indicar una lista de archivos",null, $baseData+["line"=>__LINE__], "error"); break; }
                 require_once "clases/PDFTools.php";
                 PDFTools::init();
                 $resultData=[];
@@ -889,6 +866,9 @@ function procesaAccion($accion) {
             } catch (Exception $ex) {
                 echoJSDoc("error", "Ocurrió un error", null, $baseData+["line"=>__LINE__,"error"=>getErrorData($ex)], "error");
             }
+            break; // return;
+        default:
+            respondActionError("Acción no reconocida", $baseData+["line"=>__LINE__]);
             return;
     }
     if(isset($premsg)) echo $premsg."<br>";
@@ -978,62 +958,51 @@ function findReqDataInTextFile($solfolio) {
 
 }
 function getSolFolioInLine($txt) {
-    $isSol=false;
-    if (substr($txt, 0, 3)==="SOL") {
-        $isSol=true;
-        $txt=substr($txt, 3);
-    }
-    $fecha=substr($txt, 0, 4);
-    $gpoCut=substr($txt, 6, 3);
-    $num=substr($txt, 9);
-    $padNum=str_pad(substr($txt, 9), 3, "0", STR_PAD_LEFT);
-    if ($num!==$padNum) $padNum.="!";
-    $txt=($isSol?"SOL ":"").$gpoCut.$fecha."-".$padNum;
-    return $txt;
+    return getReqPymFolio($txt, false, true);
 }
 function payRequest($id,$folio,$type,$oriname) {
-    global $solObj, $invObj, $ordObj, $ctrObj, $query;
+    global $query;
     $type=strtolower($type);
     require_once "clases/PDFTools.php";$tmpPath=PDFTools::getSavePath();
     $fullOriName=$tmpPath.$oriname;
     chmod($fullOriName, 0777);
-    if (!isset($solObj)){require_once "clases/SolicitudPago.php";$solObj=new SolicitudPago();}
+    $solObj=dao("sol");
     $solData=$solObj->getData("id=$id", 1, "idFactura,idOrden,status,proceso");
-    if (!isset($solData[0])) throw new DocLogException("No se encontró la solicitud $folio",["id"=>$id,"folio"=>$folio,"type"=>$type,"oriname"=>$oriname,"query"=>$query]);
+    if (!isset($solData[0])) throw new DocLogException("No se encontró la solicitud $folio", ["id"=>$id,"folio"=>$folio,"type"=>$type,"oriname"=>$oriname,"query"=>$query]);
     $solData=$solData[0];
     switch($type[0]) {
-        case "f": $invId=$solData["idFactura"]; if (!isset($invObj)) { require_once "clases/Facturas.php"; $invObj=new Facturas(); }
-            $invData=$invObj->getData("id=$invId", 1, "ubicacion,nombreInterno,nombreInternoPDF");
-            if (!isset($invData[0])) throw new DocLogException("No se encontró la factura relacionada",["solId"=>$id,"folio"=>$folio,"type"=>$type,"oriname"=>$oriname,"solData"=>$solData,"query"=>$query]);
+        case "f": $invId=$solData["idFactura"];
+            $invData=dao("inv")->getData("id=$invId", 1, "ubicacion,nombreInterno,nombreInternoPDF");
+            if (!isset($invData[0])) throw new DocLogException("No se encontró la factura relacionada", ["solId"=>$id,"folio"=>$folio,"type"=>$type,"oriname"=>$oriname,"solData"=>$solData,"query"=>$query]);
             $invData=$invData[0];
             $path=$invData["ubicacion"];
             $name="CP_".(isset($invData["nombreInternoPDF"][0])?$invData["nombreInternoPDF"]:$invData["nombreInterno"]).".pdf";
-            if (!$invObj->saveRecord(["id"=>$invId,"comprobantePagoPDF"=>$name]))
-                throw new DocLogException("No se pudo asignar el comprobante de pago a la factura",["solId"=>$id,"folio"=>$folio,"type"=>$type,"oriname"=>$oriname,"solData"=>$solData,"invData"=>$invData,"query"=>$query]);
+            if (!dao("inv")->saveRecord(["id"=>$invId,"comprobantePagoPDF"=>$name]))
+                throw new DocLogException("No se pudo asignar el comprobante de pago a la factura", ["solId"=>$id,"folio"=>$folio,"type"=>$type,"oriname"=>$oriname,"solData"=>$solData,"invData"=>$invData,"query"=>$query]);
         break;
-        case "o": $ordId=$solData["idOrden"]; if (!isset($ordObj)) { require_once "clases/OrdenesCompra.php"; $ordObj=new OrdenesCompra(); }
-            $ordData=$ordObj->getData("id=$ordId", 1, "rutaArchivo,nombreArchivo");
-            if (!isset($ordData[0])) throw new DocLogException("No se encontró la orden relacionada",["solId"=>$id,"folio"=>$folio,"type"=>$type,"oriname"=>$oriname,"solData"=>$solData,"query"=>$query]);
+        case "o": $ordId=$solData["idOrden"];
+            $ordData=dao("ord")->getData("id=$ordId", 1, "rutaArchivo,nombreArchivo");
+            if (!isset($ordData[0])) throw new DocLogException("No se encontró la orden relacionada", ["solId"=>$id,"folio"=>$folio,"type"=>$type,"oriname"=>$oriname,"solData"=>$solData,"query"=>$query]);
             $ordData=$ordData[0];
             $path=$ordData["rutaArchivo"];
             $name="CP_".$ordData["nombreArchivo"];
-            if (!$ordObj->saveRecord(["id"=>$ordId,"comprobantePago"=>$name]))
-                throw new DocLogException("No se pudo asignar el comprobante de pago a la orden",["solId"=>$id,"folio"=>$folio,"type"=>$type,"oriname"=>$oriname,"solData"=>$solData,"ordData"=>$ordData,"query"=>$query]);
+            if (!dao("ord")->saveRecord(["id"=>$ordId,"comprobantePago"=>$name]))
+                throw new DocLogException("No se pudo asignar el comprobante de pago a la orden", ["solId"=>$id,"folio"=>$folio,"type"=>$type,"oriname"=>$oriname,"solData"=>$solData,"ordData"=>$ordData,"query"=>$query]);
         break;
-        case "c": $ctrId=$solData["idContrarrecibo"]; if (!isset($ctrObj)) { require_once "clases/Contrarrecibos.php"; $ctrObj=new Contrarrecibos(); }
-            $ctrData=$ctrObj->getData("id=$ctrId", 1, "aliasGrupo,fechaRevision,folio");
-            if (!isset($ctrData[0])) throw new DocLogException("No se encontró el contra recibo relacionado",["solId"=>$id,"folio"=>$folio,"type"=>$type,"oriname"=>$oriname,"solData"=>$solData,"query"=>$query]);
+        case "c": $ctrId=$solData["idContrarrecibo"];
+            $ctrData=dao("ctr")->getData("id=$ctrId", 1, "aliasGrupo,fechaRevision,folio");
+            if (!isset($ctrData[0])) throw new DocLogException("No se encontró el contra recibo relacionado", ["solId"=>$id,"folio"=>$folio,"type"=>$type,"oriname"=>$oriname,"solData"=>$solData,"query"=>$query]);
             $ctrData=$ctrData[0];
             $name="CP_CTR_".$ctrData["folio"];
             $fRev=$ctrData["fechaRevision"];
             $yr =substr($fRev, 0, 4);
             $mon=substr($fRev, 5, 2);
             $path="archivos/$ctrData[aliasGrupo]/$yr/$mon/";
-            if (!$ctrObj->saveRecord(["id"=>$ctrId,"comprobantePago"=>$name]))
-                throw new DocLogException("No se pudo asignar el comprobante de pago al contra recibo",["solId"=>$id,"folio"=>$folio,"type"=>$type,"oriname"=>$oriname,"solData"=>$solData,"ctrData"=>$ctrData,"query"=>$query]);
+            if (!dao("ctr")->saveRecord(["id"=>$ctrId,"comprobantePago"=>$name]))
+                throw new DocLogException("No se pudo asignar el comprobante de pago al contra recibo", ["solId"=>$id,"folio"=>$folio,"type"=>$type,"oriname"=>$oriname,"solData"=>$solData,"ctrData"=>$ctrData,"query"=>$query]);
         break;
         default:
-            throw new DocLogException("Tipo de documento invalido",["solId"=>$id,"folio"=>$folio,"type"=>$type,"oriname"=>$oriname,"solData"=>$solData]);
+            throw new DocLogException("Tipo de documento invalido", ["solId"=>$id,"folio"=>$folio,"type"=>$type,"oriname"=>$oriname,"solData"=>$solData]);
     }
     $docRoot=$_SERVER["DOCUMENT_ROOT"];
     $fullPath=$docRoot.$path;
@@ -1117,7 +1086,8 @@ function viewTextFiles() {
     }
 }
 function readingTextFiles($txtn) {
-    foreach ($textList as $tIdx => $textname) {
+    $data=[]; $log=[]; $webPath="archivos/"; $webnames=[];
+    foreach ($txtn as $tIdx => $textname) {
         $block="";
         try {
             if (file_exists($textname)) {
@@ -1140,7 +1110,7 @@ function readingTextFiles($txtn) {
                     continue;
                 }
             } else {
-                $log[]="Text File wasn't created '$txtfile'";
+                $log[]="Text File wasn't created '$textname'";
                 continue;
             }
         } catch (Exception $ex) {
@@ -1200,7 +1170,7 @@ function getReqPymMap($fileBase, $reqList) {
                             if ($isRefLine===0) {
                                 $solFolio=getReqPymFolio($line);
                                 if ($solFolio!==false) {
-                                    if (!$reqList || in_array($solFolio, $reqlist))
+                                    if (!$reqList || in_array($solFolio, $reqList))
                                         $map[$solFolio]=$filename; // $fileabs; // 
                                 }
                                 break;
@@ -1273,7 +1243,8 @@ function doMassRequirePayment() {
         sleep(1);
     } else if (isset($createTextFileErrors[0])) { echoJSDoc("error", "Errores al convertir PDF a Texto", null, $baseData+["line"=>__LINE__,"errors"=>$createTextFileErrors], "error"); return; }
     $result=[]; $storeReceiptErrors=[];
-    global $solObj, $invObj, $ordObj, $ctrObj, $ctfObj, $prcObj, $usrObj, $query;
+    global $query;
+    $solObj=dao("sol");
     foreach ($baseFiles as $baseIndex => $baseFile) {
         $rpMap=getReqPymMap($baseFile, $refList); // [<solFolio>=><docsTempComprobantePago>, ..., error=>[message, idx, filename]|[message,code,file,line,trace]]
         foreach($rpMap as $reqName => $paymentReceiptName) {
@@ -1285,7 +1256,6 @@ function doMassRequirePayment() {
                 continue;
             }
             $reqData=$mapSol[$reqName]; // id, type(f,o,c)
-            if (!isset($solObj)) { require_once "clases/SolicitudPago.php"; $solObj=new SolicitudPago(); }
             $solData=$solObj->getData("id=$reqData[id]", 1);
             if (isset($solData[0])) $solData=$solData[0];
             else {
@@ -1293,9 +1263,10 @@ function doMassRequirePayment() {
                 continue;
             }
             switch($reqData["type"][0]) {
-                case "f": if (!isset($invObj)) { require_once "clases/Facturas.php"; $invObj=new Facturas(); }
+                case "f":
                     $idFactura=$solData["idFactura"];
-                    $invData=$invObj->getData("id=$idFactura", 1, "ubicacion,nombreInternoPDF,comprobantePagoPDF");
+                    $tabObj=dao("inv");
+                    $invData=$tabObj->getData("id=$idFactura", 1, "ubicacion,nombreInternoPDF,comprobantePagoPDF");
                     if (isset($invData[0])) $invData=$invData[0];
                     else { /* ERROR */ }
                     // toDo: decidir q hacer si ya existe el archivo, si se le agrega un timestamp o si solo se sobreescribe
@@ -1305,23 +1276,23 @@ function doMassRequirePayment() {
                         $storeReceiptErrors[]=["message"=>"No se pudo guardar el archivo","docTmpName"=>$paymentReceiptName,"ubicacion"=>$path,"cpName"=>$cpName,"invId"=>$idFactura];
                         break;
                     }
-                    if ($invObj->saveRecord(["id"=>$idFactura, "comprobantePagoPDF"=>$cpname,"statusn"=>new DBExpression("statusn|".Facturas::STATUS_PAGADO),"status"=>"Pagado"])) {
-                        $prcObj->cambioFactura($idFactura, "Pagado", getUser()->nombre, false, "Solicitud $reqName con Factura");
-
+                    if ($tabObj->saveRecord(["id"=>$idFactura, "comprobantePagoPDF"=>$cpname,"statusn"=>new DBExpression("statusn|".Facturas::STATUS_PAGADO),"status"=>"Pagado"])) {
+                        dao("prc")->cambioFactura($idFactura, "Pagado", getUser()->nombre, false, "Solicitud $reqName con Factura");
                     }
                     break;
-                case "o": if (!isset($ordObj)) { require_once "clases/OrdenesCompra.php"; $ordObj=new OrdenesCompra(); }
+                case "o":
                     $idOrden=$solData["idOrden"];
-                    $ordData=$ordObj->getData("id=$idOrden", 1, "rutaArchivo, nombreArchivo, comprobantePago");
-                    if (isset($ordData[0])) $ordData=$ordDta[0];
+                    $tabObj=dao("ord");
+                    $ordData=$tabObj->getData("id=$idOrden", 1, "rutaArchivo, nombreArchivo, comprobantePago");
+                    if (isset($ordData[0])) $ordData=$ordData[0];
                     else { /* ERROR */ }
                     $path=$ordData["rutaArchivo"];
                     $cpName="CP_$ordData[nombreArchivo]";
-                    $tabObj=$ordObj; $pdfField="nombreArchivo"; $fileField="comprobantePago"; $pathField="rutaArchivo";
+                    $pdfField="nombreArchivo"; $fileField="comprobantePago"; $pathField="rutaArchivo";
                     $divName="ordDocs"; $fieldId="idOrden"; $addFldArr=["status"=>new DBExpression("status|".OrdenesCompra::STATUS_PAGADO)];
                     break;
-                case "c": if (!isset($ctrObj)) { require_once "clases/Contrarrecibos.php"; $ctrObj=new Contrarrecibos(); }
-                    $tabObj=$ctrObj; $fileField="comprobantePago"; $divName="ctrDocs"; $fieldId="idContrarrecibo";
+                case "c":
+                    $tabObj=dao("ctr"); $fileField="comprobantePago"; $divName="ctrDocs"; $fieldId="idContrarrecibo";
                     break;
             }
         }
@@ -1343,8 +1314,7 @@ function doMassRequirePayment() {
                         foreach ($refList as $refIdx => $refVal) {
                             // Corroborar la referencia con un folio de solicitud
                             if (strpos($line, $refVal)!==false) {
-                                switch($solType[0]) { } global $query, $solObj;
-                                if (!isset($solObj)) { require_once "clases/SolicitudPago.php"; $solObj=new SolicitudPago(); }
+                                switch($solType[0]) { } global $query;
                                 $solData=$solObj->getData("id=$solId", 1);
                                 if (isset($solData[0])) $solData=$solData[0];
                                 if (isset($pathField[0])&&isset($pdfField[0])) {
@@ -1365,30 +1335,23 @@ function doMassRequirePayment() {
                                             $basePath=($path??"");
                                             $absPath=$docroot.$basePath;
                                             if (file_exists($absPath.$cpName)) {
-                                                chmod($absPath.$cpName);
+                                                chmod($absPath.$cpName, 0777);
                                                 unlink($absPath.$cpName);
                                             }
                                             if (copy($resultData["local"][$txtIdx],$absPath.$cpName)) {
                                                 if ($solType[0]=="c") {
-                                                    global $ctrObj,$ctfObj;
-                                                    if (!isset($ctrObj)) { require_once "clases/Contrarrecibos.php"; $ctrObj=new Contrarrecibos(); }
-                                                    $ctrData=$ctrObj->getData("id=".$solData[$fieldId],0,"aliasGrupo,folio");
+                                                    $ctrData=dao("ctr")->getData("id=".$solData[$fieldId],0,"aliasGrupo,folio");
                                                     if (isset($ctrData[0])) $ctrData=$ctrData[0];
-                                                    if (!isset($ctfObj)) { require_once "clases/Contrafacturas.php"; $ctfObj=new Contrafacturas(); }
-                                                    $ctfObj->rows_per_page=0;
-                                                    $ctfData=$ctfObj->getData("idContrarrecibo=".$solData[$fieldId]." and autorizadaPor is not null",0,"idFactura");
+                                                    $ctfData=dao("ctf", ["rows_per_page"=>0])->getData("idContrarrecibo=".$solData[$fieldId]." and autorizadaPor is not null",0,"idFactura");
                                                     if (isset($ctfData[0])) {
                                                         $cfi=array_column($ctfData, "idFactura");
-                                                        if ($invObj->saveRecord(["id"=>$cfi,"status"=>"Pagado","statusn"=>new DBExpression("statusn|".Facturas::STATUS_PAGADO)])&&isset($ctrData["folio"])) {
-                                                            global $prcObj;
-                                                            if (!isset($prcObj)) { require_once "clases/Proceso.php"; $prcObj=new Proceso(); }
-                                                            $prcObj->cambioFactura($cfi, "Pagado", getUser()->nombre, false, "Sol $solFolio x Contra $ctrData[aliasGrupo]-$ctrData[folio] Marcado");
+                                                        if (dao("inv")->saveRecord(["id"=>$cfi,"status"=>"Pagado","statusn"=>new DBExpression("statusn|".Facturas::STATUS_PAGADO)])&&isset($ctrData["folio"])) {
+                                                            dao("prc")->cambioFactura($cfi, "Pagado", getUser()->nombre, false, "Sol $solFolio x Contra $ctrData[aliasGrupo]-$ctrData[folio] Marcado");
                                                         }
                                                     }
                                                 }
                                                 if ($solObj->saveRecord(["id"=>$solId,"status"=>new DBExpression("status|".SolicitudPago::STATUS_PAGADA),"proceso"=>SolicitudPago::PROCESO_PAGADA]) || empty(DBi::$errno)) {
-                                                    global $usrObj;
-                                                    if (!isset($usrObj)) { require_once "clases/Usuarios.php"; $usrObj=new Usuarios(); }
+                                                    $usrObj=dao("usr");
                                                     $usrData=$usrObj->getData("id=$solData[idUsuario]",0,"nombre,persona,email");
                                                     if (isset($usrData[0])) $usrData=$usrData[0];
                                                     if (isset($codigoProveedor[0])) {
@@ -1408,9 +1371,7 @@ function doMassRequirePayment() {
                                                     }
                                                     $usrObj->saveRecord(["id"=>$solIdUsuario,"banderas"=>new DBExpression("banderas|2")]);
                                                     $mensaje=getSolFormaView($template,$solId,$solFolio,$baseKeyMap);
-                                                    global $gpoObj;
-                                                    if (!isset($gpoObj)) { require_once "clases/Grupo.php"; $gpoObj=new Grupo(); }
-                                                    $mailSettings=["domain"=>$gpoObj->getDomainKey($solData["idEmpresa"])];
+                                                    $mailSettings=["domain"=>dao("gpo")->getDomainKey($solData["idEmpresa"])];
                                                     sendMail($asunto,$mensaje,$fromObj,$toObj,null,null,$mailSettings); // (8) PAGO DE SOLICITUD. Finanzas a Solicitante
                                                 }
                                             }
@@ -1431,9 +1392,9 @@ function doMassRequirePayment() {
 }
 
 function replaceDoc() {
-    $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__]+POST;
+    $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__]+$_POST;
     $esSistemas = validaPerfil(["Sistemas","Administrador"]);
-    if (!$esSistemas) { echoJSDoc("error", "No tiene permiso para reemplazar documentos", null, $baseData+["line"=>__LINE__,"user"=>getUser()->nombre], error); return; }
+    if (!$esSistemas) { echoJSDoc("error", "No tiene permiso para reemplazar documentos", null, $baseData+["line"=>__LINE__,"user"=>getUser()->nombre], "error"); return; }
     if (!isset($_POST["path"][0])) { echoJSDoc("error", "Debe incluir la ruta del archivo a reemplazar", null, $baseData+["line"=>__LINE__]); return; }
     $path=$_POST["path"];
     if (!isset($_POST["name"][0])) { echoJSDoc("error", "Debe incluir el nombre del archivo a reemplazar", null, $baseData+["line"=>__LINE__]); return; }
@@ -1646,7 +1607,7 @@ function extrae($dwnPath, $ext) {
         } catch (Exception $e) {
             clog2("ERROR al extraer archivo ".print_r($filename,true).": ".$e->getMessage());
             $debug .= "    ERROR al extraer archivo ".
-            _r($filename,true).": ".$e->getMessage();
+            print_r($filename,true).": ".$e->getMessage();
         }
         clog2("Phar Extracted: [".$pathDwn.$filename."]");
     }
@@ -1695,9 +1656,9 @@ function renombraXML($ruta) {
         if (empty($folio)||$folio=="00") {
             $timbre = $complemento->getElementsByTagNameNS($nsc, "TimbreFiscalDigital")->item(0);
             $uuid = $timbre->getAttribute("UUID");
-            if (isset($uuid[4])) $folio = substr($uuid, -4);
-            else if ($uuidLen > 0) $folio = $uuid;
-        } else if (isset($folio[10])) $folio = substr($folio, -10);
+            if (isset($uuid[0])) $folio = $uuid;
+        }
+        if (isset($folio[10])) $folio = substr($folio, -10);
 
         $tcompro = $start->getAttribute("tipoDeComprobante");
         if ($tcompro=="egreso") $folio = "NC_".$folio;
@@ -1791,9 +1752,9 @@ function organizaXMLs($dwnPath) {
         if (empty($folio)||$folio=="00") {
             $timbre = $complemento->getElementsByTagNameNS($nsc, "TimbreFiscalDigital")->item(0);
             $uuid = $timbre->getAttribute("UUID");
-            if (isset($uuid[4])) $folio = substr($uuid, -4);
-            else if ($uuidLen > 0) $folio = $uuid;
-        } else if (isset($folio[10])) $folio = substr($folio, -10);
+            if (isset($uuid[0])) $folio = $uuid;
+        }
+        if (isset($folio[10])) $folio = substr($folio, -10);
         $pathOld = $pathFile;
         $pathNew = $pathMes.$archivo."_".$folio.".xml";
         $pathOldBckDsh = str_replace("/", "\\", $pathOld);
@@ -1815,12 +1776,7 @@ function recuperaSello() {
     $solId = $_POST["solId"]??"";
     $result="unknown";
     if (isset($solId[0])) {
-        global $solObj;
-        if (!isset($solObj)) {
-            require_once "clases/SolicitudPago.php";
-            $solObj=new SolicitudPago();
-        }
-        $solData=$solObj->getData("id=$solId");
+        $solData=dao("sol")->getData("id=$solId");
         if (isset($solData[0])) {
             $solData=$solData[0];
             $solStatus=+$solData["status"];
@@ -1836,12 +1792,7 @@ function recuperaSello() {
                 doclog("No se recupera archivo sellado porque el proceso de la solicitud está en 'pagada'","error",["solId"=>$solId,"status"=>$solStatus,"proceso"=>$solProceso]);
             } else if (isset($solData["idFactura"][0])) {
                 $invId=$solData["idFactura"];
-                global $invObj;
-                if (!isset($invObj)) {
-                    require_once "clases/Facturas.php";
-                    $invObj=new Facturas();
-                }
-                $invData=$invObj->getData("id=$invId");
+                $invData=dao("inv")->getData("id=$invId");
                 if (isset($invData[0])) {
                     $invData=$invData[0];
                     $ubicacion=$invData["ubicacion"];
@@ -1863,12 +1814,7 @@ function recuperaSello() {
                 }
             } else if (isset($solData["idOrden"][0])) {
                 $ordId=$solData["idOrden"];
-                global $ordObj;
-                if (!isset($ordObj)) {
-                    require_once "clases/OrdenesCompra.php";
-                    $ordObj=new OrdenesCompra();
-                }
-                $ordData=$ordObj->getData("id=$ordId");
+                $ordData=dao("ord")->getData("id=$ordId");
                 if (isset($ordData[0])) {
                     $ordData=$ordData[0];
                     $ubicacion=$ordData["rutaArchivo"];
@@ -1939,12 +1885,7 @@ function recuperaSello() {
     if (isset($href)) $retJS["href"]=$href;
     if (!empty($resQuery)) {
         if ($result==="success") {
-            global $prcObj;
-            if (!isset($prcObj)) {
-                require_once "clases/Proceso.php";
-                $prcObj=new Proceso();
-            }
-            $prcObj->cambiaSolicitud($solId,"restauraSello","");
+            dao("prc")->cambiaSolicitud($solId,"restauraSello","");
             DBi::commit();
         } else DBi::rollback();
         DBi::autocommit(true);
@@ -1958,22 +1899,12 @@ function rompeSello() {
     $error="";
     doclog("INI rompeSello","archivo",["solId"=>$solId]);
     if (isset($solId[0])) {
-        global $solObj;
-        if (!isset($solObj)) {
-            require_once "clases/SolicitudPago.php";
-            $solObj=new SolicitudPago();
-        }
-        $solData=$solObj->getData("id=$solId");
+        $solData=dao("sol")->getData("id=$solId");
         if (isset($solData[0])) {
             $solData=$solData[0];
             if (isset($solData["idFactura"][0])) {
                 $invId=$solData["idFactura"];
-                global $invObj;
-                if (!isset($invObj)) {
-                    require_once "clases/Facturas.php";
-                    $invObj=new Facturas();
-                }
-                $invData=$invObj->getData("id=$invId");
+                $invData=dao("inv")->getData("id=$invId");
                 if (isset($invData[0])) {
                     $invData=$invData[0];
                     $tieneSello=$invData["tieneSello"];
@@ -1983,12 +1914,7 @@ function rompeSello() {
                 }
             } else if (isset($solData["idOrden"][0])) {
                 $ordId=$solData["idOrden"];
-                global $ordObj;
-                if (!isset($ordObj)) {
-                    require_once "clases/OrdenesCompra.php";
-                    $ordObj=new OrdenesCompra();
-                }
-                $ordData=$ordObj->getData("id=$ordId");
+                $ordData=dao("ord")->getData("id=$ordId");
                 if (isset($ordData[0])) {
                     $ordData=$ordData[0];
                     $tieneSello=$ordData["tieneSello"];
@@ -2004,22 +1930,13 @@ function rompeSello() {
         $result="error";
         $error="No tiene sello";
     } else {
-        global $evtObj;
-        if (!isset($evtObj)) {
-            require_once "clases/Eventos.php";
-            $evtObj=new Eventos();
-        }
+        $evtObj=dao("evt");
         $rv=$evtObj->borraArchivo($ubicacion.$nombrepdf.".pdf",300); // Borrar archivo en 300 segundos
         // toDo: en $evtObj se traducirá el mensaje de error de la base de datos en un texto entendible para el usuario
         doclog("RV borraArchivo","archivo",["solId"=>$solId,"delQuery"=>$delQuery,"rv"=>is_bool($rv)?($rv?"true":"false"):$rv]);
         if (is_bool($rv)) { // 
             if (isset($delQuery[0])) $evtObj->ejecuta($delQuery,300);
-            global $prcObj;
-            if (!isset($prcObj)) {
-                require_once "clases/Proceso.php";
-                $prcObj=new Proceso();
-            }
-            $prcObj->cambiaSolicitud($solId,"rompeSello","evento en 5 minutos");
+            dao("prc")->cambiaSolicitud($solId,"rompeSello","evento en 5 minutos");
             doclog("Borrado de archivo programado en 5 min","eventos",["ubicacion"=>$ubicacion,"pdf"=>$nombrepdf,"delQuery"=>$delQuery,"segundos"=>300]);
             if ($rv) $result="success";
             else $result="ignore";
@@ -2158,12 +2075,6 @@ function updateTaxStatusProof() {
                     if ($docTimes>0) $aliasN="{$alias}_{$docTimes}";
                     else $aliasN=$alias;
                     echoJSDoc("upkeep","File Parsed",$incSep,$baseData+["line"=>__LINE__,"datefound"=>$datetext,"dir"=>$datepath,"alias"=>$aliasN],"archivo");
-                    require_once "clases/Grupo.php";
-                    global $gpoObj;
-                    if (!isset($gpoObj)) {
-                        $gpoObj=new Grupo();
-                        //$gpoObj->rows_per_page=0;
-                    }
                     $fileabs=$docPath.$datepath.$aliasN.".pdf";
                     if (file_exists($fileabs)) {
                         rename($fileabs,$docPath.$datepath.$alias.date("_dHis", filemtime($fileabs)).".pdf");
@@ -2173,14 +2084,8 @@ function updateTaxStatusProof() {
                         $fileabs=$docPath.$datepath.$aliasN.".pdf";
                     }
                     rename($tmpfile, $fileabs);
-                    $gpoObj->saveRecord(["id"=>$gpoId,"conSitFis"=>$datepath,"conSitFisTimes"=>$docTimes]);
-                    require_once "clases/Proceso.php";
-                    global $prcObj;
-                    if (!isset($prcObj)) {
-                        $prcObj=new Proceso();
-                        //$prcObj->rows_per_page=0;
-                    }
-                    $prcObj->alta("Grupo",$gpoId,"Actualiza",$datepath.$aliasN);
+                    dao("gpo")->saveRecord(["id"=>$gpoId,"conSitFis"=>$datepath,"conSitFisTimes"=>$docTimes]);
+                    dao("prc")->alta("Grupo",$gpoId,"Actualiza",$datepath.$aliasN);
                     echoJSDoc("success","File Saved",null,["id"=>$gpoId,"alias"=>$aliasN,"path"=>$datepath],"archivo");
                     return true;
                 } else {
@@ -2254,9 +2159,9 @@ function updateTaxStatusProof() {
         $autoReject=false;
         foreach($output as $op) {
             if (!isset($dateLine[0])&&preg_match("/Revisi.+n practicada el d.+a (\d+) de (\w+) de (\d+), a las (\d+):(\d+) horas/",$op, $matches) === 1) {
-                $meses=["enero"=>"01","febrero"=>"02","marzo"=>"03","abril"=>"04","mayo"=>"05","junio"=>"06","julio"=>"07","agosto"=>"08","septiembre"=>"09","octubre"=>"10","noviembre"=>"11","diciembre"=>"12"];
-                if(isset($meses[$matches[2]])) {
-                    $dateLine=str_pad($matches[1],2,"0",STR_PAD_LEFT)."/".$meses[$matches[2]]."/".$matches[3];
+                $monNum = getMonthNumber(monthname: $matches[2]);
+                if($monNum !== false) {
+                    $dateLine=str_pad($matches[1],2,"0",STR_PAD_LEFT)."/".$monNum."/".$matches[3];
                     if ($autoReject) break;
                 }
             }
@@ -2278,12 +2183,8 @@ function removeBGDocs() {
     $solId=$_POST["solid"]??"";
     if (!isset($solId[0])) { echoJSDoc("error", "No se recibi&oacute; identificador de Solicitud de pago", null, $baseData+["line"=>__LINE__], "error"); return; }
     if (!isset($type[0])) { echoJSDoc("error", "No se registró lo que desea eliminar", null, $baseData+["line"=>__LINE__], "error"); return; }
-    global $solObj;
-    if (!isset($solObj)) {
-        require_once "clases/SolicitudPago.php";
-        $solObj=new SolicitudPago();
-    }
     global $query;
+    $solObj=dao("sol");
     if ($type==="Todas") {
         if (!$solObj->saveRecord(["id"=>$solId,"archivoAntecedentes"=>null])) { echoJSDoc("error", "No se pudo guardar la solicitud $solId", null, $baseData+["line"=>__LINE__,"query"=>$query], "error"); return; }
         echo json_encode(["result"=>"success"]);
@@ -2299,23 +2200,13 @@ function removeBGDocs() {
         $bgName="sol{$solId}BG";
         if (isset($solData["idFactura"][0])) {
             $bgName.="F";
-            global $invObj;
-            if (!isset($invObj)) {
-                require_once "clases/Facturas.php";
-                $invObj=new Facturas();
-            }
-            $invData=$invObj->getData("id=$solData[idFactura]");
+            $invData=dao("inv")->getData("id=$solData[idFactura]");
             if (!isset($invData[0]["id"][0])) { echoJSDoc("error", "Factura desconocida", null, $baseData+["line"=>__LINE__,"query"=>$query], "error"); return; }
             $invData=$invData[0];
             $path=$invData["ubicacion"];
         } else if (isset($solData["idOrden"][0])) {
             $bgName.="O";
-            global $ordObj;
-            if (!isset($ordObj)) {
-                require_once "clases/OrdenesCompra.php";
-                $ordObj=new OrdenesCompra();
-            }
-            $ordData=$ordObj->getData("id=$solData[idOrden]");
+            $ordData=dao("ord")->getData("id=$solData[idOrden]");
             if (!isset($ordData[0]["id"][0])) { echoJSDoc("error", "Orden de Compra desconocida", null, $baseData+["line"=>__LINE__,"query"=>$query], "error"); return; }
             $ordData=$ordData[0];
             $path=$ordData["rutaArchivo"];
@@ -2336,13 +2227,10 @@ function removeBGDocs() {
             $pageCount=$pdfObj->pageCount;
             if ($iniPage<1) $iniPage=1;
             if ($endPage>$pageCount) $endPage=$pageCount;
-            require_once "clases/Proceso.php";
-            global $prcObj;
-            if (!isset($prcObj)) $prcObj=new Proceso();
             $delPages=1+$endPage-$iniPage;
             if ($iniPage==1 && $endPage==$pdfObj->pageCount) {
                 if (!$solObj->saveRecord(["id"=>$solId,"archivoAntecedentes"=>null])) { echoJSDoc("error", "No se pudo guardar la solicitud $solId", null, $baseData+["line"=>__LINE__,"query"=>$query], "error"); return; }
-                $prcObj->alta("SolPago",$solId,"Antecedentes","Elimina {$delPages}/{$pageCount} hojas");
+                dao("prc")->alta("SolPago",$solId,"Antecedentes","Elimina {$delPages}/{$pageCount} hojas");
                 echo json_encode(["result"=>"success","path"=>$path]);
             } else {
                 $delNumPg=1+$endPage-$iniPage;
@@ -2351,7 +2239,7 @@ function removeBGDocs() {
                 if (!$solObj->saveRecord(["id"=>$solId,"archivoAntecedentes"=>$bgName])) { echoJSDoc("error", "No se pudo guardar el archivo $ffile[name]", null, $baseData+["line"=>__LINE__,"query"=>$query], "error"); return; }
                 $retArr=["result"=>"success","path"=>$path, "name"=>$bgName];
                 if ($currPage>$newNumPg) $retArr["currentPage"]=$newNumPg;
-                $prcObj->alta("SolPago",$solId,"Antecedentes","Elimina {$delPages}/{$pageCount} hojas");
+                dao("prc")->alta("SolPago",$solId,"Antecedentes","Elimina {$delPages}/{$pageCount} hojas");
                 echo json_encode($retArr);
             }
         } else echoJSDoc("error", "El documento fue eliminado previamente", null, ["action"=>"clearpdf"], false);
@@ -2375,35 +2263,20 @@ function addBGDocs() {
     if (!isset($pdfObj)) { echoJSDoc("error", isset(PDF::$errmsg[0])?PDF::$errmsg:"El archivo PDF no fue creado", null, $baseData+["line"=>__LINE__,"solId"=>$solId,"pdfName"=>$destination]+PDF::$errdata, "error"); return; }
     $addingPages=$pdfObj->pageCount;
     $prePg=$_POST["prevPage"]??1;
-    global $solObj;
-    if (!isset($solObj)) {
-        require_once "clases/SolicitudPago.php";
-        $solObj=new SolicitudPago();
-    }
     global $query;
-    $solData=$solObj->getData("id=$solId");
+    $solData=dao("sol")->getData("id=$solId");
     if (!isset($solData[0]["id"][0])) { echoJSDoc("error", "Solicitud desconocida", null, $baseData+["line"=>__LINE__,"query"=>$query], "error"); return; }
     $solData=$solData[0];
     $bgName="sol{$solId}BG";
     if (isset($solData["idFactura"][0])) {
         $bgName.="F";
-        global $invObj;
-        if (!isset($invObj)) {
-            require_once "clases/Facturas.php";
-            $invObj=new Facturas();
-        }
-        $invData=$invObj->getData("id=$solData[idFactura]");
+        $invData=dao("inv")->getData("id=$solData[idFactura]");
         if (!isset($invData[0]["id"][0])) { echoJSDoc("error", "Factura desconocida",null, $baseData+["line"=>__LINE__,"query"=>$query], "error"); return; }
         $invData=$invData[0];
         $path=$invData["ubicacion"];
     } else if (isset($solData["idOrden"][0])) {
         $bgName.="O";
-        global $ordObj;
-        if (!isset($ordObj)) {
-            require_once "clases/OrdenesCompra.php";
-            $ordObj=new OrdenesCompra();
-        }
-        $ordData=$ordObj->getData("id=$solData[idOrden]");
+        $ordData=dao("ord")->getData("id=$solData[idOrden]");
         if (!isset($ordData[0]["id"][0])) { echoJSDoc("error", "Orden de Compra desconocida",null, $baseData+["line"=>__LINE__,"query"=>$query], "error"); return; }
         $ordData=$ordData[0];
         $path=$ordData["rutaArchivo"];
@@ -2431,12 +2304,9 @@ function addBGDocs() {
         if(rename($destination, $docRoot.$path.$bgName.".pdf")===false) { echoJSDoc("error", "No se pudo guardar el archivo", null, $baseData+["line"=>__LINE__,"bgname"=>$bgName,"moveError"=>error_get_last(),"tmpname"=>$destination,"filedata"=>$ffile], "error"); return; }
         $oldPageCount=0;
     }
-    if (!$solObj->saveRecord(["id"=>$solId,"archivoAntecedentes"=>$bgName])) { echoJSDoc("error", "No se pudo guardar el archivo", null, $baseData+["line"=>__LINE__,"tmpname"=>$destination,"query"=>$query,"filedata"=>$ffile], "error"); return; }
+    if (!dao("sol")->saveRecord(["id"=>$solId,"archivoAntecedentes"=>$bgName])) { echoJSDoc("error", "No se pudo guardar el archivo", null, $baseData+["line"=>__LINE__,"tmpname"=>$destination,"query"=>$query,"filedata"=>$ffile], "error"); return; }
     $newPageCount=$oldPageCount+$addingPages;
-    require_once "clases/Proceso.php";
-    global $prcObj;
-    if (!isset($prcObj)) $prcObj=new Proceso();
     $pl_s=$addingPages==1?"":"s";
-    $prcObj->alta("SolPago",$solId,"Antecedentes",$oldPageCount==0?"Nuevo $addingPages hoja{$pl_s}":"Agrega {$addingPages} hoja{$pl_s}, ahora son {$newPageCount}");
+    dao("prc")->alta("SolPago",$solId,"Antecedentes",$oldPageCount==0?"Nuevo $addingPages hoja{$pl_s}":"Agrega {$addingPages} hoja{$pl_s}, ahora son {$newPageCount}");
     echo json_encode(["result"=>"success","path"=>$path, "name"=>$bgName]);
 }

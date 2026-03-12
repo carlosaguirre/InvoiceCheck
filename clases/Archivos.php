@@ -9,12 +9,7 @@ class Archivos {
     }
 
     public static function getGpoCodigoOpt() {
-        global $gpoObj;
-        if (!isset($gpoObj)) {
-            require_once "clases/Grupo.php";
-            $gpoObj=new Grupo();
-        }
-        $gpoFullMapWhere=$gpoObj->setCodigoOptSession();
+        $gpoFullMapWhere=dao('gpo')->setCodigoOptSession();
         return $_SESSION['gpoCodigoOpt'];
     }
     public static function dirlist($dirpath) {
@@ -248,28 +243,17 @@ class Archivos {
         return $result;
     }
     public static function fixCFDIPDF() {
-        global $infObj, $logObj, $invObj, $gpoObj, $query;
-        if (!isset($infObj)) {
-            require_once "clases/InfoLocal.php";
-            $infObj=new InfoLocal();
-        }
-        if (!isset($logObj)) {
-            require_once "clases/Logs.php";
-            $logObj=new Logs();
-        }
+        global $query;
+        $infObj=dao('inf');
         $maxId = $infObj->getData("nombre='fixCFDIPDF_maxid'",0,"valor");
         if (isset($maxId[0]["valor"][0])) $maxId=$maxId[0]["valor"];
         else $maxId=null;
         $minId = $infObj->getData("nombre='fixCFDIPDF_minid'",0,"valor");
         if (isset($minId[0]["valor"][0])) $minId=$minId[0]["valor"];
         else $minId=null;
-        if (!isset($invObj)) {
-            require_once "clases/Facturas.php";
-            $invObj=new Facturas();
-        } else {
-            $invOrderList=$invObj->orderlist;
-            $invObj->clearOrder();
-        }
+        $invObj=dao('inv');
+        $invOrderList=$invObj->orderlist;
+        $invObj->clearOrder();
         $invRows=$invObj->rows_per_page;
         $invObj->rows_per_page=1;
         $invObj->addOrder("id", "desc");
@@ -312,11 +296,7 @@ class Archivos {
                 $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__];
                 doclog("CAMBIAR NOMBRE PDF", "pdf", $baseData+["line"=>__LINE__,"xml"=>$xmlName,"oldpdf"=>$pdfName,"newpdf"=>$pdfRlNm]);
                 if ($sttn&Facturas::STATUS_RESPALDADO) $infFields["statusn"]=$sttn-Facturas::STATUS_RESPALDADO;
-                if (!isset($gpoObj)) {
-                    require_once "clases/Grupo.php";
-                    $gpoObj=new Grupo();
-                }
-                $empresa=$gpoObj->getData("rfc='$rfcGrupo'",0,"alias");
+                $empresa=dao('gpo')->getData("rfc='$rfcGrupo'",0,"alias");
                 if (isset($empresa[0]["alias"][0])) {
                     $empresa=$empresa[0]["alias"];
                     if ($invObj->saveRecord($invFields)) {
@@ -342,7 +322,7 @@ class Archivos {
             $errMsg=DBi::getError();
             $logFields["texto"]="Error $errNo: Sin resultado. $errMsg | $query";
         }
-        $logObj->saveRecord($logFields);
+        dao('log')->saveRecord($logFields);
         if (isset($invOrderList)) $invObj->setOrderList($invOrderList);
         $invObj->rows_per_page=$invRows;
     }

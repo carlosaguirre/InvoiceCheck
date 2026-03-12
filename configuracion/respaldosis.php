@@ -43,7 +43,7 @@ function backupSort($path1, $path2) {
     return ($chunk1<=$chunk2)?1:-1; // Para cambiar sentido invertir valor positivo y negativo
 }
 function showList($globlist, $listId) { // data, code, logs, cfdi
-    global $tgtPath, $tgtPathLen, $monStrs, $measures;
+    global $tgtPath, $tgtPathLen, $measures;
     $measure=$measures[$listId];
     $idx=0;
     clog2("showList $listId => $tgtPath".$measure[0]." : #".count($globlist));
@@ -76,7 +76,7 @@ function showList($globlist, $listId) { // data, code, logs, cfdi
                     $yearText=substr($fileName, $fSfxLen, 4);
                     $monthTxt=substr($fileName, $fSfxLen+4, 2);
                     $monthIdx=(+$monthTxt)-1;
-                    $monthName=$monStrs[$monthIdx];
+                    $monthName=ucfirst(mesesMexico()[$monthIdx]);
                     $monthClass=strtolower($monthName);
                     $dayText=+substr($fileName, $fSfxLen+6, 2);
                     $hourText=substr($fileName, $fSfxLen+8, 2);

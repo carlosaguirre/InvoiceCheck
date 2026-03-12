@@ -28,9 +28,7 @@ if (isset($_POST["submitxml"])||($_esDesarrollo&&isset($_GET["submitxml"]))) {
 } else {
     $resultMessage="";
     require_once "clases/CFDI.php";
-    require_once "clases/Proveedores.php";
-    if (!isset($prvObj)) $prvObj = new Proveedores();
-    if (!$deshabilitarAlta && $_esProveedor && !Proveedores::esCorporativo($username) && (!isset(CFDI::PRV_MONTHLIMIT_EXCEPTION[0]) || !in_array($username, CFDI::PRV_MONTHLIMIT_EXCEPTION))) {
+    if (!$deshabilitarAlta && $_esProveedor && !dao('prv')->esCorporativo($username) && (!isset(CFDI::PRV_MONTHLIMIT_EXCEPTION[0]) || !in_array($username, CFDI::PRV_MONTHLIMIT_EXCEPTION))) {
         $today=new DateTime();
         $lastWorkingDay=getLastInvoicingDay();
         if (!$lastWorkingDay) $errorMessage="<P class='noticia margin20 centered'>El Servicio de Alta de Facturas y Pagos se encuentra deshabilitado</P>";
@@ -71,25 +69,19 @@ function getUbicacionFactura($factura) {
     return "archivos/".$fcoder."/".$anio.$mes;
 }
 function getRutaReal($uuid) {
-    global $invObj;
-    if (!isset($invObj)) {
-        require_once "clases/Facturas.php";
-        $invObj = new Facturas();
-    }
     $uuid=strtoupper($uuid);
-    $result = $invObj->getValue ("uuid", $uuid, "ubicacion,nombreInterno,nombreInternoPDF");
+    $result = dao("inv")->getValue ("uuid", $uuid, "ubicacion,nombreInterno,nombreInternoPDF");
     if (!$result) return null;
     list($ubicacion,$nombreXML,$nombrePDF) = explode("|",$result);
     if (empty($nombrePDF)) return $ubicacion.$nombreXML.".xml";
     return $ubicacion.$nombrePDF.".pdf";
 }
 function validaUsuarioProveedor($rfcEmisor) {
-    global $tracelog, $prvObj;
+    global $tracelog;
     $tracelog = "validaUsuarioProveedor($rfcEmisor)\n";
-    require_once "clases/Proveedores.php";
-    if (!isset($prvObj)) $prvObj = new Proveedores();
     $usrnm = getUser()->nombre;
     $tracelog.= "username=$usrnm\n";
+    $prvObj = dao("prv");
     if (empty(getUser()->rfc)) {
         $usrRfc = $prvObj->getValue("codigo",$usrnm,"rfc");
         if (!empty($usrRfc)) {
@@ -103,12 +95,7 @@ function validaUsuarioProveedor($rfcEmisor) {
     return $rfcEmisor==$usrRfc;
 }
 function validaUsuarioCompras($rfcReceptor) {
-    global $ugObj;
-    if (!isset($ugObj)) {
-        require_once "clases/Usuarios_Grupo.php";
-        $ugObj = new Usuarios_Grupo();
-    }
-    return $ugObj->isRelatedByRFC(getUser(), $rfcReceptor, "Compras", "vista");
+    return dao("ug")->isRelatedByRFC(getUser(), $rfcReceptor, "Compras", "vista");
 }
 function buscaTraceLog($searchword) {
     global $tracelog;
@@ -118,13 +105,8 @@ function buscaTraceLog($searchword) {
 }
 function consultaServicio($rfcE, $rfcR, $total, $uuid) {
     if (true) {
-        global $invObj;
-        if (!isset($invObj)) {
-            require_once "clases/Facturas.php";
-            $invObj=new Facturas();
-        }
         $uuid=strtoupper($uuid);
-        return $invObj->consultaServicio($rfcE, $rfcR, $total, $uuid);
+        return dao("inv")->consultaServicio($rfcE, $rfcR, $total, $uuid);
     }
     //$rfcE = utf8_encode($rfcE); //str_replace("&", "&amp;", $rfcE);
     $rfcE = str_replace("&","&amp;",$rfcE);
@@ -152,14 +134,10 @@ function consultaServicio($rfcE, $rfcR, $total, $uuid) {
     return $factura;
 }
 function consultaBase($uuid) {
-    global $tracelog, $invObj;
-    if (!isset($invObj)) {
-        require_once "clases/Facturas.php";
-        $invObj = new Facturas();
-    }
+    global $tracelog;
     $uuid=strtoupper($uuid);
-    $invData=$invObj->getData("uuid='$uuid'",0,"id, mensajeCFDI cfdi, estadoCFDI estado, status");
-    //$result = explode("|",$invObj->getValue("uuid", $uuid, "id, mensajeCFDI cfdi, estadoCFDI estado, status"));
+    $invData=dao("inv")->getData("uuid='$uuid'",0,"id, mensajeCFDI cfdi, estadoCFDI estado, status");
+    //$result = explode("|",dao("inv")->getValue("uuid", $uuid, "id, mensajeCFDI cfdi, estadoCFDI estado, status"));
     if (isset($invData[0]["cfdi"])) $result=$invData[0];
     //$tracelog = "consultaBase($uuid)->result = ".str_replace("\"", "\\\"", htmlentities(json_encode($result)));
     //$tracelog .= "<br>isEmpty:".(empty($result)?"TRUE":"FALSE").", isFirstEmpty:".(empty($result[0])?"TRUE":"FALSE").", Count:".count($result);
@@ -174,12 +152,7 @@ function consultaBase($uuid) {
     return false;
 }
 function obtenerSerie($ubicacion, $nombreInterno) {
-    global $invObj;
-    if (!isset($invObj)) {
-        require_once "clases/Facturas.php";
-        $invObj = new Facturas();
-    }
-    return $invObj->getValue("nombreInterno",$nombreInterno,"serie","ubicacion='$ubicacion'");
+    return dao("inv")->getValue("nombreInterno",$nombreInterno,"serie","ubicacion='$ubicacion'");
 }
 function ajustarRegistroFactura(&$arr) {
     if (isset($arr["pedido"]) && is_string($arr["pedido"]) && strlen($arr["pedido"])>20) {

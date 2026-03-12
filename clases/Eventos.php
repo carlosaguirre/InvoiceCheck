@@ -11,17 +11,10 @@ class Eventos extends DBObject {
         $this->log = "\n// xxxxxxxxxxxxxx Eventos xxxxxxxxxxxxxx //\n";
     }
     static function getVencidos() {
-        global $evtObj;
-        if (!isset($evtObj)) {
-            $evtObj=new Eventos();
-        }
         // ultimos 10 : order by id desc, limit 10
         // primeros 10 : cada consulta debe eliminar el registro por lo que siempre debe estar avanzando
         // dependiendo de la frecuencia de uso de eventos, habrá que aumentar o disminuir los registros evaluados simultáneamente
-        $evtObj->rows_per_page=10;
-        $evtObj->clearOrder();
-        $evtObj->addOrder("termino", "asc");
-        $data_array = $evtObj->getData("termino<=now()");
+        $data_array = dao('evt', ['rows_per_page'=>10, 'orderlist'=>["termino"=>"asc"]])->getData("termino<=now()");
         return $data_array;
     }
     static function testRepetir($fila) {
@@ -58,12 +51,7 @@ class Eventos extends DBObject {
                 $fldata=["funcion"=>$funcion,"tipofuncion"=>$tipo,"veces"=>$veces,"ciclo"=>$ciclo];
                 if (isset($clase)) $fldata["clase"]=$clase;
                 $fldarr=["tipo"=>"repite","termino"=>$fecha,"accion"=>"funcion","data"=>json_encode($fldata)];
-                global $evtObj;
-                if (!isset($evtObj)) {
-                    //require_once "clases/Eventos.php";
-                    $evtObj=new Eventos();
-                }
-                if ($evtObj->saveRecord($fldarr)) {
+                if (dao('evt')->saveRecord($fldarr)) {
                 }
             }
         } catch (Exception $ex) {
@@ -75,13 +63,9 @@ class Eventos extends DBObject {
         $vencidos=Eventos::getVencidos();
         if (isset($vencidos[0]))
             $resultado[]="Eventos Vencidos: ".count($vencidos);
-        global $evtObj;
-        if (!isset($evtObj)) {
-            $evtObj=new Eventos();
-        }
         foreach ($vencidos as $num => $fila) {
             try {
-                $txt1=$evtObj->procesaEvento($fila);
+                $txt1=dao('evt')->procesaEvento($fila);
                 if (isset($txt1[0])) {
                     $mensaje[]=$txt1;
                     $resultado[]="$num) $txt1";
@@ -305,11 +289,7 @@ class Eventos extends DBObject {
         return "Registro indeterminado: ".json_encode($fila);
     }
     static function elimina($id) {
-        global $evtObj;
-        if (!isset($evtObj)) {
-            $evtObj=new Eventos();
-        }
-        if ($evtObj->deleteRecord(["id"=>$id])) {
+        if (dao('evt')->deleteRecord(["id"=>$id])) {
             return "Registro eliminado $id";
         } else if (DBi::$errno<=0) {
             return "No se encontró registro $id a eliminar";
@@ -319,11 +299,7 @@ class Eventos extends DBObject {
         return "FIN elimina Eventos";
     }
     static function getPendientes() {
-        global $evtObj;
-        if (!isset($evtObj)) {
-            $evtObj=new Eventos();
-        }
-        $data_array = $evtObj->getData("termino>now()");
+        $data_array = dao('evt')->getData("termino>now()");
         return $data_array;
     }
     static function pendientes() {
@@ -381,11 +357,6 @@ class Eventos extends DBObject {
     }
     private function logFunc($eventType) { // ["duedate","action","type","class","function","data","functype","times","frequency","query","file"]
         if (!isset($eventType)) return;
-        global $logObj;
-        if (!isset($logObj)) {
-            require_once "clases/Logs.php";
-            $logObj=new Logs();
-        }
         $systemUserId=1038;
         $eventType="_{$eventType}_event_";
         $typeValue=$GLOBALS[$eventType."type"]??"";
@@ -437,6 +408,6 @@ class Eventos extends DBObject {
                 $text.="$val='".$GLOBALS[$evtname]."'";
             }
         } */
-        if (isset($text[0])) $logObj->agrega($systemUserId, "EVENTOS", $text);
+        if (isset($text[0])) dao('log')->agrega($systemUserId, "EVENTOS", $text);
     }
 }

@@ -475,7 +475,7 @@ function agregaDatoPost(name, value) {
 }
 function clearCheckbox(errmsg,respTxt,extra) {
     //console.log("INI clearCheckbox:"+errmsg+"\nRSP clearCheckbox:"+respTxt+"\nXTR clearCheckbox:"+JSON.stringify(extra,jsonCircularReplacer()));
-    const xh=(extra&&extra.parameters&&extra.parameters.xmlHttpPost)?extra.parameters.xmlHttpPost:false;
+    const xh=(extra&&extra.parameters&&extra.parameters.controller)?extra.parameters.controller:false;
     if (xh&&xh.checkbox) { xh.checkbox=false; delete xh.checkbox; }
     // ToDo: Agregar a Dialogbox position:relative, anexar subDiv semitransparente del 100% ancho y alto que lo tape completamente. Poner mensaje de error centrado v/h y un tache para cerrar, pero cualquier click sobre el subDiv lo elimina y dialogbox regresa a position:static. Mejor crear metodo en general.js que realice todo esto: function overlayError(message)
 }

@@ -422,7 +422,7 @@ function browseInvoice(evt) {
                         cladd(ff,["darkRedLabel","reddenbg"]);
                         messageBlock.textContent="No se localizó el folio o uuid indicado";
                         console.log("ERROR: "+errmsg,params,evt);
-                        delete params.xmlHttpPost;
+                        delete params.controller;
                         logService("scripts.listasolp.browseInvoice EMPTY RESPONSE",{retmsg:retmsg,parameters:params});
                         return;
                     }
@@ -500,10 +500,8 @@ function browseInvoice(evt) {
                     messageBlock.textContent="Proceso en actualización, consulte al administrador";
                     console.log("EXCEPTION: ",ex,params);
                     console.log("MESSAGE ("+retmsg.length+"):\n",retmsg);
-                    delete params.xmlHttpPost;
-                    postService("consultas/Logs.php",{
-                        action:"doclog",
-                        message:"scripts.listasolp.browseInvoice Exception",
+                    delete params.controller;
+                    logService("scripts.listasolp.browseInvoice Exception",{
                         filebase:"error",
                         data:JSON.stringify({exception:ex.toString(),parameters:params,resMsg:retmsg})});
                 }
@@ -659,39 +657,18 @@ function snd() {
         //console.log("PREPARING DATA");
         msj.appendChild(ecrea({eName:"P", className:"snd", eText:"Enviando..."}));
         const parameters={action:"docProofOfPayment", id:ebyid("cpId").value, solId:ebyid("cpSolId").value, type:ebyid("cpPlace").value, name:ebyid("cpName").value, attach:cp.files[0]};
-        const url="/invoice/consultas/Facturas.php";
-        postService(url, parameters, function(retmsg, params, rdyState, status) {
-            if(rdyState==4&&status==200) {
-                try {
-                    jobj=JSON.parse(retmsg);
-                    //console.log('SUCCESS: '+retmsg);
-                    fee(lbycn("snd",msj),el=>ekil(el));
-                    msj.appendChild(ecrea({eName:"P", className:"snd", eText:"ARCHIVO RECIBIDO!"}));
-                    const divDocs=ebyid(jobj.divname);
-                    if (divDocs) {
-                        fee(lbycn("cpDoc",divDocs),el=>ekil(el));
-                        divDocs.appendChild(ecrea({eName:"A",className:"cpDoc",href:jobj.path+jobj.name,target:"archivo",eChilds:[{eName:"IMG",src:"imagenes/icons/invChk200.png",width:"20",height:"20",title:"COMPROBANTE PAGO",style:{filter:"grayscale(1) brightness(0.8) contrast(2.5)"}}]}));
-                    }
-                } catch (ex) {
-                    fee(lbycn("snd",msj),el=>ekil(el));
-                    msj.appendChild(ecrea({eName:"P", className:"snd", eText:"Proceso en actualización, consulte al administrador."}));
-                    console.log("EXCEPCION: ",ex,params);
-                    delete params.xmlHttpPost;
-                    postService("consultas/Logs.php",{
-                        action:"doclog",
-                        message:"scripts.listasolp.snd Exception",
-                        filebase:"error",
-                        data:JSON.stringify({exception:ex.toString(),parameters:params,resMsg:retmsg})});
-                }
-            } else if (rdyState>4 || status!=200) {
-                fee(lbycn("snd",msj),el=>ekil(el));
-                msj.appendChild(ecrea({eName:"P", className:"snd", eText:"Consulta incompleta, consulte al administrador."}));
-                console.log("ERROR RDY"+rdyState+", STT"+status+": "+retmsg,params);
+        readyService("/invoice/consultas/Facturas.php", parameters, (jobj, extra)=> {
+            fee(lbycn("snd",msj),el=>ekil(el));
+            msj.appendChild(ecrea({eName:"P", className:"snd", eText:"ARCHIVO RECIBIDO!"}));
+            const divDocs=ebyid(jobj.divname);
+            if (divDocs) {
+                fee(lbycn("cpDoc",divDocs),el=>ekil(el));
+                divDocs.appendChild(ecrea({eName:"A",className:"cpDoc",href:jobj.path+jobj.name,target:"archivo",eChilds:[{eName:"IMG",src:"imagenes/icons/invChk200.png",width:"20",height:"20",title:"COMPROBANTE PAGO",style:{filter:"grayscale(1) brightness(0.8) contrast(2.5)"}}]}));
             }
-        }, function(errmsg, params, evt) {
+        }, (errmsg, respText, extra)=> {
             fee(lbycn("snd",msj),el=>ekil(el));
             msj.appendChild(ecrea({eName:"P", className:"snd", eText:"Servidor temporalmente sin conexión, intente nuevamente más tarde."}));
-            console.log("ERROR: "+errmsg,params,evt);
+            console.log("ERROR: "+errmsg,respText,extra);
         });
         //console.log("REQUEST SENT");
     }
@@ -962,7 +939,7 @@ function showFilterOptions(evt) {
                 const cookieValue=addCookie("filtroListaSolP",fCkStr,7);
                 console.log("CookieValue="+cookieValue);
                 console.log("FilterCookie="+getCookie("filtroListaSolP"));
-                postService("consultas/Logs.php",{action:"doclog",message:"scripts.listasolp:showFilterOptions: COOKIE LOG",filebase:"action",data:JSON.stringify({oldFiltroListaSolP:oldfCkStr,tgtIdName:tgtId,tgtIdValue:filterValues,filtroListaSolP:fCkStr})});
+                logService("scripts.listasolp:showFilterOptions: COOKIE LOG",{filebase:"action",data:JSON.stringify({oldFiltroListaSolP:oldfCkStr,tgtIdName:tgtId,tgtIdValue:filterValues,filtroListaSolP:fCkStr})});
             }
             if (fCkStr!==oldfCkStr) {
                 console.log(ebyid(tgtId+"ren").filterId);
@@ -1008,7 +985,7 @@ function filterAction(evt) {
                 fCkStr=JSON.stringify(fCk);
                 //console.log("FilterCookie="+fCkStr);
                 addCookie("filtroListaSolP",fCkStr,7);
-                postService("consultas/Logs.php",{action:"doclog",message:"scripts.listasolp:filterAction: COOKIE LOG",filebase:"action",data:JSON.stringify({oldFiltroListaSolP:oldfCkStr,delName:delName,delValue:delValue,filtroListaSolP:fCkStr})});
+                logService("scripts.listasolp:filterAction: COOKIE LOG",{filebase:"action",data:JSON.stringify({oldFiltroListaSolP:oldfCkStr,delName:delName,delValue:delValue,filtroListaSolP:fCkStr})});
             }
             //filterCalcHeight();
             backdropCloseable=false;
@@ -1055,24 +1032,17 @@ function rompeSelloCR(elem, idx) {
 }
 function rompeSello(solId) {
     const parameters={action:"rompeSello",solId:solId};
-    postService("consultas/Archivos.php",parameters,function(msg,pars,state,status){
-        if (state==4&&status==200&&msg.length>0) {
-            try {
-                const jobj=JSON.parse(msg);
-                console.log("RESPUESTA ROMPE SELLO: ",jobj);
-                if (jobj.action) {
-                    if (jobj.action==="refresh") {
-                        location.reload(true);
-                    } else if (jobj.action==="delay") {
-                        //const currTime=ebyid("pie_clock").value;
-                        delayTimeout=window.setTimeout(function(){location.reload(true);},5*60*1000);
-                    }
-                }
-                //if (jobj.message) console.log(jobj.message);
-            } catch (ex) {
-                console.log(msg, ex);
+    readyService("consultas/Archivos.php",parameters,(jobj)=>{
+        console.log("RESPUESTA ROMPE SELLO: ",jobj);
+        if (jobj.action) {
+            if (jobj.action==="refresh") {
+                location.reload(true);
+            } else if (jobj.action==="delay") {
+                delayTimeout=window.setTimeout(function(){location.reload(true);},5*60*1000);
             }
         }
+    },(m,r,x)=>{
+        console.log("ERROR rompeSello: ",m,r,x);
     });
 }
 function pagoMultiple() {
@@ -1107,7 +1077,7 @@ function pagoMultiple() {
         // ToDo: Si todas las solicitudes seleccionadas tienen proceso=3, se realiza postservice para marcar todas como pagadas=>(proceso=4) (ahi se validará nuevamente que las solicitudes ya tengan comprobante de pago (proceso=3))
         //console.log(solIdList);
         clearTimeout(delayTimeout);
-        postService("consultas/Facturas.php",{action:"payingMultipleRequest",ids:solIdList}, payingMultipleResponse);
+        readyService("consultas/Facturas.php",{action:"payingMultipleRequest",ids:solIdList}, payingMultipleResponse, payingMultipleError);
     } else {
         //console.log("LEN:"+solIdList.length+", MISSING:"+misn+", ERROR:"+errn+", LIST: ",solIdList);
         ekil("appendButton");
@@ -1151,88 +1121,70 @@ function pagoMultiple() {
             ekil(ebyid("appendButton"));
             console.log("PostService: consultas/Facturas.php, Parameters: ",parameters);
             clearTimeout(delayTimeout);
-            postService("consultas/Facturas.php",parameters, payingMultipleResponse);
+            readyService("consultas/Facturas.php",parameters, payingMultipleResponse, payingMultipleError);
         }}));
     }
 }
-function payingMultipleResponse(msg, pars, state, status) {
-    if (state==4&&status==200) {
-        console.log("INI payingMultipleResponse");
-        if (msg.length==0) {
-            overlayMessage({eName:"H3",eText:"SIN RESPUESTA"},"VACIO");
-        } else {
-            try {
-                const jobj=JSON.parse(msg);
-                const ovArr=[];
-                if (jobj.message)
-                    ovArr.push({eName:"H3",eText:jobj.message});
-                if (jobj.info) {
-                    let errNum=0;
-                    let logNum=0;
-                    const resultRows=[];
-                    for (let key in jobj.info) {
-                        const val=jobj.info[key];
-                        const cellData=[];
-                        if (key==="error") {
-                            val.forEach(txt=>{
-                                errNum++;
-                                cellData.push({eName:"P",className:"stk cancelLabel",eText:errNum+") "+txt});
-                            });
-                        } else {
-                            if (val.error) {
-                                val.error.forEach(txt=>{
-                                    errNum++;
-                                    cellData.push({eName:"P",className:"stk cancelLabel",eText:"ERROR "+errNum+": "+txt});
-                                });
-                            }
-                            if (val.log) {
-                                logNum++;
-                                cellData.push({eName:"P",className:"stk",eText:val.log});
-                            }
-                        }
-                        resultRows.push({eName:"TR",eChilds:[{eName:"TD",className:"top",eChilds:[{eName:"P",className:"stk",eText:key}]},{eName:"TD",className:"top",eChilds:cellData}]});
-                    }
-                    let resultReview="";
-                    if (errNum>0) resultReview+="Errores: "+errNum;
-                    if (logNum>0) {
-                        if (errNum>0) resultReview+=". ";
-                        resultReview+="Solicitudes procesadas: "+logNum;
-                    } else if (logNum==0&&errNum==0)
-                        resultReview="Sin resultados";
-                    const resTHead={eName:"THEAD",eChilds:[{eName:"TR",eChilds:[{eName:"TH",eChilds:[{eName:"DIV",className:"nowrap pad5 centered",eText:"SOL ID"}]},{eName:"TH",eChilds:[{eName:"DIV",className:"nowrap pad5 centered",eText:"RESULTADO"}]}]}]};
-                    const resTBody={eName:"TBODY",eChilds:resultRows};
-                    const resTFoot={eName:"TFOOT",eChilds:[{eName:"TR",eChilds:[{eName:"TH",colSpan:"2",eChilds:[{eName:"DIV",eText:resultReview}]}]}]};
-                    ovArr.push({eName:"TABLE",className:"widfit noApply",eChilds:[resTHead,resTBody,resTFoot]});
+function payingMultipleResponse(jobj, extra) {
+    console.log("INI payingMultipleResponse");
+    const ovArr=[];
+    if (jobj.message)
+        ovArr.push({eName:"H3",eText:jobj.message});
+    if (jobj.info) {
+        let errNum=0;
+        let logNum=0;
+        const resultRows=[];
+        for (let key in jobj.info) {
+            const val=jobj.info[key];
+            const cellData=[];
+            if (key==="error") {
+                val.forEach(txt=>{
+                    errNum++;
+                    cellData.push({eName:"P",className:"stk cancelLabel",eText:errNum+") "+txt});
+                });
+            } else {
+                if (val.error) {
+                    val.error.forEach(txt=>{
+                        errNum++;
+                        cellData.push({eName:"P",className:"stk cancelLabel",eText:"ERROR "+errNum+": "+txt});
+                    });
                 }
-                overlayMessage(ovArr,"RESULTADO");
-                ebyid("overlay").callOnClose=function() {
-                    overlayClose();
-                    viewWaitBackdrop();
-                    location.reload(true);
+                if (val.log) {
+                    logNum++;
+                    cellData.push({eName:"P",className:"stk",eText:val.log});
                 }
-            } catch(ex) {
-                overlayMessage(getParagraphObject("Respuesta del servidor inválida. Consulte al administrador", "errorLabel"),"ERROR");
-                delete pars.xmlHttpPost;
-                postService("consultas/Logs.php",{
-                    action:"doclog",
-                    message:"scripts.listasolp.payingMultipleResponse Exception",
-                    filebase:"error",
-                    data:JSON.stringify({exception:ex.toString(),parameters:pars,resMsg:msg})});
             }
+            resultRows.push({eName:"TR",eChilds:[{eName:"TD",className:"top",eChilds:[{eName:"P",className:"stk",eText:key}]},{eName:"TD",className:"top",eChilds:cellData}]});
         }
-        const dra=ebyid("dialog_resultarea");
-        cladd(dra,["flexCenter","flexColumn"]);
-    } else if (state>4||status!=200) {
-        overlayMessage(getParagraphObject("No se pudo obtener respuesta válida del servidor. Consulte al administrador", "errorLabel"),"ERROR");
-        delete pars.xmlHttpPost;
-        postService("consultas/Logs.php",{
-            action:"doclog",
-            message:"scripts.listasolp.payingMultipleResponse STATERROR",
-            filebase:"error",
-            data:JSON.stringify({state:state,status:status,parameters:pars,resMsg:msg})});
-        const dra=ebyid("dialog_resultarea");
-        cladd(dra,["flexCenter","flexColumn"]);
+        let resultReview="";
+        if (errNum>0) resultReview+="Errores: "+errNum;
+        if (logNum>0) {
+            if (errNum>0) resultReview+=". ";
+            resultReview+="Solicitudes procesadas: "+logNum;
+        } else if (logNum==0&&errNum==0)
+            resultReview="Sin resultados";
+        const resTHead={eName:"THEAD",eChilds:[{eName:"TR",eChilds:[{eName:"TH",eChilds:[{eName:"DIV",className:"nowrap pad5 centered",eText:"SOL ID"}]},{eName:"TH",eChilds:[{eName:"DIV",className:"nowrap pad5 centered",eText:"RESULTADO"}]}]}]};
+        const resTBody={eName:"TBODY",eChilds:resultRows};
+        const resTFoot={eName:"TFOOT",eChilds:[{eName:"TR",eChilds:[{eName:"TH",colSpan:"2",eChilds:[{eName:"DIV",eText:resultReview}]}]}]};
+        ovArr.push({eName:"TABLE",className:"widfit noApply",eChilds:[resTHead,resTBody,resTFoot]});
     }
+    overlayMessage(ovArr.length>0?ovArr:[{eName:"H3",eText:"SIN RESPUESTA"}],"RESULTADO");
+    ebyid("overlay").callOnClose=function() {
+        overlayClose();
+        viewWaitBackdrop();
+        location.reload(true);
+    }
+    const dra=ebyid("dialog_resultarea");
+    cladd(dra,["flexCenter","flexColumn"]);
+    setTimeout(onresizeScripts,100);
+}
+function payingMultipleError(messageError, responseText, extra) {
+    overlayMessage(getParagraphObject("No se pudo obtener respuesta válida del servidor. Consulte al administrador", "errorLabel"),"ERROR");
+    logService("scripts.listasolp.payingMultipleResponse ERROR",{
+        filebase:"error",
+        data:JSON.stringify({error:messageError,response:responseText,extra:extra})});
+    const dra=ebyid("dialog_resultarea");
+    cladd(dra,["flexCenter","flexColumn"]);
     setTimeout(onresizeScripts,100);
 }
 function massAction(chkClass, actionName, readyFunc, exceptionFunc, emptyMessage) {
@@ -1243,7 +1195,7 @@ function massAction(chkClass, actionName, readyFunc, exceptionFunc, emptyMessage
     if (solIdList.length>0) {
         clearTimeout(massTimeout);
         const parameters={action:actionName, ids:solIdList};
-        postService("consultas/SolPago.php",parameters,getPostRetFunc(readyFunc,exceptionFunc),getPostErrFunc(exceptionFunc));
+        readyService("consultas/SolPago.php",parameters,readyFunc,exceptionFunc);
     } else {
         overlayMessage(getParagraphObject(emptyMessage, "errorLabel"),"ERROR");
     }
@@ -1289,7 +1241,7 @@ function massPaymentWithFile(evt) {
     const tgt=evt.target;
     const files=tgt.files;
     const solData=tgt.solData;
-    readyService("consultas/ArchivosMul.php",{action:"massReqPaym",data:solData,files:files},(j,e)=>{
+    readyService("consultas/Archivos.php",{action:"massReqPaym",data:solData,files:files},(j,e)=>{
         delete j.params;
         console.log("JOBJ: "+JSON.stringify(j,jsonCircularReplacer()));
         delete e.action;
@@ -1340,36 +1292,34 @@ function generaDoc() {
     let solIdList=[];
     fee(lbycn("pymchk"),el=>el.checked?solIdList.push(el.getAttribute("solid")):null);
     //console.log(solIdList);
-    const parameters={action:"genPaymTextFile",ids:solIdList};
+    const parameters={action:"genPaymTextFile",ids:solIdList,respType:"text"};
     if (solIdList.length>0) {
         clearTimeout(delayTimeout);
-        postService("consultas/Facturas.php",parameters, function(msg,pars,state,status) {
-            if (state==4&&status==200) {
-                if (msg.length>0) {
-                    const messages=msg.split("|");
-                    if (messages[0].length>0) {
-                        const anchorObj={eName:"A",download:"pago.txt",style:{display:"none"},href:"data:text/plain;charset=utf-8,"+encodeURIComponent(messages[0])};
-                        const element=ecrea(anchorObj);
-                        document.body.appendChild(element);
-                        element.click();
-                        document.body.removeChild(element);
-                    }
-                    if (messages.length>1 && messages[1].length>0) {
-                        overlayMessage(getParagraphObject(messages[1], "errorLabel"),"ERROR");
-                        const dra=ebyid("dialog_resultarea");
-                        cladd(dra,["flexCenter","flexColumn"]);
-                    }
-                } else {
-                    overlayMessage(getParagraphObject("Documento vacío", "errorLabel"),"ERROR");
+        readyService("consultas/Facturas.php",parameters, function(msg,extra) {
+            if (msg.length>0) {
+                const messages=msg.split("|");
+                if (messages[0].length>0) {
+                    const anchorObj={eName:"A",download:"pago.txt",style:{display:"none"},href:"data:text/plain;charset=utf-8,"+encodeURIComponent(messages[0])};
+                    const element=ecrea(anchorObj);
+                    document.body.appendChild(element);
+                    element.click();
+                    document.body.removeChild(element);
+                }
+                if (messages.length>1 && messages[1].length>0) {
+                    overlayMessage(getParagraphObject(messages[1], "errorLabel"),"ERROR");
                     const dra=ebyid("dialog_resultarea");
                     cladd(dra,["flexCenter","flexColumn"]);
                 }
-            } else if (state>4 || status!=200) {
-                overlayMessage(getParagraphObject("Servicio no disponible, intente nuevamente más tarde.", "errorLabel"),"ERROR");
-                console.log("State="+state+", Status="+status);
+            } else {
+                overlayMessage(getParagraphObject("Documento vacío", "errorLabel"),"ERROR");
                 const dra=ebyid("dialog_resultarea");
                 cladd(dra,["flexCenter","flexColumn"]);
             }
+        }, function(messageError, responseText, extra) {
+            overlayMessage(getParagraphObject("Servicio no disponible, intente nuevamente más tarde.", "errorLabel"),"ERROR");
+            console.log("GENDOC ERROR: ",messageError,responseText,extra);
+            const dra=ebyid("dialog_resultarea");
+            cladd(dra,["flexCenter","flexColumn"]);
         });
     } else {
         overlayMessage(getParagraphObject("Debe seleccionar las casillas de las solicitudes a incluir en el documento", "errorLabel"),"ERROR");

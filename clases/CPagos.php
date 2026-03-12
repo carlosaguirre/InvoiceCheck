@@ -19,7 +19,7 @@ class CPagos extends DBObject {
         $query="INSERT INTO proceso (modulo,identif,status,detalle,fecha,usuario,region) (SELECT 'CPago',$idf,if(saldoInsoluto=0,'Pagado','Parcial'),concat('$',format(saldoAnterior,2),' - $',format(impPagado,2),' = $',format(saldoInsoluto,2)),fechaPago,'$user->nombre','$ip' from cpagos where id=$idf)";
         DBi::query($query); // proceso no entra para replicar insert, no hace falta pasar el objeto
     }
-    private function resetAllData() {
+    public function resetAllData(): void {
         $this->fixedIdList=["Queries"=>[],"Pasos"=>[],"Errores"=>[]];
         $this->data=["inv"=>[],"icp"=>[],"cpy"=>[],"cpyc"=>[],"dpy"=>[],"dpyf"=>[],"dpyp"=>[]];
         $this->dataLog=[];
@@ -35,21 +35,19 @@ class CPagos extends DBObject {
         $this->fixedIdList["Pasos"][]="REVIEW ICP: $icpMin - $icpMax";
     }
     private function errObjData($type) {
-        global $query, $invObj, $dpyObj;
         switch($type) {
-            case "INV": if (isset($invObj)) return $invObj->errors;
+            case "INV": return dao('inv')->errors;
             case "CPY": return $this->errors;
-            case "DPY": if (isset($dpyObj)) return $dpyObj->errors;
+            case "DPY": return dao('dpy')->errors;
         }
         return null;
     }
     private function setObjData($action,$type,$params,$prefix=null) {
-        global $query, $invObj, $dpyObj;
         $tmstmp = date("His");
         switch($type) {
-            case "INV": if (!isset($invObj)) { require_once "clases/Facturas.php"; $invObj=new Facturas(); } $obj=$invObj; break;
+            case "INV": $obj=dao('inv'); break;
             case "CPY": $obj=$this; break;
-            case "DPY": if (!isset($dpyObj)) { require_once "clases/DPagos.php"; $dpyObj=new DPagos(); } $obj=$dpyObj; break;
+            case "DPY": $obj=dao('dpy'); break;
         }
         if (!isset($obj)) {
             $this->fixedIdList["Errores"][]="[$tmstmp] SetObjData Tipo incorrecto ($type|$action)";
@@ -103,6 +101,7 @@ class CPagos extends DBObject {
                     $this->fixedIdList["Errores"][]="[$tmstmp] ($identif) SetObjData Acción incorrecta";
                     return null;
             }
+            global $query;
             $this->fixedIdList["Queries"][]="[$tmstmp] $query";
             $currentErrno = DBi::getErrno();
             $currentError = DBi::getError();
@@ -247,16 +246,7 @@ class CPagos extends DBObject {
         $this->resetAllData();
         try {
             $this->fixedIdList["Pasos"][]="INI fixEmptyCPagos";
-            global $invObj;
-            if (!isset($invObj)) {
-                require_once "clases/Facturas.php";
-                $invObj=new Facturas();
-            }
-            $rpp=$invObj->rows_per_page;
-            $ordlist=$invObj->orderlist;
-            $invObj->rows_per_page=100;
-            $invObj->clearOrder();
-            $invObj->addOrder("ciclo","desc");
+            //$invObj=dao('inv', ["rows_per_page"=>100, "orderlist"=>["ciclo"=>"desc"]]);
             $icpData=$this->getObjData("INV",["f.tipoComprobante='p' and (f.statusn is null or f.statusn<128) and f.status!='Temporal' and c.idCPago is null",0,"f.*","f left join cpagos c on f.id=c.idCPago"]);
             $icpRows=$this->numrows;
             $this->addData($icpData,"id","icp");
@@ -289,17 +279,14 @@ class CPagos extends DBObject {
             DBi::autocommit(true);
             $this->fixedIdReview();
             $this->fixedIdList["Pasos"][]="END fixEmptyCPagos";
+            //$invObj->restoreOldValues();
         }
     }
     public function fixListCPagos($idList) {
         $this->resetAllData();
         try {
             $this->fixedIdList["Pasos"][]="INI fixListCPagos";
-            global $invObj;
-            if (!isset($invObj)) {
-                require_once "clases/Facturas.php";
-                $invObj=new Facturas();
-            }
+            $values = "(".implode(",",$idList).")";
             $icpData=$this->getObjData("INV",["tipoComprobante='p' and id in $values",0,"*"]);
             $this->addData($icpData,"id","icp");
             $invData=$this->getObjData("INV",["tipoComprobante!='p' and id in $values",0,"*"]);
@@ -378,7 +365,7 @@ class CPagos extends DBObject {
             $isErr = ($nm==="error");
             $cpex->doLog($isPym?$cpex->getMessage():"fixOldCPagos ".($isErr?"Failed":"Error"));
             $this->fixedIdList["Pasos"][]="Rollback! CPException ".$cpex->getMessage();
-            $this->fixedIdList["Errores"][]=json_encode(getErrorData($ex));
+            $this->fixedIdList["Errores"][]=json_encode(getErrorData($cpex));
             return $cpex->getUserMessage();
         } catch (Error $ex) {
             DBi::rollback();
@@ -417,7 +404,7 @@ class CPagos extends DBObject {
             $isErr = ($nm==="error");
             $cpex->doLog($isPym?$cpex->getMessage():"fixCP ".($isErr?"Failed":"Error"));
             $this->fixedIdList["Pasos"][]="Rollback! CPException ".$cpex->getMessage();
-            $this->fixedIdList["Errores"][]=json_encode(getErrorData($ex));
+            $this->fixedIdList["Errores"][]=json_encode(getErrorData($cpex));
             return $cpex->getUserMessage();
         } catch (Error $ex) {
             DBi::rollback();
@@ -450,7 +437,7 @@ class CPagos extends DBObject {
             $isErr = ($nm==="error");
             $cpex->doLog($isPym?$cpex->getMessage():"fixInvStats ".($isErr?"Failed":"Error"));
             $this->fixedIdList["Pasos"][]="Rollback! CPException ".$cpex->getMessage();
-            $this->fixedIdList["Errores"][]=json_encode(getErrorData($ex));
+            $this->fixedIdList["Errores"][]=json_encode(getErrorData($cpex));
             return $cpex->getUserMessage();
         } catch (Error $ex) {
             DBi::rollback();
@@ -478,7 +465,7 @@ class CPagos extends DBObject {
             $this->resetCPData($idCFDI,/*&*/$icpData,/*&*/$cpyData,/*&*/$dpyData);
             $this->setInvoicesStatus($icpData, $cpyData, $dpyData);
             DBi::commit();
-            $this->fixedIDList["Pasos"][]="Commit! Success!!";
+            $this->fixedIdList["Pasos"][]="Commit! Success!!";
             return true;
         } catch (CPException $cpex) {
             DBi::rollback();
@@ -509,9 +496,9 @@ class CPagos extends DBObject {
                 else $idCFDIs.=$idCFDI;
             }
             $icpData=$this->getObjData("INV",["id{$idCFDIs}"]);
+            global $query;
             if (!isset($icpData[0])) {
-                global $invObj;
-                throw new CPException("No hay datos", 10000002, null, ["id"=>$idCFDI,"query"=>$query,"data"=>$icpData,"log"=>$invObj->log],"pagosErr","No se encontro registro de CFDI");
+                throw new CPException("No hay datos", 10000002, null, ["id"=>$idCFDI,"query"=>$query,"data"=>$icpData,"log"=>dao('inv')->log],"pagosErr","No se encontro registro de CFDI");
             }
             if (isset($icpData["id"])) $icpData=[$icpData];
             $rjPys=[];
@@ -583,7 +570,9 @@ class CPagos extends DBObject {
                     } else {
                         if (isset($emptyList[0])) { // toDo: en lugar de borrar todo cpyData y dpyData, solo eliminar los que esten en emptyList
                             $dpyRes=$this->delObjData("DPY",$ppFldArr);
+                            $dQry=$query;
                             $cpyRes=$this->delObjData("CPY",$cpIdFldArr);
+                            $cQry=$query;
                             doclog("DELETEP2","pagos",["idFactura"=>$idCFDI,"invData"=>$icpData,"dpyData"=>$dpyData,"cpyData"=>$cpyData,"deleteDP"=>["fldarr"=>$ppFldArr,"query"=>$dQry,"res"=>(is_bool($dpyRes)?($dpyRes?"TRUE":"FALSE"):$dpyRes)],"deleteCP"=>["fldarr"=>$cpIdFldArr,"query"=>$cQry,"res"=>(is_bool($cpyRes)?($cpyRes?"TRUE":"FALSE"):$cpyRes)]]);
                             $cpyData=null;
                             $dpyData=null;
@@ -675,8 +664,7 @@ class CPagos extends DBObject {
                             doclog("NOTHING TO SAVEDDP","pagos",["query"=>$query,"dpgArr"=>$dpgArr,"icpIdx"=>$icpIdx,"pgIdx"=>$pgIdx,"drIdx"=>$drIdx]);
                         }
                     }
-                    global $dpyObj;
-                    $dpgArr["id"]=$dpyObj->lastId;
+                    $dpgArr["id"]=dao('dpy')->lastId;
                     doclog("SAVEDDP","pagos",["dpgArr"=>$dpgArr,"query"=>$query,"icpIdx"=>$icpIdx,"pgIdx"=>$pgIdx,"drIdx"=>$drIdx]);
                     $this->addData([$dpgArr],"idFactura","dpyf");
                     $this->addData([$dpgArr],"idPPago","dpyp");
@@ -814,8 +802,7 @@ class CPagos extends DBObject {
                                 doclog("NOTHING TO SAVEDDP","pagos",["query"=>$query,"dpgArr"=>$dpgArr,"icpIdx"=>$icpIdx,"pgIdx"=>$pgIdx,"drIdx"=>$drIdx]);
                             }
                         }
-                        global $dpyObj;
-                        $dpgArr["id"]=$dpyObj->lastId;
+                        $dpgArr["id"]=dao('dpy')->lastId;
                         doclog("SAVEDDP","pagos",["dpgArr"=>$dpgArr,"query"=>$query,"icpIdx"=>$icpIdx,"pgIdx"=>$pgIdx,"drIdx"=>$drIdx]);
                         $this->addData([$dpgArr],"idFactura","dpyf");
                         $this->addData([$dpgArr],"idPPago","dpyp");
@@ -1017,7 +1004,7 @@ class CPagos extends DBObject {
                             }
                             if (!$this->saveObjData("INV",$invFldArr)) {
                                 if (DBi::getErrno()>0) {
-                                    $errData=["idCP"=>$idCFDI,"cpData"=>$icpValue,"query"=>$query];
+                                    $errData=["idCP"=>$lastCP["idCPago"],"cpData"=>$lastCP,"query"=>$query];
                                     $errObj=$this->errObjData("INV");
                                     if (isset($errObj)) $errData["oerrors"]=$errObj;
                                     $errObj=DBi::$errors??null;
@@ -1039,7 +1026,7 @@ class CPException extends Exception {
     private $data;
     private $name;
     private $userMessage;
-    public function __construct($message, $code=0, Exception $previous=null, $data=null, $name="error",$description=null) {
+    public function __construct($message, $code=0, $previous=null, $data=null, $name="error",$description=null) {
         parent::__construct($message, $code, $previous);
         if (empty($data)) $this->data=[];
         else if (!is_array($data)||!array_filter(array_keys($data), 'is_string')) $this->data=["data"=>$data];
@@ -1061,7 +1048,7 @@ class CPException extends Exception {
         if (empty($this->userMessage)) return $this->getMessage();
         return $this->userMessage;
     }
-    public function __toString() {
+    public function __toString(): string {
         return __CLASS__.": [{$this->code}];: {$this->message}\n";
     }
     public function doLog($message=null) {

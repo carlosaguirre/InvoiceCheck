@@ -22,10 +22,7 @@ $gpoSize=10;
 $gpoWhere="status='activo' and conSitFis is not null";
 if ($_esProveedor) {
     global $query;
-    require_once "clases/Facturas.php";
-    $invObj = new Facturas();
-    $invObj->rows_per_page = 0;
-    $invData = $invObj->getData("codigoProveedor='$username'", 0, "distinct rfcGrupo");
+    $invData = dao("inv", ["rows_per_page" => 0])->getData("codigoProveedor='$username'", 0, "distinct rfcGrupo");
     $rfcGpoList = array_column($invData,"rfcGrupo");
     if (!isset($rfcGpoList[$gpoSize])) {
         $gpoSize=count($rfcGpoList);
@@ -35,14 +32,7 @@ if ($_esProveedor) {
     clog2("GPOWHERE= '$gpoWhere'");
 } //else clog2("NO ES PROVEEDOR. QUERY: $query");
 
-require_once "clases/Grupo.php";
-global $gpoObj;
-if (!isset($gpoObj)) {
-    $gpoObj=new Grupo();
-    $gpoObj->rows_per_page=0;
-}
-$gpoObj->addOrder("alias");
-$gpoData=$gpoObj->getData($gpoWhere,0,"id,conSitFis,alias,conSitFisTimes");
+$gpoData=dao("gpo", ["rows_per_page"=>0, "orderlist"=>["alias"=>"asc"]])->getData($gpoWhere,0,"id,conSitFis,alias,conSitFisTimes");
 global $query;
 //clog2("QUERY: $query");
 if (!isset($gpoData[$gpoSize])) {

@@ -28,30 +28,13 @@ clog1seq(1);
 $puedePagar = validaPerfil("Paga Viaticos")||$_esSistemas;
 $statusControl = ($puedeAutorizar||$puedePagar)?"<SELECT id=\"control\" class=\"noprintBorder\" onchange=\"console.log('CONTROL CHANGED TO '+this.value);\"><OPTION value=\"\">PENDIENTE</OPTION><OPTION value=\"autorizar\">AUTORIZAR</OPTION><OPTION value=\"rechazar\">RECHAZAR</OPTION>".($puedePagar?"<OPTION value=\"pagado\">PAGADO</OPTION>":"")."</SELECT>":"<INPUT type=\"text\" id=\"control\" class=\"nombreV padv02 noprintBorder\" readonly/>";
 
-if (!isset($perObj)) {
-    require_once "clases/Perfiles.php";
-    $perObj=new Perfiles();
-}
-$ccId=$perObj->getIdByName("Caja Chica");
-if (!isset($ugObj)) {
-    require_once "clases/Usuarios_grupo.php";
-    $ugObj=new Usuarios_Grupo();
-}
-$ugObj->rows_per_page=0;
-$refundGroupId=$ugObj->getRefundGroupId(getUser()->id, $ccId, "vista");
+$ccId=dao("per")->getIdByName("Caja Chica");
+$refundGroupId=dao('ug', ["rows_per_page"=>0])->getRefundGroupId(getUser()->id, $ccId, "vista");
 if (isset($refundGroupId[1])) $gpWhere="id in (".implode(",",$refundGroupId).")";
 else if (isset($refundGroupId[0])) $gpWhere="id=".$refundGroupId[0];
 else $gpWhere=false;
 
-if (!isset($gpoObj)) {
-    require_once "clases/Grupo.php";
-    $gpoObj=new Grupo();
-}
-$gpoObj->rows_per_page=0;
-$gpoObj->clearFullMap();
-$gpoObj->clearOrder();
-$gpoObj->addOrder("alias");
-$grupoOptionMap=$gpoObj->getFullMap("id","alias",$gpWhere); 
+$grupoOptionMap=dao("gpo", ["rows_per_page"=>0, "orderlist"=>["alias"=>"asc"], "fullmap"=>[]])->getFullMap("id","alias",$gpWhere); 
 $groupOptions=getHtmlOptions($grupoOptionMap,null);
 
 if (isset($_REQUEST["datos"])) {

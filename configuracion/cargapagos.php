@@ -26,14 +26,8 @@ if (isset($_FILES["pagos"])) {
         $pls=(isset($pagos[1]))?"S":"";
         $numpagos=count($pagos);
         plog("INICIA CARGA DE $numpagos ARCHIVO{$pls}:",true);
-        require_once "clases/Pagos.php";
-        $pyObj = new Pagos();
-        $pyObj->rows_per_page=0;
-        require_once "clases/Facturas.php";
-        $invObj = new Facturas();
-        $invObj->rows_per_page=1;
-        $invObj->clearOrder();
-        $invObj->addOrder("id","desc");
+        //$pyObj = dao("pagos", ["rows_per_page" => 0]);
+        //$invObj = dao("inv", ["rows_per_page" => 1, "orderlist"=>["id"=>"desc"]]);
         for($i=0; isset($pagos[$i]); $i++) {
             $num=$i+1;
             $pname=$pagos[$i]["name"]; $psize=$pagos[$i]["size"]; $ptmpn=$pagos[$i]["tmp_name"];
@@ -179,7 +173,7 @@ function isValidFileData($pname,$psize,$ptmpn,$perrn,$ptype,&$errmsg) {
     return !isset($errmsg[0]);
 }
 function getNewName($line1,$line2,&$nrfc) {
-    global $meses,$gpoObj;
+    global $meses;
     $dateLineResult=preg_match('/^(\d+) de (\w+) de (\d+)$/',trim($line1),$matches);
     if($dateLineResult===1) {
         $ndia=$matches[1];
@@ -189,11 +183,7 @@ function getNewName($line1,$line2,&$nrfc) {
         if (isset($meses[$nmes])) $nmes=$meses[$nmes];
         $nanio=substr($matches[3],2,2);
         $nrfc=trim($line2);
-        if(!isset($gpoObj)) {
-          require_once "clases/Grupo.php";
-          $gpoObj=new Grupo();
-        }
-        $nalias=$gpoObj->getValue("rfc",$nrfc,"alias");
+        $nalias=dao("gpo")->getValue("rfc",$nrfc,"alias");
         if(!isset($nalias[0])) $nalias=$nrfc."_";
         $nname=$nalias."_".$nanio.$nmes.$ndia.".txt";
         return $nname;
@@ -216,7 +206,7 @@ function getNewName($line1,$line2,&$nrfc) {
 //     * No es Pago de Egreso
 //     * La factura ya tenía status de pagado
 function extractData($filename,$nrfc,$lines,&$result) {
-    global $query, $invObj,$pyObj,$prvObj,$solObj;
+    global $query;
     $numLines=count($lines);
     $timeLimit=7*$numLines;
     $timeLimitStr="";
@@ -250,6 +240,8 @@ function extractData($filename,$nrfc,$lines,&$result) {
     $lastErrFactId=null;
     $dbPyCols=["archivo","codigoProveedor","idFactura","fechaPago","cantidad","iva","total","tipo","referencia"];
     $isLogLineStarted=false;
+    $invObj = dao("inv");
+    $pyObj = dao("py");
     foreach ($lines as $lineIdx=>$oneline) {
         if ($lineIdx>0 && ($lineIdx%10)==0) {
             $isLogLineStarted=true;
@@ -398,11 +390,7 @@ function extractData($filename,$nrfc,$lines,&$result) {
                         } else {
                             $lastErrFolio=$currFolio;
                             if (!isset($result["invalido"])) $result["invalido"]=[];
-                            if (!isset($prvObj)) {
-                                require_once "clases/Proveedores.php";
-                                $prvObj=new Proveedores();
-                            }
-                            if ($prvObj->exists("codigo='$currProv'")) {
+                            if (dao("prv")->exists("codigo='$currProv'")) {
                                 $lastQuery=$query;
                                 $queryList[]=$query;
                                 $result["invalido"][]=["idx"=>$lineIdx,"mensaje"=>"La factura no esta registrada","corto"=>"Factura no registrada","proveedor"=>$currProv,"folio"=>$currFolio,"queries"=>$queryList,"id"=>0];
@@ -522,11 +510,7 @@ function extractData($filename,$nrfc,$lines,&$result) {
         return false;
     }
     $pyObj->insertIntoProceso($pyMaxId,$_SESSION["user"]??(object)["nombre"=>"nouser"]);
-    if (!isset($solObj)) {
-        require_once "clases/SolicitudPago.php";
-        $solObj=new SolicitudPago();
-    }
-    $solObj->updateStatus($arrIdData, Facturas::STATUS_PAGADO);
+    dao("sol")->updateStatus($arrIdData, Facturas::STATUS_PAGADO);
     if ($isLogLineStarted) {
         $numPagado=count($arrIdData);
         $pls=($numPagado==1?"":"s");

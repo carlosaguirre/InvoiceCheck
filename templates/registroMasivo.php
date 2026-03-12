@@ -52,7 +52,7 @@ $opinionFunc=function($provId, $provRfc, $btnText, $opiFile, $opiVal, $opiGen, $
                     "}".
                 "},".
                 "function(text,pars,evt){".
-                    "console.log('ERROR '+text+' '+pars.xmlHttpPost.readyState+'-'+pars.xmlHttpPost.status);".
+                    "console.log('ERROR '+text+' '+pars.controller.readyState+'-'+pars.controller.status);".
                 "}".
             ");\"":"")
     ];

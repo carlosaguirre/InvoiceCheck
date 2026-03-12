@@ -105,25 +105,14 @@ class PDFCR {
         $this->getUsers("Reporte FCRD");
     }
     private function getUsers($perfil) {
-        global $perObj;
-        if (!isset($perObj)) {
-            require_once "clases/Perfiles.php";
-            $perObj = new Perfiles();
-        }
-        $perObj->rows_per_page=0;
+        $perObj=dao('per', ["rows_per_page"=>0]);
         $perWhr=$perObj->getWhereCondition("nombre", $perfil);
         if (isset($perWhr[0])) $perWhr=rtrim($perWhr," AND ");
         // select id from Perfiles where nombre="Reporte FCRD";
         $perData=$perObj->getData($perWhr,0,"id");
         if (isset($perData[0])) {
             $perIds=array_column($perData, "id");
-            global $ugObj, $usrObj;
-            if (!isset($ugObj)) {
-                require_once "clases/Usuarios_Grupo.php";
-                $ugObj = new Usuarios_Grupo();
-            } else $ugObj->clearOrder();
-            $ugObj->rows_per_page=0;
-            $ugObj->addOrder("idUsuario");
+            $ugObj=dao('ug', ["rows_per_page"=>0, "orderlist"=>["idUsuario"=>"asc"]]);
             $ugWhr=$ugObj->getWhereCondition("idPerfil",$perIds);
             if (isset($ugWhr[0])) $ugWhr=rtrim($ugWhr," AND ");
             // select idUsuario, group_concat(idGrupo) idGrupos from usuarios_grupo where idPerfil=120 group by idUsuario;
@@ -458,11 +447,7 @@ class PDFCR {
     public static function sendReportByMail($dataValue=null,$originDesc=null) {
         $systemUserId=1038;
         $hasDataValue=isset($dataValue[0]);
-        global $logObj;
-        if (!isset($logObj)) {
-            require_once "clases/Logs.php";
-            $logObj=new Logs();
-        }
+        $logObj=dao('log');
         if (!$hasDataValue) {
             $todayLabel=strtotime("now");
             $successCount=0;
@@ -519,8 +504,7 @@ class PDFCR {
         $subject="Acumulado de Facturas del dia $dayValue";
         $from=null; // ToDo: Obtener correo de usrId, validar que usrId tenga perfil ReporteFCRD
         if (isset($usrId[0])) {
-            global $usrObj; if (!$usrObj) { require_once "clases/Usuarios.php"; $usrObj=new Usuarios(); }
-            $to=$usrObj->getData("id=$usrId",0,"email address,persona name");
+            $to=dao('usr')->getData("id=$usrId",0,"email address,persona name");
             if (!isset($to[0])) $to=getMailAddressesByProfile("Reporte FCRD");
         } else $to=getMailAddressesByProfile("Reporte FCRD");
         $base = file_get_contents(getBasePath()."templates/respGralSolPago.html");
@@ -542,11 +526,6 @@ class PDFCR {
             $genDate=strtotime("-".self::$daysBehind." days");
         $pcrObj=new PDFCR($genDate);
         $genDate=$pcrObj->getDay();
-        global $logObj;
-        if (!isset($logObj)) {
-            require_once "clases/Logs.php";
-            $logObj=new Logs();
-        }
         if ($pcrObj->hasErrors()) {
             $errors=$pcrObj->getErrors();
             if (isset($errors[0]) && !isset($errors[1]) && $errors[0]==="No se generaron datos") {
@@ -554,14 +533,14 @@ class PDFCR {
             }
             doclog("PDFCR::autoReport ERROR","pruebas",["errors"=>$errors]);
             $result=["result"=>"error","message"=>"ERROR EN PREPARACION DE DATOS","errors"=>$errors];
-            $logObj->agrega($systemUserId, "PDFCRAUTO", "AUTOREPORT ERRORS $genDate: ".self::err2log($errors));
+            dao('log')->agrega($systemUserId, "PDFCRAUTO", "AUTOREPORT ERRORS $genDate: ".self::err2log($errors));
             return $result;
         }
         if ($pcrObj->isEmpty()) {
             global $query;
             doclog("PDFCR::autoReport VACIO","pruebas",["query"=>$query]);
             $result=["result"=>"empty","message"=>"DIA $genDate SIN REGISTROS"];
-            $logObj->agrega($systemUserId, "PDFCRAUTO", "AUTOREPORT EMPTY $genDate: SIN REGISTROS");
+            dao('log')->agrega($systemUserId, "PDFCRAUTO", "AUTOREPORT EMPTY $genDate: SIN REGISTROS");
             return $result;
         }
         $newFileNames=$pcrObj->createFiles();
@@ -569,7 +548,7 @@ class PDFCR {
         $message="Proceso PDFCR concluido ";
         if ($pcrObj->hasErrors()) {
             doclog("PDFCR::autoReport ERROR","pruebas",["files"=>$newFileNames,"error"=>$pcrObj->getErrors(),"idErr"=>$pcrObj->errIds,"log"=>$pcrObj->log]);
-            $logObj->agrega($systemUserId, "PDFCRAUTO", "AUTOREPORT ERROR $genDate: ".substr($newFileNamesTxt,0,1480));
+            dao('log')->agrega($systemUserId, "PDFCRAUTO", "AUTOREPORT ERROR $genDate: ".substr($newFileNamesTxt,0,1480));
             if (empty($newFileNames)) return ["result"=>"empty","message"=>"ERROR EN CREACION DE ARCHIVO", "errors"=>$pcrObj->getErrors()];
             $message.="con";
         } else $message.="sin";
@@ -583,8 +562,7 @@ class PDFCR {
             return $dtx;
         });
         //natsort($fileList);
-        global $usrObj;
-        if (!$usrObj) { require_once "clases/Usuarios.php"; $usrObj=new Usuarios(); }
+        $usrObj=dao('usr');
         $fileDataList=[];
         foreach (array_reverse($fileList) as $idx => $filepath) {
             $fileTime=getCorrectMTime($filepath);
@@ -623,7 +601,7 @@ class PDFCR {
             $result["errors"]=$errors;
             $errlog=": ".self::err2log($errors);
         } else $errlog="";
-        $logObj->agrega($systemUserId, "PDFCRAUTO", "AUTOREPORT SUCCESS $genDate{$errlog}");
+        dao('log')->agrega($systemUserId, "PDFCRAUTO", "AUTOREPORT SUCCESS $genDate{$errlog}");
         $result["list"]=$fileDataList;
         return $result;
     }

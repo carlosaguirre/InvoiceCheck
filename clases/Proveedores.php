@@ -85,9 +85,7 @@ class Proveedores extends DBObject {
         }
 
         if (!empty($arrData["id"])) {
-            require_once "clases/Usuarios.php";
-            $usrObj = new Usuarios();
-            $arrValues = $usrObj->getValue("nombre", $code, "id,email");
+            $arrValues = dao('usr')->getValue("nombre", $code, "id,email");
             if (!empty($arrValues)) {
                 list($arrData["userId"],$arrData["email"]) = explode("|",$arrValues);
             }
@@ -97,10 +95,15 @@ class Proveedores extends DBObject {
         $_SESSION["$_SERVER[SERVER_NAME]_invoice_check_provider_cache"][$code]=$arrData;
         return $arrData;
     }
-    static function esCorporativo($codigo) {
-        static $groupCodes = ["A-010","A-046","B-036","B-097","B-098","C-075","C-502","D-015","D-027","D-999","E-054","E-087","I-162","L-007","L-022","L-043","M-040","M-122","M-262","P-011","P-049","P-101","R-069","S-050","S-164","T-028"];
-        return in_array($codigo, $groupCodes);
+    public function esCorporativo($codigo) {
+        // return $this->exists("codigo='$codigo' and rfc in (select rfc from grupo where status<>'inactivo')");                                            // 0.406 sec
+        // return $this->exists("codigo='$codigo' and tipo1='Corporativo'"); // static, will fail with new group companies not updating Proveedores.tipo1   // 0.000 sec
+        return $this->exists("p.codigo='$codigo' and p.status<>'inactivo' and g.status='activo'", "p inner join grupo g on p.rfc=g.rfc"); // 0.000 sec
     }
+//    static function esCorporativo($codigo) {
+//        static $groupCodes = ["A-010","A-046","B-036","B-097","B-098","C-075","C-502","D-015","D-027","D-999","E-054","E-087","I-162","L-007","L-022","L-043","M-040","M-122","M-262","P-011","P-049","P-101","R-069","S-050","S-164","T-028"];
+//        return in_array($codigo, $groupCodes);
+//    }
     static function describeBankStatus($status,$verificado,$cumplido,$descType=0) { // [activo,inactivo,actualizar,bloqueado],[-1,0,1],[-2,-1,0,1],[0,1]
         static::$warning="describeBankStatus: $status, $verificado, $cumplido, $descType";
         $dt0=($descType==0);

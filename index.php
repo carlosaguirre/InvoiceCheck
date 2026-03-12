@@ -74,47 +74,24 @@ if (!isset($menu_accion[0])) {
                 //echo "<!-- USER && BANDERA 2 -->\n";
                 $resultTitle="Solicitud de Pago";
                 $resultMessage="<P class='fontRelevant margin20 centered'>Se ha generado un pendiente en <b class=\"alink\" onclick=\"autoSubmit({menu_accion:'ListaSolPago',target:'_self'});\">Solicitud de Pago</b></P>";
-                if (!isset($usrObj)) {
-                    require_once "clases/Usuarios.php";
-                    $usrObj=new Usuarios();
-                }
-                $usrObj->saveRecord(["id"=>$userid,"banderas"=>new DBExpression("banderas&253")]); // Borrar bandera 2
+                dao('usr')->saveRecord(["id"=>$userid,"banderas"=>new DBExpression("banderas&253")]); // Borrar bandera 2
             }
         }
         unset($_SESSION["tmp"]);
     }
     //echo "<!-- INV INIT  -->\n";
     if ((($_esSistemas??false)||($_esAdministrador??false)) && (!isset($_POST["menu_accion"])||$_POST["menu_accion"]==="Inicio")) {
-        global $invObj, $query;
-        if (!isset($invObj)) {
-            require_once "clases/Facturas.php";
-            $invObj=new Facturas();
-        }
-        $invObj->rows_per_page=100;
-        $invObj->clearOrder();
-        $invObj->addOrder("version","desc");
-        $invObj->addOrder("ciclo","desc");
-        $invObj->addOrder("right(ubicacion,3)","desc");
-        $invObj->addOrder("ubicacion");
+        global $query;
+        $invObj=dao('inv', ["rows_per_page"=>100, "orderlist"=>["version"=>"desc", "ciclo"=>"desc", "right(ubicacion,3)"=>"desc", "ubicacion"=>"asc"]]);
+        //$noCCPAccData=$invObj->getData(); // getDataFromTemp()
     }
     if (isset($user->proveedor) && !isset($_REQUEST["logout"])) {
         if ($user->proveedor->status==="inactivo") $menu_accion="Inactivo";
         else if (!isset($_POST["menu_accion"])||$_POST["menu_accion"]==="Inicio"||$_POST["menu_accion"]==="ActualizaCuentaBancaria") {
-            global $invObj, $query;
-            if (!isset($invObj)) {
-                require_once "clases/Facturas.php";
-                $invObj=new Facturas();
-            }
+            global $query;
             // Actualizar pagos en tablas CPagos y DPagos
             // Si el status es aceptado
-            $invObj->rows_per_page=200;
-            $invObj->clearOrder();
-            $invObj->addOrder("version","desc");
-            $invObj->addOrder("year(fechaFactura)","desc");
-            $invObj->addOrder("right(ubicacion,3)","desc");
-            $invObj->addOrder("folio","desc");
-            $invObj->addOrder("ubicacion");
-            //$invObj->addOrder("d.numParcialidad","desc");
+            $invObj=dao('inv', ["rows_per_page"=>200, "orderlist"=>["version"=>"desc", "year(fechaFactura)"=>"desc", "right(ubicacion,3)"=>"desc", "ubicacion"=>"asc" /*, "d.numParcialidad"=>"desc"*/ ]]);
             /*$noCCPData=$invObj->getData("f.codigoProveedor=\"".$user->proveedor->codigo."\" and f.tipoComprobante=\"i\" and f.metodoDePago=\"PPD\" and (f.idReciboPago is null or f.statusReciboPago is null or c.idCPago is null or f.statusReciboPago<1 or f.saldoReciboPago>0) and f.statusn between 32 and 127 and (p.statusn is null or p.statusn<127) and (g.statusn is null or g.statusn<127) and (f.fechaPago is null or f.fechaPago>\"2018-09-01 00:00:00\")", 0,
                 "f.id,f.ubicacion,f.uuid,f.serie,f.folio,f.fechaFactura,f.total,f.moneda,f.nombreInterno,f.nombreInternoPDF,f.ea,f.version,f.idReciboPago,f.statusReciboPago,f.saldoReciboPago,f.statusn,c.idCPago,c.fechaPago,d.numParcialidad,d.saldoInsoluto,p.statusn cpStatusN,g.statusn rpStatusN,p.folio cpFolio,p.nombreInterno cpNombreInterno,p.nombreInternoPDF cpNombreInternoPDF,p.ubicacion cpUbicacion",
                 "f left join dpagos d on f.id=d.idFactura left join cpagos c on d.idppago=c.id left join facturas p on c.idCPago=p.id left join facturas g on f.idReciboPago=g.id", 1000);
@@ -330,22 +307,14 @@ if (!isset($menu_accion[0])) {
                 $hasThirdWarning=($user->banderas & 32)>0;
                 if (!$hasThirdWarning && !$hasSecondWarning && !$hasFirstWarning) {
                     $noticia[]=AVISO["PROVEEDOR"];
-                    if (!isset($usrObj)) {
-                        require_once "clases/Usuarios.php";
-                        $usrObj=new Usuarios();
-                    }
-                    $usrObj->saveRecord(["id"=>$userid,"banderas"=>new DBExpression("banderas&253")]);
+                    dao('usr')->saveRecord(["id"=>$userid,"banderas"=>new DBExpression("banderas&253")]);
                 }
             }
             if (isset(MENSAJE["PROVEEDOR"][0])) { // UNA VEZ
                 $hasBeenNoticed=($user->banderas & 4)>0;
                 if (!$hasBeenNoticed) {
                     $noticia[]=MENSAJE["PROVEEDOR"];
-                    if (!isset($usrObj)) {
-                        require_once "clases/Usuarios.php";
-                        $usrObj=new Usuarios();
-                    }
-                    $usrObj->saveRecord(["id"=>$userid,"banderas"=>new DBExpression("banderas&253")]);
+                    dao('usr')->saveRecord(["id"=>$userid,"banderas"=>new DBExpression("banderas&253")]);
                 }
             }
             if (isset($noticia[0])) {

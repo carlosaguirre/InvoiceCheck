@@ -14,27 +14,14 @@ if (!$consultaProc) {
 clog2ini("configuracion.correos");
 clog1seq(1);
 
-require_once "clases/Grupo.php";
-require_once "clases/Proveedores.php";
-
 $tracelog = "";
 
-global $gpoObj;
-if (!isset($gpoObj)) {
-    require_once "clases/Grupo.php";
-    $gpoObj = new Grupo();
-}
-$gpoFullMapWhere = $gpoObj->setOptSessions();
+$gpoFullMapWhere = dao("gpo")->setOptSessions();
 $gpoRazSocOpt = $_SESSION['gpoRazSocOpt'];
 $gpoCodigoOpt = $_SESSION['gpoCodigoOpt'];
 $gpoRFCOpt = $_SESSION['gpoRFCOpt'];
 
-global $prvObj;
-if(!isset($prvObj)) {
-    require_once "clases/Proveedores.php";
-    $prvObj = new Proveedores();
-}
-$prvFullMapWhere = $prvObj->setOptSessions();
+$prvFullMapWhere = dao("prv")->setOptSessions();
 $prvRazSocOpt = $_SESSION['prvRazSocOpt'];
 $prvCodigoOpt = $_SESSION['prvCodigoOpt'];
 $prvRFCOpt = $_SESSION['prvRFCOpt'];

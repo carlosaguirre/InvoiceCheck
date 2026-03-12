@@ -28,28 +28,21 @@ class Permisos extends DBObject {
             validarPermiso($usuario->id,0,0,true);
     }
     private function validarPermisoGral ($usuario, $accion, $tipo, $nivel=1) {
-        static $actObj=null;
         static $act2Id=[];
         if (empty($usuario) || !is_object($usuario) || !isset($usuario->id) || empty($accion)) return false;
         if(!isset($act2Id[$accion])) {
-            if ($actObj==null) {
-                require_once "clases/Acciones.php";
-                $actObj=new Acciones();
-            }
-            $act2Id[$accion]=$actObj->getValue("nombre",$accion,"id");
+            $act2Id[$accion]=dao('act')->getValue("nombre",$accion,"id");
         }
         if ($tipo==Permisos::$CONSULTA) return $this->validarPermiso($usuario->id, $act2Id[$accion], $nivel)->consulta;
         if ($tipo==Permisos::$MODIFICA) return $this->validarPermiso($usuario->id, $act2Id[$accion], $nivel)->modificacion;
         return false;
     }
     function validarPermiso ($idUsuario = 0, $idAccion=0, $nivel=1, $resetPermisos=false) {
-        static $upObj=null;
         static $perfiles=[];
         static $values=[];
 
         if ($resetPermisos) {
             if (empty($idUsuario)) {
-                $upObj=null;
                 $perfiles=[];
                 $values=[];
             } else {
@@ -62,12 +55,7 @@ class Permisos extends DBObject {
         if ($idAccion==0) return false;
         if (empty($values[$idUsuario][$idAccion])) {
             if (empty($perfiles[$idUsuario])) {
-                if($upObj==null) {
-                    require_once "clases/Usuarios_Perfiles.php";
-                    $upObj = new Usuarios_Perfiles();
-                    $upObj->rows_per_page=0;
-                }
-                $upData = $upObj->getData("idUsuario='$idUsuario'");
+                $upData = dao('up', ['rows_per_page'=>0])->getData("idUsuario='$idUsuario'");
                 if (empty($upData)) return (object) array("consulta" => false, "modificacion" => false);
                 $perfiles[$idUsuario] = "";
                 foreach($upData as $upRow) {

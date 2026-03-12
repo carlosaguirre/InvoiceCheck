@@ -5,7 +5,6 @@ if (!validaPerfil("Administrador")&&!validaPerfil("Sistemas")) {
     exit;
 }
 
-$monthNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 //echo "SOLICITUD RECIBIDA";
 $tgtPath="C:\\InvoiceCheckShare\\RESPALDO\\";
 $codePath="C:\\Apache24\\htdocs\\invoice";
@@ -87,7 +86,6 @@ function backupSort($path1, $path2) {
     return ($chunk1<=$chunk2)?1:-1; // Para cambiar sentido invertir valor positivo y negativo
 }
 function echoList($filelist, $path, $timeStart, $ftype) {
-    global $monthNames;
     //echo "[";
     $jsonArr=["result"=>"success","data"=>[]];
     $isFirst=true;
@@ -119,7 +117,7 @@ function echoList($filelist, $path, $timeStart, $ftype) {
             $yearText=substr($fileName, $timeStart, 4);
             $monthTxt=substr($fileName, $timeStart+4, 2);
             $monthIdx=(+$monthTxt)-1;
-            $monthName=$monthNames[$monthIdx];
+            $monthName=ucfirst(mesesMexico()[$monthIdx]);
             $dateText=substr($fileName, $timeStart+6, 2);
             $hourText=substr($fileName, $timeStart+8, 2);
             $minuText=substr($fileName, $timeStart+10, 2);

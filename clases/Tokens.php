@@ -88,16 +88,13 @@ class Tokens extends DBObject {
         return false;
     }
     public static function eligeUsuario($refId,$modulo) {
-        global $tokObj;
-        if (!isset($tokObj))
-            $tokObj=new Tokens();
         sessionInit();
         if (!hasUser()) return false;
         $usrId=getUser()->id;
         // encuentra tokens con refId y modulo indicados y con usos en null o mayor a cero
         // a todos los tokens encontrados con usrId no activo cambiar status a cancelado y si usos no es null restarle 1
         // si uno de esos tokens tiene el usrId activo, cambiar status a ocupado y si usos no es null restarle 1
-        return $tokObj->updateRecord(["status"=>new DBExpression("if(usrId=$usrId,'ocupado','cancelado')"),"usos"=>new DBExpression("if(isnull(usos),null,usos-1)"),"refId"=>$refId,"modulo"=>$modulo],["refId","modulo","usos"=>new DBExpression("(usos is null or usos>0)","REPLACE")]);
+        return dao('tok')->updateRecord(["status"=>new DBExpression("if(usrId=$usrId,'ocupado','cancelado')"),"usos"=>new DBExpression("if(isnull(usos),null,usos-1)"),"refId"=>$refId,"modulo"=>$modulo],["refId","modulo","usos"=>new DBExpression("(usos is null or usos>0)","REPLACE")]);
     }
     function eligeToken($token,$status="ocupado",$repeatable=false,$keepOldUser=false) {
         doclog("eligeToken INI","token",["token"=>$token,"status"=>$status]);
@@ -145,18 +142,13 @@ class Tokens extends DBObject {
                 }
                 if ($isThisToken) {
                     $hasResult=true; // ["refId"=>$tokData["refId"],"modulo"=>$tokData["modulo"],"usrId"=>$tokData["usrId"],"status"=>$status,"usos"=>$usos];
-                    global $prcObj;
-                    if (!isset($prcObj)) {
-                        require_once "clases/Proceso.php";
-                        $prcObj = new Proceso();
-                    }
                     $detalle="ref$tokData[refId]|$tokData[modulo]|usr$tokData[usrId]";
                     if ($tokData["usrId"]!==getUser()->id) {
                         $detalle.="=>".getUser()->id;
                     }
                     if ($status!=="ocupado") $detalle.="|$status";
                     if (isset($usos)) $detalle.="|".$usos;
-                    $prcObj->cambiaToken($tokData["id"], $detalle);
+                    dao('prc')->cambiaToken($tokData["id"], $detalle);
                 }
             }
         } catch (Exception $ex) {
@@ -287,13 +279,7 @@ class Tokens extends DBObject {
             $tokenException=$ex;
         }
         if (!isset($this->data["usrId"][0])) throw new Exception("NoUser");
-        global $usrObj;
-        if (!isset($usrObj)) {
-            require_once "clases/Usuarios.php";
-            $usrObj=new Usuarios();
-        }
-        doclog("validaUsuario 1","token",["data"=>$this->data]);
-        $usrData=$usrObj->getData("id=".$this->data["usrId"]);
+        $usrData=dao('usr')->getData("id=".$this->data["usrId"]);
         if (isset($usrData[0]) && !isset($usrData["nombre"])) $usrData=$usrData[0];
         doclog("validaUsuario 2","token",["data"=>$usrData]);
         if (Tokens::$userUsage===self::USAGE_VALIDATE) {
@@ -318,29 +304,16 @@ class Tokens extends DBObject {
                 global $_project_name;
                 $usr->project_name = $_project_name;
                 if (!isset($usr->cambiaClave)) $usr->cambiaClave=false;
-                if (!isset($upObj)) {
-                    require_once "clases/Usuarios_Perfiles.php";
-                    $upObj = new Usuarios_Perfiles();
-                }
-                $listaPerfilIds = $upObj->getList("idUsuario",$usr->id,"idPerfil");
+                $listaPerfilIds = dao('up')->getList("idUsuario",$usr->id,"idPerfil");
                 if (!empty($listaPerfilIds)) $arrayPerfilIds = explode("|",$listaPerfilIds);
                 if (!empty($arrayPerfilIds)) {
-                    if (!isset($perObj)) {
-                        require_once "clases/Perfiles.php";
-                        $perObj = new Perfiles();
-                    }
-                    $listaPerfiles = $perObj->getList("id",$arrayPerfilIds,"nombre");
+                    $listaPerfiles = dao('per')->getList("id",$arrayPerfilIds,"nombre");
                     if (!empty($listaPerfiles)) $usr->perfiles = explode("|",$listaPerfiles);
                 }
                 doclog("validaUsuario 5","token",["usr"=>$usr]);
                 $_SESSION['user'] = $usr;
                 $_SESSION['tmp'] = "tokenized";
-                global $prcObj;
-                if (!isset($prcObj)) {
-                    require_once "clases/Proceso.php";
-                    $prcObj = new Proceso();
-                }
-                $prcObj->cambioSesion($usr->id, "Inicio", $usr->nombre, "Token: ".$usr->persona);
+                dao('prc')->cambioSesion($usr->id, "Inicio", $usr->nombre, "Token: ".$usr->persona);
                 doclog("validaUsuario newUser","token",["userid"=>$usr->id]);
             }
         } else {
@@ -378,28 +351,15 @@ class Tokens extends DBObject {
             global $_project_name;
             $usr->project_name = $_project_name;
             if (!isset($usr->cambiaClave)) $usr->cambiaClave=false;
-            if (!isset($upObj)) {
-                require_once "clases/Usuarios_Perfiles.php";
-                $upObj = new Usuarios_Perfiles();
-            }
-            $listaPerfilIds = $upObj->getList("idUsuario",$usr->id,"idPerfil");
+            $listaPerfilIds = dao('up')->getList("idUsuario",$usr->id,"idPerfil");
             if (!empty($listaPerfilIds)) $arrayPerfilIds = explode("|",$listaPerfilIds);
             if (!empty($arrayPerfilIds)) {
-                if (!isset($perObj)) {
-                    require_once "clases/Perfiles.php";
-                    $perObj = new Perfiles();
-                }
-                $listaPerfiles = $perObj->getList("id",$arrayPerfilIds,"nombre");
+                $listaPerfiles = dao('per')->getList("id",$arrayPerfilIds,"nombre");
                 if (!empty($listaPerfiles)) $usr->perfiles = explode("|",$listaPerfiles);
             }
             $_SESSION['user'] = $usr;
             $_SESSION['tmp'] = "tokenized";
-            global $prcObj;
-            if (!isset($prcObj)) {
-                require_once "clases/Proceso.php";
-                $prcObj = new Proceso();
-            }
-            $prcObj->cambioSesion($usr->id, "Inicio", $usr->nombre, "Token: ".$usr->persona);
+            dao('prc')->cambioSesion($usr->id, "Inicio", $usr->nombre, "Token: ".$usr->persona);
         }
         if (isset($tokenException)) throw $tokenException;
     }

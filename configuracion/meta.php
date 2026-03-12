@@ -311,12 +311,7 @@ function doclog($content,$filebase=null,$data=null) {
         } else if (!is_writable($logname)) { $failText="Sin permiso de escritura '$logname'";
         } else { $failText="Archivo editable, error desconocido '$logname'"; }
         if ($filebase==="delayedError") {
-            global $logObj;
-            if (!isset($logObj)) {
-                require_once "clases/Logs.php";
-                $logObj=new Logs();
-            }
-            $logObj->agrega($userid, "DOCLOG", $failText.": ".$text);
+            dao('log')->agrega($userid, "DOCLOG", $failText.": ".$text);
             return;
         }
         if (!isset($data["doclogDelay"])) $data["doclogDelay"]=1;
@@ -376,9 +371,18 @@ function doclog($content,$filebase=null,$data=null) {
     }
 }
 class DocLogException extends Exception {
-    public function _construct($message, $data) {
-        parent::__construct($message);
-        doclog($message,"error",$data);
+    public function __construct($message = "", $data = [], $code = 0, ?Throwable $previous = null) {
+        if (is_int($data) && $code===0) {
+            $code=$data;
+            $data=[];
+        } else if (!is_array($data)) {
+            $data=["value"=>$data];
+        }
+        parent::__construct($message, $code, $previous);
+        if ($data) {
+            require_once "configuracion/error.php";
+            doclog($message,"error",$data+($code?["code"=>$code]:[])+($previous?["previous"=>getErrorData($previous)]:[]));
+        }
     }
 }
 function isWorkingDate($from) {
@@ -452,11 +456,103 @@ function getDBDatePrefix($from) { // "2022/10"=>
     $month = -1+substr($from, 5, 2); // 01234 56 => "10" => 9
     return $year.$mC[$month]; // 22O
 } // Abril,BC,Diciembre,Enero,Febrero,aGosto,HI,Junio,K,juLio,Marzo,Noviembre,Octubre,PQR,Septiembre,TUVWX,maYo,Z
+function mesesMexico($abbreviated=false, $indexStart=0) {
+    static $cache=[];
+    $cacheKey=($abbreviated?"corto":"largo")."_".$indexStart;
+    if (isset($cache[$cacheKey])) return $cache[$cacheKey];
+    
+    $mesesLargo=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+    $mesesCorto=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+    
+    $result=$abbreviated?$mesesCorto:$mesesLargo;
+    if ($indexStart!==0) {
+        $reindexed=[];
+        foreach($result as $idx=>$mes) {
+            $reindexed[$idx+$indexStart]=$mes;
+        }
+        $result=$reindexed;
+    }
+    $cache[$cacheKey]=$result;
+    return $result;
+}
 function getMonthNumber($monthname) {
-    static $monthList=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
-    $key=array_search(strtolower($monthname), $monthList);
+    $key=array_search(strtolower($monthname), mesesMexico());
     if ($key===false) return false;
     return substr(("00".(1+$key)), -2);
+}
+function fechaHoraMexico($datetime) {
+    if (!($datetime instanceof DateTime)) $datetime=new DateTime($datetime);
+    $datetime=(clone $datetime);
+    $datetime->setTimezone(new DateTimeZone("Etc/GMT+6"));
+    $hora=$datetime->format("g:ia");
+    $meses=mesesMexico(false, 1);
+    $dia=(int)$datetime->format("j");
+    $mes=(int)$datetime->format("n");
+    $anio=$datetime->format("Y");
+    $fecha=$dia." de ".$meses[$mes]." del ".$anio;
+    return $fecha." ".$hora;
+}
+function fechaBdAHumana($dbDate) { // fechaBD="YYYY-MM-DD HH:MM:SS" => "DD de MMMM del YYYY a las H:MMpm"
+    if (!isset($dbDate[9])) return $dbDate;
+    $year=substr($dbDate,0,4);
+    $month=+substr($dbDate,5,2);
+    $day=+substr($dbDate,8,2);
+    if (!isset($dbDate[15])) {
+        if ($month>12) {
+            $month--; // Se resta 1 para cambiar rango 1-12 a 0-11 para calculos
+            $year+=floor($month/12);
+            $month = ($month%12)+1; // Se suma 1 para volver al rango 1-12
+        }
+        while($day>(+date("t", strtotime("$year-$month-01")))) {
+            $day-=(+date("t", strtotime("$year-$month-01")));
+            $month++;
+            if ($month>12) {
+                $month=1;
+                $year++;
+            }
+        }
+        $meses=mesesMexico();
+        if (!isset($meses[+$month-1])) return $dbDate;
+        $mes=$meses[+$month-1];
+        return "$day de $mes del $year";
+    }
+    $hora=+substr($dbDate,11,2);
+    $minutos=substr($dbDate,14,2);
+    $segundos=isset($dbDate[17])?+substr($dbDate,17,2):0;
+    if ($segundos>=60) {
+        $minutos+=floor($segundos/60);
+        $segundos%=60;
+    }
+    if ($minutos>=60) {
+        $hora+=floor($minutos/60);
+        $minutos%=60;
+    }
+    if ($hora>=24) {
+        $day+=floor($hora/24);
+        $hora%=24;
+    }
+    $meridiano="am";
+    if ($hora>12) {
+        $hora-=12;
+        $meridiano="pm";
+    }
+    if ($month>12) {
+        $month--; // Se resta 1 para cambiar rango 1-12 a 0-11 para calculos
+        $year+=floor($month/12);
+        $month = ($month%12)+1; // Se suma 1 para volver al rango 1-12
+    }
+    while($day>(+date("t", strtotime("$year-$month-01")))) {
+        $day-=(+date("t", strtotime("$year-$month-01")));
+        $month++;
+        if ($month>12) {
+            $month=1;
+            $year++;
+        }
+    }
+    $meses=mesesMexico();
+    if (!isset($meses[+$month-1])) return $dbDate;
+    $mes=$meses[+$month-1];
+    return "$day de $mes del $year, a las $hora:$minutos$meridiano";
 }
 function formatTwoFractionDigits($number) {
     static $fmt2fd=null;
@@ -784,8 +880,7 @@ function modificacionValida($accion,$nivel=1) {
     return validaPermiso($accion,Permisos::$MODIFICA,$nivel);
 }
 function validaPermiso($accion,$tipo,$nivel=1) {
-    static $prmObj = null;
-    require_once "clases/Permisos.php";
+    $prmObj = dao('prm');
     if ($nivel<1) return false;
     $esConsulta = $tipo==Permisos::$CONSULTA;
     $esModifica = $tipo==Permisos::$MODIFICA;
@@ -801,9 +896,6 @@ function validaPermiso($accion,$tipo,$nivel=1) {
             $user->permisos[$accion] = array();
         }
         if (!isset($user->permisos[$accion][$tp])) {
-            if ($prmObj==null) {
-                $prmObj = new Permisos();
-            }
             if ($esConsulta) $user->permisos[$accion][$tp] = ($prmObj->consultaValida($user, $accion, 1)?"SI":"NO");
             else if ($esModifica) $user->permisos[$accion][$tp] = ($prmObj->modificacionValida($user, $accion, 1)?"SI":"NO");
         }
@@ -862,30 +954,14 @@ function getPerfiles() {
     return [];
 }
 function getMailAddressesByProfile($prfName,$grpId=false) {
-    global $prfObj, $upObj, $ugObj, $usrObj;
-    if (!isset($prfObj)) {
-        require_once "clases/Perfiles.php";
-        $prfObj=new Perfiles();
-    }
-    $prfId=$prfObj->getIdByName($prfName);
+    $prfId=dao('prf')->getIdByName($prfName);
     if ($grpId) {
-        if (!isset($ugObj)) {
-            require_once "clases/Usuarios_Grupo.php";
-            $ugObj=new Usuarios_Grupo();
-        }
-        $usrIds=$ugObj->getIdUsers($prfId,$grpId);
+        $usrIds=dao('ug')->getIdUsers($prfId,$grpId);
     } else {
-        if (!isset($upObj)) {
-            require_once "clases/Usuarios_Perfiles.php";
-            $upObj=new Usuarios_Perfiles();
-        }
-        $usrIds=$upObj->getIdUsers($prfId);
+        $usrIds=dao('up')->getIdUsers($prfId);
     }
     if (!isset($usrIds[0])) return [];
-    if (!isset($usrObj)) {
-        require_once "clases/Usuarios.php";
-        $usrObj=new Usuarios();
-    }
+    $usrObj=dao('usr');
     $usrData=$usrObj->getData($usrObj->getQueryExpression("id",$usrIds,"WHERE")."email is not null group by email",0,"email address,persona name");
     return $usrData;
 }
@@ -1461,36 +1537,26 @@ function getDomainMap($addressList) {
     return $map;
 }
 function getMailHourCount($domain) {
-    global $infObj;
     static $hours=5;
-    if (!isset($infObj)) {
-        require_once "clases/InfoLocal.php";
-        $infObj=new InfoLocal();
-    }
     $dt = new DateTime();
     $curr=$dt->format("ymdH");
     $hr=substr($curr,-2);
     doclog("check current time","mail",["domain"=>$domain,"ymdH"=>$curr]);
     $dt->modify("-$hours hours");
     $lastFull=$dt->format("Y-m-d H:i:s");
+    $infObj = dao('inf');
     $val = $infObj->getVal("mail_hour_key");
     doclog("modify -$hours hours","mail",["domain"=>$domain,"ymdH"=>$dt->format("ymdH"),"mail_hour_key"=>$val]);
     if ($val<$curr) {
         $infObj->delVal("mail_hour_count%",$lastFull);
         $infObj->setVal("mail_hour_key",$curr);
     }
-    
     return $infObj->getVal("mail_hour_count_$domain{$hr}")??0;
 }
 function addMailHourCount($domain,$num=1) {
-    global $infObj;
-    if (!isset($infObj)) {
-        require_once "clases/InfoLocal.php";
-        $infObj=new InfoLocal();
-    }
     $dt = new DateTime();
     $hr=$dt->format("H");
-    $infObj->incVal("mail_hour_count_$domain{$hr}",$num);
+    dao('inf')->incVal("mail_hour_count_$domain{$hr}",$num);
     doclog("incVal","mail",["domain"=>$domain,"hr"=>$hr,"num"=>$num]);
 }
 function sendMail($asunto,$mensaje,$from,$to,$cc=null,$bcc=null,$data=null) {

@@ -283,12 +283,7 @@ class Facturas extends DBObject {
     public static function estaRecPago($statusN) { return ($statusN<128) && ($statusN & 64); }
     public static function estaRechazado($statusN) { return ($statusN>=128); /*($statusN & 128);*/ }
     public static function tieneSolicitud($factId) {
-        global $solObj;
-        if (!isset($solObj)) {
-            require_once "clases/SolicitudPago.php";
-            $solObj=new SolicitudPago();
-        }
-        return $solObj->exists("idFactura=$factId");
+        return dao('sol')->exists("idFactura=$factId");
     }
 
 
@@ -374,16 +369,14 @@ class Facturas extends DBObject {
         return $status;
     }
     function getExportContent($ids) { // List of invoice IDs, comma separated
-        $arr = export(",",$ids);
+        $ids=trim($ids);
+        if (empty($ids)) return "";
+        $arr = explode(",",$ids);
         $num = count($arr);
-        if ($num<=0) return "";
         if ($num==1) $where = "id=$ids";
         else $where = "id in ($ids)";
         
         $this->rows_per_page=0;
-        // require_once "clases/Conceptos.php";
-        // $cptObj = new Conceptos();
-        // $cptObj->rows_per_page  = 0;
         
         $fData = $this->getData($where);
         foreach($fData as $fRow) {
@@ -458,7 +451,7 @@ class Facturas extends DBObject {
     }
     function reparaXML($filename) {
         require_once "clases/CFDI.php";
-        return CFDI::reparaXML(getBasePath().$filename);
+        return CFDI::reparaXML(getBasePath().$filename, $filename, $log);
     }
     function altaTempBlock($result,$message=null,$ubicacion=null,$xmlname=null,$pdfname=null,$id=null,$cfdiObj=null,$extra=[]) {
         $block=["result"=>$result];
@@ -495,8 +488,7 @@ class Facturas extends DBObject {
         return $this->altaTempBlock("error",$errStk,$ubicacion,$xmlname,$pdfname,null,$cfdiObj,$extra);
     }
     function cargaConceptos($invId, $cfdiObj=null) {
-        require_once("clases/Conceptos.php");
-        $cptObj=new Conceptos();
+        $cptObj=dao('cpt');
         if ($cptObj->exists("idFactura=$invId")) throw new Exception("La factura ya tiene conceptos");
         $invData=$this->getData("id=$invId");
         if (!isset($invData[0])) throw new Exception("No se encontró la factura con id $invId");
@@ -563,14 +555,9 @@ class Facturas extends DBObject {
     private function validaUsuario($data) {
         if (!validaPerfil(["Administrador","Sistemas"])) {
             if (!validaPerfil(["Compras","Alta Facturas"])) throw new Exception("No tiene permiso para dar de alta Facturas");
-            global $ugObj,$perObj;
-            if (!isset($ugObj)) {
-                require_once "clases/Usuarios_grupo.php";
-                $ugObj=new Usuarios_Grupo();
-            }
             $idGrupo=$data["idGrupo"];
             $alias=$data["aliasGrupo"]??"Empresa $idGrupo";
-            if(!$ugObj->isRelatedByPerfil(getUser(),$idGrupo,"Compras","vista")) throw new Exception("No tiene permiso para dar de alta facturas de $alias");
+            if(!dao('ug')->isRelatedByPerfil(getUser(),$idGrupo,"Compras","vista")) throw new Exception("No tiene permiso para dar de alta facturas de $alias");
         }
     }
     function transferTries($filename, $filesize, $tries=10, $docname="altaMasiva") {
@@ -637,10 +624,7 @@ class Facturas extends DBObject {
         return $result;
     }
     function resumenDeAltaMasiva() {
-        require_once "clases/Grupo.php";
-        $gpoObj = new Grupo();
-        $gpoObj->rows_per_page=0;
-        $validRfcList=array_column($gpoObj->getData(false,0,"rfc"), "rfc");
+        $validRfcList=array_column(dao('gpo')->getData(false,0,"rfc"), "rfc");
 
         require_once "clases/FTP.php";
         $ftpObj = MIFTP::newInstanceFacturas();
@@ -691,10 +675,7 @@ class Facturas extends DBObject {
         if (isset($datePath[0])) {
             if ($datePath[0]!=="/") $datePath="/".$datePath;
         } else $datePath="";
-        require_once "clases/Grupo.php";
-        $gpoObj = new Grupo();
-        $gpoObj->rows_per_page=0;
-        $validRfcList=array_column($gpoObj->getData(false,0,"concat('/',rfc) drfc"), "drfc");
+        $validRfcList=array_column(dao('gpo', ['rows_per_page'=>0])->getData(false,0,"concat('/',rfc) drfc"), "drfc");
         require_once "clases/FTP.php";
         $ftpObj = MIFTP::newInstanceFacturas();
         if (!isset($ftpObj)) {
@@ -738,10 +719,7 @@ class Facturas extends DBObject {
         if (isset($datePath[0])) {
             if ($datePath[0]!=="/") $datePath="/".$datePath;
         } else $datePath="";
-        require_once "clases/Grupo.php";
-        $gpoObj = new Grupo();
-        $gpoObj->rows_per_page=0;
-        $validRfcList=array_column($gpoObj->getData(false,0,"concat('/',rfc) drfc"), "drfc");
+        $validRfcList=array_column(dao('gpo', ['rows_per_page'=>0])->getData(false,0,"concat('/',rfc) drfc"), "drfc");
         require_once "clases/FTP.php";
         $ftpObj = MIFTP::newInstanceFacturas();
         if (!isset($ftpObj)) {
@@ -765,11 +743,6 @@ class Facturas extends DBObject {
         }
         $rawfiles = $ftpObj->list($xmlPath,1,false);
         $sum=0;
-        global $prcObj;
-        if (!isset($prcObj)) {
-            require_once "clases/Proceso.php";
-            $prcObj=new Proceso();
-        }
         if (isset($rawfiles[0])) foreach($rawfiles as $rawfile) {
             $info = preg_split("/[\s]+/", $rawfile, 4);
             $filename=$info[3];
@@ -792,13 +765,13 @@ class Facturas extends DBObject {
                     $block=$this->altaAutomatica($ftpObj, $xmlFile, $pdfFile, $pdfFile2??null);
                     if (isset($block["result"])) {
                         if ($block["result"]==="success") {
-                            $prcObj->anotaAltaMasiva($block["id"], "ACCEPTED", "{$dateTag}|{$onlyName}", "SISTEMAS");
+                            dao('prc')->anotaAltaMasiva($block["id"], "ACCEPTED", "{$dateTag}|{$onlyName}", "SISTEMAS");
                             $sum++;
                         } else if ($block["result"]==="error") {
                             doclog("ALTA TEMPORAL CON ERROR","altaMasivaError",$block);
                             if (!isset($block["message"])) $block["message"]="SIN MENSAJE. CODIGO $block[code]";
                             global $query;
-                            $prcObj->anotaAltaMasiva($block["id"]??null, "REJECTED", "{$dateTag}|{$onlyName}|$block[message]", "SISTEMAS");
+                            dao('prc')->anotaAltaMasiva($block["id"]??null, "REJECTED", "{$dateTag}|{$onlyName}|$block[message]", "SISTEMAS");
                             doclog("ANOTA ALTA TEMPORAL EN PROCESO","altaMasivaError",["id"=>$block["id"]??null, "dateTag"=>$dateTag, "onlyName"=>$onlyName, "message"=>$block["message"], "query"=>$query, "error"=>DBi::getError(), "errno"=>DBi::getErrno()]);
                             if (!isset($block["code"]) || !in_array($block["code"], [static::ERROR_AUTO_NOCFDI, static::ERROR_AUTO_NOCFDI2, static::ERROR_AUTO_ERRCFDI, static::ERROR_AUTO_ERRCFDI2, static::ERROR_AUTO_NOCLI, static::ERROR_AUTO_NOPRV, static::ERROR_AUTO_NOPRV2, static::ERROR_AUTO_NOSRV, static::ERROR_AUTO_NOSAT, static::ERROR_AUTO_NOSAT2, static::ERROR_AUTO_SATN602, static::ERROR_AUTO_DB, static::ERROR_AUTO_UNKNOWN])) {
                                 doclog("MOVER A REJECTED","altaMasivaError",["xml"=>$xmlFile,"pdf"=>$pdfFile??null,"code"=>$block["code"]??null]);
@@ -832,18 +805,18 @@ class Facturas extends DBObject {
                             // ToDo: Revisar si se prefiere que no se muevan los archivos cuando el proveedor no ha sido dado de alta o si no es servicio, para corregirlos y volver a subirlos
                         } else {
                             doclog("BLOQUE CON RESULTADO NO CONTEMPLADO","altaMasivaError",$block);
-                            $prcObj->anotaAltaMasiva($block["id"]??null, "IGNORED", "{$dateTag}|{$onlyName}|$block[message]", "SISTEMAS");
+                            dao('prc')->anotaAltaMasiva($block["id"]??null, "IGNORED", "{$dateTag}|{$onlyName}|$block[message]", "SISTEMAS");
                         }
                     } else {
                         doclog("ALTA TEMPORAL DESCONOCIDA","altaMasivaError",$block);
-                        $prcObj->anotaAltaMasiva(null, "IGNORED", "{$dateTag}|{$onlyName}|".($block["message"]??"SIN PROCESAR"), "SISTEMAS");
+                        dao('prc')->anotaAltaMasiva(null, "IGNORED", "{$dateTag}|{$onlyName}|".($block["message"]??"SIN PROCESAR"), "SISTEMAS");
                     }
                 } catch (Exception $exR) {
                     $errblk=getErrorData($exR);
                     $errCode=$errblk["code"]??"";
                     if ($errCode==CFDI::EXCEPTION_VAL_UUID_EXISTS) {
                         //doclog("ALTA AUTOMATICA DESCARTADA","altaMasivaError",["ftpPath"=>$xmlPath,"name"=>$filename, "error"=>$errblk]);
-                        $prcObj->anotaAltaMasiva(CFDI::getLastError()["id"], "DISCARDED", "{$dateTag}|{$onlyName}|$errblk[message]", "SISTEMAS");
+                        dao('prc')->anotaAltaMasiva(CFDI::getLastError()["id"], "DISCARDED", "{$dateTag}|{$onlyName}|$errblk[message]", "SISTEMAS");
                     } else {
                         doclog("ALTA AUTOMATICA FALLIDA","altaMasivaError",["ftpPath"=>$xmlPath,"name"=>$filename, "error"=>$errblk]);
                         if (!is_string($errCode)) $errCode="$errCode";
@@ -861,7 +834,7 @@ class Facturas extends DBObject {
                         if ($ptIdx!==false) {
                             $errmsg=substr($errmsg, 0, $ptIdx).substr($errmsg, $ptIdx+3);
                         }
-                        $prcObj->anotaAltaMasiva(null, "FAILED", "{$dateTag}|{$onlyName}|ERROR {$errCode}: $errmsg", "SISTEMAS");
+                        dao('prc')->anotaAltaMasiva(null, "FAILED", "{$dateTag}|{$onlyName}|ERROR {$errCode}: $errmsg", "SISTEMAS");
                     }
                 }
             }
@@ -999,16 +972,17 @@ class Facturas extends DBObject {
             }
             $rptaBD=$this->consultaBase($uuid);
             $rutaBase=$_SERVER['DOCUMENT_ROOT'];
-            if ($rptaBD!==false && $rptaBD["status"]==="Temporal") { $id=$rptaBD["id"]; $statusn=$rptaBD["statusn"]??"";
+            if ($rptaBD!==false && $rptaBD["status"]==="Temporal") {
+                $id=$rptaBD["id"];
+                $statusn=$rptaBD["statusn"]??"";
                 //if (isset($statusn[0])){$returnBlock=$this->altaTempError("La factura ya está registrada",$ubicacion,null,null,$cfdiObj); return $returnBlock;}
-                global $solObj; if (!isset($solObj)) { require_once "clases/SolicitudPago.php"; $solObj=new SolicitudPago(); }
-                $solData=$solObj->getData("idFactura=".$rptaBD["id"]);
+                $solData=dao('sol')->getData("idFactura=".$rptaBD["id"]);
                 if (isset($solData[0])&&$solData[0]["status"]<SolicitudPago::STATUS_CANCELADA) {
                     $returnBlock=$this->altaTempError("Ya existe una solicitud con esta factura",$ubicacion,null,null,$cfdiObj,["code"=>static::ERROR_AUTO_HASSOL]);
                     return $returnBlock;
                 }
                 //if ($status==="Temporal") {
-                    $this->deleteRecord(["id"=>$rptaBD["id"]]);
+                    $this->deleteRecord(["id"=>$id]);
                     $xmlFullName=$rutaBase.$rptaBD["ubicacion"].$rptaBD["nombreInterno"].".xml";
                     $pdfFullName=isset($rptaBD["nombreInternoPDF"][0])?$rutaBase.$rptaBD["ubicacion"].$rptaBD["nombreInternoPDF"].".pdf":"";
                     if (isset($xmlFullName[0]) && file_exists($xmlFullName)) {
@@ -1051,7 +1025,7 @@ class Facturas extends DBObject {
             }
 
             if ($rptaBD===false && file_exists($xmlFullName)) {
-                $serieData=$this->getData("nombreInterno='$xmlbdname' and ubicacion='$ubicacion'",0,"id,serie,statusn");
+                $serieData=$this->getData("nombreInterno='$xmlbdname' and ubicacion='$ubicacion'",0,"id,serie,status,statusn");
                 if (isset($serieData[0])) {
                     $serieData=$serieData[0];
                     $serieBD=$serieData["serie"];
@@ -1082,14 +1056,13 @@ class Facturas extends DBObject {
                             $sst=$serieData["status"]??"";
                             $sstnn=$serieData["statusn"]??"";
                             if (isset($sstnn[0])) $this->altaTempError("Ya existe una factura con los mismos últimos 10 dígitos de serie-folio",$ubicacion,null,null,$cfdiObj);
-                            global $solObj; if (!isset($solObj)) { require_once "clases/SolicitudPago.php"; $solObj=new SolicitudPago(); }
-                            $solData=$solObj->getData("idFactura=".$rptaBD["id"]);
+                            $solData=dao('sol')->getData("idFactura=".$serieData["id"]);
                             if (isset($solData[0])&&$solData[0]["status"]<SolicitudPago::STATUS_CANCELADA) {
                                 $returnBlock=$this->altaTempError("Ya existe una solicitud para esta factura",$ubicacion,null,null,$cfdiObj,["code"=>static::ERROR_AUTO_HASSOL2]);
                                 return $returnBlock;
                             }
                             if ($sst!=="Temporal") throw new Exception("Factura con status inválido",static::ERROR_AUTO_BADSTT);
-                            $this->deleteRecord(["id"=>$rptaBD["id"]]);
+                            $this->deleteRecord(["id"=>$serieData["id"]]);
                         }
                     }
                 }
@@ -1247,12 +1220,7 @@ class Facturas extends DBObject {
                 return $returnBlock;
             }
             $invId = $this->lastId;
-            global $prcObj;
-            if (!isset($prcObj)) {
-                require_once "clases/Proceso.php";
-                $prcObj=new Proceso();
-            }
-            $prcObj->cambioFactura($invId, "Pendiente", getUser()->nombre, $ahora, "AltaAutomatica");
+            dao('prc')->cambioFactura($invId, "Pendiente", getUser()->nombre, $ahora, "AltaAutomatica");
             
             rename($xmlLocalPath, $xmlFullName);
             chmod($xmlFullName,0764);
@@ -1438,12 +1406,7 @@ class Facturas extends DBObject {
             $rptaBD = $this->consultaBase($uuid);
             //DBi::query("SELECT 'RPTACHK1' as test");
             if ($rptaBD) {
-                global $solObj;
-                if (!isset($solObj)) {
-                    require_once "clases/SolicitudPago.php";
-                    $solObj=new SolicitudPago();
-                }
-                $solData=$solObj->getData("idFactura=".$rptaBD["id"]);
+                $solData=dao('sol')->getData("idFactura=".$rptaBD["id"]);
                 if (isset($solData[0])) return $this->altaTempError("Ya existe una solicitud para esta factura",$ubicacion,null,null,$cfdiObj);
                 if ($rptaBD["status"]==="Temporal") {
                     $this->deleteRecord(["id"=>$rptaBD["id"]]);
@@ -1598,12 +1561,7 @@ class Facturas extends DBObject {
             return $this->altaTempError("El comprobante no pudo guardarse",$ubicacion,null,null,$cfdiObj); // throw new Exception("El comprobante no pudo guardarse");
         }
         //DBi::query("SELECT 'DONE7' as test");
-        global $prcObj;
-        if (!isset($prcObj)) {
-            require_once "clases/Proceso.php";
-            $prcObj=new Proceso();
-        }
-        $prcObj->cambioFactura($this->lastId, "Temporal", getUser()->nombre, $ahora, "altafacturaSP");
+        dao('prc')->cambioFactura($this->lastId, "Temporal", getUser()->nombre, $ahora, "altafacturaSP");
 
         // Verificar y establecer permisos de directorio
         $rutaDeCarga=$rutaBase.$ubicacion;

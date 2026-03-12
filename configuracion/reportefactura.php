@@ -14,9 +14,6 @@ if (!$consultaProc) {
 clog2ini("configuracion.reportefactura");
 clog1seq(1);
 
-require_once "clases/Grupo.php";
-require_once "clases/Proveedores.php";
-
 /* 
 unset($_SESSION['gpoRazSocOpt']);
 unset($_SESSION['gpoCodigoOpt']);
@@ -32,25 +29,15 @@ $esGestor = validaPerfil("Gestor");
 $esRevision = validaPerfil("Revision");
 $esAltaFactura = validaPerfil("Alta Factura");
 
-global $gpoObj;
-if (!isset($gpoObj)) {
-    require_once "clases/Grupo.php";
-    $gpoObj = new Grupo();
-}
-//$gpoFullMapWhere = $gpoObj->setOptSessions($_esCompras?"Compras":($_esComprasB?"Compras Basico":""),true);
-$gpoFullMapWhere = $gpoObj->setOptSessions($_esComprasB&&!$_esCompras?"Compras Basico":"Compras",true);
+//$gpoFullMapWhere = dao("gpo")->setOptSessions($_esCompras?"Compras":($_esComprasB?"Compras Basico":""),true);
+$gpoFullMapWhere = dao("gpo")->setOptSessions($_esComprasB&&!$_esCompras?"Compras Basico":"Compras",true);
 clog2("GPO WHERE: $gpoFullMapWhere");
 $gpoRazSocOpt = $_SESSION['gpoRazSocOpt']??[];
 $gpoCodigoOpt = $_SESSION['gpoCodigoOpt']??[];
 $gpoRFCOpt = $_SESSION['gpoRFCOpt']??[];
 $esCompras=isset($gpoFullMapWhere[0])&&!$_esProveedor;
 
-global $prvObj;
-if(!isset($prvObj)) {
-    require_once "clases/Proveedores.php";
-    $prvObj = new Proveedores();
-}
-$prvFullMapWhere = $prvObj->setOptSessions(true);
+$prvFullMapWhere = dao('prv')->setOptSessions(true);
 clog2("PRV WHERE: $prvFullMapWhere");
 $prvRazSocOpt = $_SESSION['prvRazSocOpt']??[];
 $prvCodigoOpt = $_SESSION['prvCodigoOpt']??[];

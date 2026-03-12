@@ -30,13 +30,9 @@ class AutoUploadInvoice {
         }
     }
     public static function service() {
-        global $_project_name, $usrObj;
+        global $_project_name;
         if (!isset($_project_name[0])) $_project_name="invoice";
-        if(!isset($usrObj)) {
-            require_once "clases/Usuarios.php";
-            $usrObj = new Usuarios();
-        }
-        $usrData = $usrObj->getData("nombre='eventos'",0,"id,nombre,persona,email,banderas");
+        $usrData = dao('usr')->getData("nombre='eventos'",0,"id,nombre,persona,email,banderas");
         if ($usrData) {
             $usr = (object) $usrData[0];
             $usr->project_name = $_project_name;
@@ -228,7 +224,7 @@ class AutoUploadInvoice {
         return $this->errList;
     }
     private function logAutoUploadError($ex, $baseName) {
-        global $autoUploadPath, $autoUploadErrPath, $cmfObj;
+        global $autoUploadPath, $autoUploadErrPath;
         $dt=new DateTime();$dbdt=$dt->format("Y-m-d H:i:s");
         if ($ex instanceof Exception) {
             $erDt=@unserialize($ex->getMessage());
@@ -248,7 +244,6 @@ class AutoUploadInvoice {
         if (!isset($erDt["desc"])) $erDt["desc"]="error desconocido";
         
         $nombreArchivo=basename($baseName); $rutaOrigen=dirname($baseName); $rutaDestino=$rutaOrigen;
-        if (!isset($cmfObj)) { require_once "clases/CargaMF.php"; $cmfObj=new CargaMF(); }
         $erDt["fileName"]=$nombreArchivo;
         $erDt["filePath"]=$rutaOrigen;
         //$erDt["archivoOrigen"]=$baseName;
@@ -264,8 +259,7 @@ class AutoUploadInvoice {
                 $fieldArray["status"]=CargaMF::STATUS_NOPROVEEDOR;
             else if (isset($edd["id"])) {
                 $invId=$edd["id"];
-                global $invObj; if (!isset($invObj)) { require_once "clases/Facturas.php"; $invObj=new Facturas(); }
-                $invData=$invObj->getData("id=$invId",0,"uuid,ubicacion,nombreInterno,nombreInternoPDF");
+                $invData=dao('inv')->getData("id=$invId",0,"uuid,ubicacion,nombreInterno,nombreInternoPDF");
                 if (isset($invData[0])) {
                     $uuid=$invData[0]["uuid"];
                     $ubicacion=$invData[0]["ubicacion"];
@@ -281,7 +275,7 @@ class AutoUploadInvoice {
             unset($erDt["data"]);
             if (isset($fieldArray["datos"][500])) $fieldArray["datos"]=substr($fieldArray["datos"], 0, 500)."..."; // acepta 600 caracteres pero llega a intentar guardar 650 aprox. Con esta validación no debería... parece que no se están sumando las diagonales invertidas \\ pero en mysql si 
         }
-        if (!$cmfObj->saveRecord($fieldArray)) {
+        if (!dao('cmf')->saveRecord($fieldArray)) {
             $erDt["saveCMFError"]="No se pudo guardar registro de error CargaMF";
         }
         if (isset($rutaDestino[0])) {
@@ -342,7 +336,7 @@ class AutoUploadInvoice {
                         $uploadResults[$invIdx]["result"]="saved";
                         $uploadResults["nSvd"]++;
                         // $uploadResults[$invIdx]["data"]=$rtV["xmlObj"]->data; // data is private... instead add only necesary data from xmlObj
-                        if (!$cmfObj->saveRecord($fieldArray)) {
+                        if (!dao('cmf')->saveRecord($fieldArray)) {
                             doclog("AUI: CMF ERROR: No se pudo guardar registro en CargaMF","autoupload");
                         }
                     } else {

@@ -79,7 +79,7 @@ function updateFile(elem) {
     const parameters = {action:"updateTaxStatusProof", inclusiveSeparator:"***", alias:nameEl.value,file:elem.files,gpoId:(optEl?optEl.id.slice(3):-1)};
     console.log("Parameters: ",parameters);
     overlayWheel();
-    progressService("consultas/Archivos<?= $esDesarrollo?"Mul":"" ?>.php",parameters,updatedFile,notUpdatedFile);
+    progressService("consultas/Archivos.php",parameters,updatedFile,notUpdatedFile);
 }
 <?php
     } ?>

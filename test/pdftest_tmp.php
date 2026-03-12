@@ -59,7 +59,7 @@ $factIds=[245178,245201,245226,245227,245228,245508,245824,247364,247365,247366,
         },(errmsg,text,extra)=>{
             console.log('WEBERROR!');
             const pa=extra.parameters;
-            overlayMessage({eName:'P',eText:pa.xmlHttpPost.readyState+'-'+pa.xmlHttpPost.status+': '+errmsg},'WEBERROR');
+            overlayMessage({eName:'P',eText:pa.controller.readyState+'-'+pa.controller.status+': '+errmsg},'WEBERROR');
         });
     }
     function doPrint() {

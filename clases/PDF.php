@@ -77,7 +77,7 @@ class PDF extends BasePDF {
         } else {
             if (!rename($v15Name,$fileName)) {
                 doclog("Falló la degradación de versión silenciosa y renombrado de archivo.","pdferr",["fileName"=>$fileName,"v15Name"=>$v15Name]);
-                throw new Exception("No se reparó el archivo ni se recuperó el original.","pdferr",["fileName"=>$fileName,"v15Name"=>$v15Name]);
+                throw new Exception("No se reparó el archivo ni se recuperó el original.");
             }
             doclog("Falló la degradación de versión silenciosa.","pdferr",["fileName"=>$fileName,"v15Name"=>$v15Name]);
             throw new Exception("No se encontro archivo $fileName");
@@ -120,8 +120,9 @@ class PDF extends BasePDF {
                 $t2X=$imX+$imWid*0.03;
                 $t2Y=$imY+$imHgt*0.47;
                 $this->SetXY($t2X,$t2Y);
-                $this->MultiCell(62,8.8,utf8_decode('                         '.$nameStr),0,'C');
-                //$this->MultiCell(62,8.8,mb_convert_encoding('                         '.$nameStr, 'ISO-8859-1', 'UTF-8'),0,'C');
+                $safeName=@mb_convert_encoding('                         '.$nameStr, 'ISO-8859-1', 'UTF-8');
+                if ($safeName===false) $safeName='                         '.$nameStr;
+                $this->MultiCell(62,8.8,$safeName,0,'C');
             }
         }
     }

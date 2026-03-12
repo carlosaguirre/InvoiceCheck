@@ -14,7 +14,7 @@ $webPath="http://".$_SERVER["HTTP_HOST"]."/docs/tmp/";
     doShowLogs=true;
     function joinFunc(files) {
         document.body.insertBefore(ecrea({eName:"IMG",src:"imagenes/icons/flying.gif",id:"waiting"}),ebyid('overlay'));
-        postService('consultas/ArchivosMul.php', {action:'pdfmerge2',files:files},
+        postService('consultas/Archivos.php', {action:'pdfmerge2',files:files},
             function(t,p,se,ss) {
                 if(se==4&&ss==200&&t.length>0) {
                     console.log('DONE!',p,se,ss);
@@ -45,13 +45,13 @@ $webPath="http://".$_SERVER["HTTP_HOST"]."/docs/tmp/";
             },
             function(em,pa,ev) {
                 console.log('WEBERROR!');
-                overlayMessage({eName:'P',eText:pa.xmlHttpPost.readyState+'-'+pa.xmlHttpPost.status+': '+em},'WEBERROR');
+                overlayMessage({eName:'P',eText:pa.controller.readyState+'-'+pa.controller.status+': '+em},'WEBERROR');
             }
         );
     }
     function breakFunc(files) {
         document.body.insertBefore(ecrea({eName:"IMG",src:"imagenes/icons/flying.gif",id:"waiting"}),ebyid('overlay'));
-        postService('consultas/ArchivosMul.php', {action:'pdfbreak',files:files},
+        postService('consultas/Archivos.php', {action:'pdfbreak',files:files},
             function(t,p,se,ss) {
                 if(se==4&&ss==200&&t.length>0) {
                     console.log('DONE!',p,se,ss);
@@ -85,7 +85,7 @@ $webPath="http://".$_SERVER["HTTP_HOST"]."/docs/tmp/";
             },
             function(em,pa,ev) {
                 console.log('WEBERROR!');
-                overlayMessage({eName:'P',eText:pa.xmlHttpPost.readyState+'-'+pa.xmlHttpPost.status+': '+em},'WEBERROR');
+                overlayMessage({eName:'P',eText:pa.controller.readyState+'-'+pa.controller.status+': '+em},'WEBERROR');
             }
         );
     }

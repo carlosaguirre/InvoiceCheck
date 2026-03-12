@@ -242,9 +242,9 @@ if (isset($_POST["actualizaProveedor"]) && $_POST["actualizaProveedor"]==="falta
                     foreach($output as $op) {
                         if (isset($dateLine[0])&&$autoReject) break; // Se encontraron ambas, dejar de buscar
                         if (!isset($dateLine[0])&&preg_match("/Revisi.+n practicada el d.+a (\d+) de (\w+) de (\d+), a las (\d+):(\d+) horas/",$op, $matches) === 1) {
-                            $meses=["enero"=>"01","febrero"=>"02","marzo"=>"03","abril"=>"04","mayo"=>"05","junio"=>"06","julio"=>"07","agosto"=>"08","septiembre"=>"09","octubre"=>"10","noviembre"=>"11","diciembre"=>"12"];
-                            if(isset($meses[$matches[2]])) {
-                                $dateLine=$matches[3]."-".$meses[$matches[2]]."-".str_pad($matches[1],2,"0",STR_PAD_LEFT);
+                            $monNum = getMonthNumber(monthname: $matches[2]);
+                            if($monNum !== false) {
+                                $dateLine=$matches[3]."-".$monNum."-".str_pad($matches[1],2,"0",STR_PAD_LEFT);
                             }
                         }
                         if(!$autoReject&&preg_match("/su situaci.+n fiscal no se encuentra al corriente/",$op, $matches) === 1) {
@@ -265,9 +265,7 @@ if (isset($_POST["actualizaProveedor"]) && $_POST["actualizaProveedor"]==="falta
         }
         DBi::autocommit(FALSE);
         if ($checkSuccess && $saveUser) {
-            require_once "clases/Usuarios.php";
-            $usrObj = new Usuarios();
-            if (!$usrObj->saveRecord($ufldarr)) {
+            if (!dao('usr')->saveRecord($ufldarr)) {
                 if (!empty(DBi::$errno)) {
                     $checkSuccess=false; $errLog.="|NO SAVE USR";
                     $onloadScript .= "overlayMessage('<p>Error al guardar correo electrónico, consulte a su administrador.</p>','ERROR');ebyid('user_email').focus();";
@@ -292,11 +290,9 @@ if (isset($_POST["actualizaProveedor"]) && $_POST["actualizaProveedor"]==="falta
                     $saveLog.="|satpnd";
                 }
             }
-            require_once "clases/Proveedores.php";
-            $prvObj = new Proveedores();
             if (!$saveProv) {
                 $onloadScript .= "overlayMessage('<p>Es necesario que corrija sus datos.</p>','ERROR');";
-            } else if (!$prvObj->saveRecord($pfldarr)) {
+            } else if (!dao('prv')->saveRecord($pfldarr)) {
                 if (!empty(DBi::$errno)) {
                     $checkSuccess=false; $errLog.="|NO SAVE PRV";
                     $onloadScript .= "overlayMessage('<p>Error al guardar datos de proveedor, consulte a su administrador.</p>','ERROR');";
@@ -331,12 +327,8 @@ if (isset($_POST["actualizaProveedor"]) && $_POST["actualizaProveedor"]==="falta
                     $permiso[]="Valida Opinion";
                 }
                 if (!empty($permiso)) {
-                    if (!isset($usrObj)) {
-                        require_once "clases/Usuarios.php";
-                        $usrObj = new Usuarios();
-                    }
                     global $query;
-                    $emailData=$usrObj->getDataByProfileNames($permiso,"email address,persona name","email is not null group by email,persona");
+                    $emailData=dao('usr')->getDataByProfileNames($permiso,"email address,persona name","email is not null group by email,persona");
                     $emailQuery=$query;
                     //require_once "clases/Correo.php";
                     //$mail=new Correo();
@@ -350,16 +342,11 @@ if (isset($_POST["actualizaProveedor"]) && $_POST["actualizaProveedor"]==="falta
                         //$mail->setSubject($asunto);
                         $mensaje="<html><body>El proveedor {$user->persona} ({$username}) ha actualizado sus documentos y requiere sean verificados.<br>Por favor ingrese al portal para verificar los documentos.</body></html>";
                         //$mail->setBody($mensaje);
-                        global $logObj;
-                        if (!isset($logObj)) {
-                            require_once "clases/Logs.php";
-                            $logObj=new Logs();
-                        }
                         if (sendMail($asunto,$mensaje,null,$emailData,null,null,["domain"=>"default"])) {
-                            $logObj->agrega($systemUserId, "FaltaBanco", "Correo Enviado: {$user->persona} ({$username})");
+                            dao('log')->agrega($systemUserId, "FaltaBanco", "Correo Enviado: {$user->persona} ({$username})");
                         } else {
                             $errLog.="|NO SENT";
-                            $logObj->agrega($systemUserId, "FaltaBanco", "Error en envío: {$user->persona} ({$username})");
+                            dao('log')->agrega($systemUserId, "FaltaBanco", "Error en envío: {$user->persona} ({$username})");
                         }
                         /*try {
                             $mail->send();
@@ -401,8 +388,7 @@ if (isset($_POST["actualizaProveedor"]) && $_POST["actualizaProveedor"]==="falta
 
             $procDetalle = "FaltaBanco".($hasUser?" USR".json_encode($ufldarr):"")." PRV".json_encode($pfldarr);
             $saveLog.="\n".$procDetalle;
-            require_once "clases/Proceso.php";
-            $prcObj = new Proceso();
+            $prcObj = dao('prc');
             if ($prcObj->cambioProveedor($user->proveedor->id, $user->proveedor->status, $username, $procDetalle)) {
                 echo "<!-- PROCESO CAMBIO PROVEEDOR ".$user->proveedor->id.", ".$username.", ".$user->proveedor->status." -->";
                 $saveLog.="\nPROCESO id=".$user->proveedor->id.", nombre=".$username.", status=".$user->proveedor->status;

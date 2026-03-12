@@ -14,11 +14,7 @@ clog2("testVar: $testVar");
 clog2("testEnv: $testEnv");
 clog2("_project_name: $_project_name");
 
-if (!isset($infObj)) {
-    require_once "clases/InfoLocal.php";
-    $infObj = new InfoLocal();
-}
-$infObj->rows_per_page=0;
+$infObj = dao("inf", ["rows_per_page"=>0]);
 
 $infData = $infObj->getData("nombre LIKE 'CFDI_ALLOWP01%' and valor='1'",0,"nombre");
 $allowP01=[];
@@ -53,15 +49,11 @@ clog2("VIEWMYLOG RESULT".($viewMyLog?"(true)":"(false)")."=".json_encode($viewMy
 $editButtonClass="hidden"; // ToDo: Debería estar vacío, pero para evitar equivocaciones se mantendrá oculto, así como el checkbox con disabled.
 // Actualmente la lista contiene a todos los usuarios que no son proveedores, y la busqueda editable siempre estará vacía pues solo se despliegan los usuarios no proveedores que no estén en la lista.
 $lastMonthClass="";
+$usrObj = dao("usr", ["rows_per_page"=>0]);
 if (!$allowLastMonth) {
     $editButton=" <img id=\"editButton\" src=\"imagenes/icons/rename12.png\" class=\"pointer\" onclick=\"showFilterLine(event);\">";
     if ($infData[0]["valor"]!=="0") {
         $usrIdList=explode(",", $infData[0]["valor"]);
-        if (!isset($usrObj)) {
-            require_once "clases/Usuarios.php";
-            $usrObj=new Usuarios();
-        }
-        $usrObj->rows_per_page=0;
         $usrData=$usrObj->getData("id in (".$infData[0]["valor"].")",0,"id,nombre,persona");
         clog2("USRDATA LENGTH = ".count($usrData));
         if (isset($usrData[0])) foreach ($usrData as $idx => $usrItem) {
@@ -72,9 +64,7 @@ if (!$allowLastMonth) {
     $editButtonClass=" hidden";
     $lastMonthClass=" hidden";
 }
-global $usrObj;
-if (!isset($usrObj)) { require_once "clases/Usuarios.php"; $usrObj=new Usuarios(); }
-$usrObj->rows_per_page=0;
+$usrObj->clearOrder();
 $usrObj->addOrder("nombre");
 
 $lstP01="";

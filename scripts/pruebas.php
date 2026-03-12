@@ -15,7 +15,7 @@ function massTest() {
     ekfil("result");
     const res=ebyid("result");
     const smm=ebyid("summary");
-    progressService("consultas/ArchivosMul.php",{action:"massReqTest",inclusiveSeparator:"###"},(j,e)=>{ // rdyFunc
+    progressService("consultas/Archivos.php",{action:"massReqTest",inclusiveSeparator:"###"},(j,e)=>{ // rdyFunc
         let rowCount = res.querySelectorAll('TR').length;
         if (j.message!=="fullend") { massNum++; rowCount++; }
         const resTxt=JSON.stringify(j,jsonCircularReplacer());

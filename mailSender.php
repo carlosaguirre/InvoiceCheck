@@ -33,10 +33,9 @@ if (!empty($reqValName))
     $addressName = explode(",",$reqValName);
 
 $reqValUsers = reqVal("users");
+$usrObj = dao('usr');
 if (!empty($reqValUsers)) {
     $addressUsers = explode(",",$reqValUsers);
-    require_once "clases/Usuarios.php";
-    $usrObj = new Usuarios();
     $emailPipeList = $usrObj->getValue("nombre", $addressUsers, "email", false, false, true);
     $personaPipeList = $usrObj->getValue("nombre", $addressUsers, "persona", false, false, true);
     if (!empty($emailPipeList)) {
@@ -52,10 +51,6 @@ if (!empty($reqValUsers)) {
 
 $reqValTodos = reqVal("todos");
 if(!empty($reqValTodos)) {
-    if (!isset($usrObj)) {
-        require_once "clases/Usuarios.php";
-        $usrObj = new Usuarios();
-    }
     $emailPipeList = $usrObj->getValue(false, false, "email", false, false, true);
     $personaPipeList = $usrObj->getValue(false, false, "persona", false, false, true);
     if (!empty($emailPipeList)) {
@@ -71,16 +66,8 @@ if(!empty($reqValTodos)) {
 $reqValPerfil = reqVal("usrperfil");
 if(!empty($reqValPerfil)) {
     $usrPerfiles = explode(",",$reqValPerfil);
-    require_once "clases/Perfiles.php";
-    $prfObj = new Perfiles();
-    $idPerfilPipeList = $prfObj->getValue("nombre",$usrPerfiles,"id",false,false,true);
-    require_once "clases/Usuarios_Perfiles.php";
-    $upObj = new Usuarios_Perfiles();
-    $idUPPipeList = $upObj->getValue("idPerfil",explode("|",$idPerfilPipeList),"idUsuario",false,false,true);
-    if (!isset($usrObj)) {
-        require_once "clases/Usuarios.php";
-        $usrObj = new Usuarios();
-    }
+    $idPerfilPipeList = dao('prf')->getValue("nombre",$usrPerfiles,"id",false,false,true);
+    $idUPPipeList = dao('up')->getValue("idPerfil",explode("|",$idPerfilPipeList),"idUsuario",false,false,true);
     $addressUserIds = explode("|",$idUPPipeList);
     $emailPipeList = $usrObj->getValue("id", $addressUserIds, "email", false, false, true);
     $personaPipeList = $usrObj->getValue("id", $addressUserIds, "persona", false, false, true);

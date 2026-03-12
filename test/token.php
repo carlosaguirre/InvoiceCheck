@@ -255,7 +255,7 @@ if (!isset($_POST["accion"])) {
                             //ekil(ebyid("resultList"));
                         }
                     } catch (ex) {
-                        console.log("error: ",ex,pars.xmlHttpPost.responseText);
+                        console.log("error: ",ex,pars.controller.responseText);
                         clearUserList();
                         setNoUser();
                     }
