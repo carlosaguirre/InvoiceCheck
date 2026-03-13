@@ -168,12 +168,7 @@ function doCatalogoService() {
                 }
             }
             if (isset($filterFecha[0])) {
-                if (!isset($usrObj)) {
-                    require_once "clases/Usuarios.php";
-                    $usrObj=new Usuarios();
-                }
-                $usrObj->rows_per_page=0;
-                $usrData=$usrObj->getData(false,0,"nombre");
+                $usrData=dao('usr', ["rows_per_page"=>0])->getData(false,0,"nombre");
                 $usrList=array_column($usrData, "nombre");
                 $filePattern=$logsPath."/".$filterFecha."/*.log";
                 $fileList=glob($filePattern);

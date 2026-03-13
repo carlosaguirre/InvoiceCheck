@@ -245,30 +245,40 @@ $maxResults=1500;
 $numResults=0;
 if (is_array($filtros)) {
     $fSeccion=$filtros["filter10"]??[];
-    foreach ($secciones as $key => $data) {
-        if (isset($fSeccion[0])&&!in_array($key, $fSeccion)) continue;
-        $funcname="getNum{$key}F";
-        $fixFiltros=$filtros;
-        if ($key==="SinFactura") {
-            if (!isset($fixFiltros["filter05"][0])) $fixFiltros["filter05"]=[];
-            $fixFiltros["filter05"][]="!I-998";
-            $fixFiltros["filter05"][]="!I-999";
-        } else if ($key==="ImpuestoImportacion") {
-            $hasF05=isset($fixFiltros["filter05"][0]);
-            $hasI998=$hasF05&&in_array("I-998", $fixFiltros["filter05"]);
-            $hasI999=$hasF05&&in_array("I-999", $fixFiltros["filter05"]);
-            if ($hasF05 && !$hasI998 && !$hasI999) continue;
-            $fixFiltros["filter05"]=[];
-            if (!$hasF05||$hasI998) $fixFiltros["filter05"][]="I-998";
-            if (!$hasF05||$hasI999) $fixFiltros["filter05"][]="I-999";
-            $funcname="getNumSinFacturaF";
+    try {
+        foreach ($secciones as $key => $data) {
+            if (isset($fSeccion[0])&&!in_array($key, $fSeccion)) continue;
+            $funcname="getNum{$key}F";
+            $fixFiltros=$filtros;
+            if ($key==="SinFactura") {
+                if (!isset($fixFiltros["filter05"][0])) $fixFiltros["filter05"]=[];
+                $fixFiltros["filter05"][]="!I-998";
+                $fixFiltros["filter05"][]="!I-999";
+            } else if ($key==="ImpuestoImportacion") {
+                $hasF05=isset($fixFiltros["filter05"][0]);
+                $hasI998=$hasF05&&in_array("I-998", $fixFiltros["filter05"]);
+                $hasI999=$hasF05&&in_array("I-999", $fixFiltros["filter05"]);
+                if ($hasF05 && !$hasI998 && !$hasI999) continue;
+                $fixFiltros["filter05"]=[];
+                if (!$hasF05||$hasI998) $fixFiltros["filter05"][]="I-998";
+                if (!$hasF05||$hasI999) $fixFiltros["filter05"][]="I-999";
+                $funcname="getNumSinFacturaF";
+            }
+            $num=$solObj->$funcname($fixFiltros,(($data["empresas"]??"")==="todas")?null:$empresas);
+            if (!is_null($num)) {
+                if (is_numeric($num))
+                    $numResults+= (+$num);
+                else doclog("ConfigListaSolP countResults","solpago",["key"=>$key,"funcname"=>$funcname,"num"=>$num]);
+            }
         }
-        $num=$solObj->$funcname($fixFiltros,(($data["empresas"]??"")==="todas")?null:$empresas);
-        if (!is_null($num)) {
-            if (is_numeric($num))
-                $numResults+= (+$num);
-            else doclog("ConfigListaSolP countResults","solpago",["key"=>$key,"funcname"=>$funcname,"num"=>$num]);
-        }
+    } catch (SessionException $se) {
+        setcookie("menu_accion", "", time() - 3600);
+        setcookie("menu_accion", "", time() - 3600, "/invoice");
+        doclog("ConfigListaSolP SessionException","error",["message"=>$se->getMessage()]);
+        header("Location: /".$_project_name."/");
+        die("Redirecting to /".$_project_name."/");
+    } catch (Exception $ex) {
+        doclog("ConfigListaSolP Exception","error",["message"=>$ex->getMessage()]);
     }
     doclog("ConfigListaSolP secciones","solpago",["filtros"=>array_keys($filtros),"seccionesKeys"=>array_keys($secciones),"numResults"=>$numResults]);
     if ($numResults<=$maxResults) foreach ($secciones as $key => $data) {

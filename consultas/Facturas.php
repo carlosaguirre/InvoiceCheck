@@ -136,7 +136,7 @@ else if (isset($_POST["consultaSAT"])&&isset($_POST["rfcemisor"])&&isset($_POST[
     $idFactura = $_GET["emulaPDF"];
     echo "Factura: $idFactura";
 } else if (isset($_GET["exportar"])) {
-    sessionInit();
+    if (!sessionCheck()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     $username=(isset($_SESSION['user'])?$_SESSION['user']->nombre:null);
     $idFactList = $_GET["exportar"];
     $idFArr = explode(",",$idFactList);
@@ -448,7 +448,7 @@ else if (isset($_POST["consultaSAT"])&&isset($_POST["rfcemisor"])&&isset($_POST[
         $prcObj->cambioFactura($fId, "Exportado", $username, false, "Facturas.Exportado otra vez");
     }
 } else if (isset($_GET["respaldar"])) {
-    sessionInit();
+    if (!sessionCheck()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     $username = (isset($_SESSION['user'])?$_SESSION['user']->nombre:null);
 
     $solObj = dao('sol');
@@ -816,8 +816,11 @@ $logtext .= "\n";
     if (isset($fixResult)) {
         if ($fixResult===TRUE) echo json_encode(["result"=>"success"]);
         else if ($fixResult===FALSE) echo json_encode(["result"=>"failure", "message"=>"No se realizaron cambios"]);
-        else if (isset($fixResult[0])) echo json_encode(["result"=>"failure", "message"=>$fixResult]);
-        else echo json_encode(["result"=>"failure", "message"=>"No se realizaron cambios..."]);
+        else if (is_string($fixResult)) {
+            if (!isset($fixResult[0])) echo json_encode(["result"=>"failure", "message"=>"Error no definido..."]);
+            else if (str_contains($fixResult, "ha expirado")) echo json_encode(["result"=>"refresh", "message"=>$fixResult]);
+            else echo json_encode(["result"=>"failure", "message"=>$fixResult]);
+        } else echo json_encode(["result"=>"failure", "message"=>"No se realizaron cambios...", "value"=>$fixResult]);
     }
 } else {
     echo "<!-- REFRESH -->";
@@ -987,7 +990,7 @@ function testProcesoRoot() {
     flush_buffers(false);
 }
 function cambiaStatus() {
-    sessionInit();
+    if (!sessionCheck()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     if(empty(getUser()->perfiles) || (!in_array("Administrador",getUser()->perfiles) && !in_array("Sistemas",getUser()->perfiles))) {
         errNDie("Accion desconocida",["errmsg"=>"Accion desconocida","perfiles"=>getUser()->perfiles]);
     }
@@ -1429,7 +1432,7 @@ function isESASAPayment() {
 }
 function doESASAPayment() {
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__]+$_POST;
-    sessionInit();
+    if (!sessionCheck()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     if (!hasUser()) {
         echoJsNDie("refresh","Sin sesion");
     }
@@ -1702,7 +1705,7 @@ function isAppendPDFService() {
 }
 function getAppendPDFService() {
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__]+$_POST;
-    sessionInit();
+    if (!sessionCheck()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     $invObj = dao('inv'/*, ["rows_per_page"=>0] */);
     if (isset($_POST["id"]))         $id         = $_POST["id"];
     if (isset($_POST["nombre"]))     $nombre     = $_POST["nombre"];
@@ -1798,7 +1801,7 @@ function isSaveInvoiceInPaymReq() {
 }
 function doSaveInvoiceInPaymReq() {
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__]+$_POST;
-    sessionInit();
+    if (!sessionCheck()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     if (!hasUser()) errNDie("Sin sesion",$baseData+["line"=>__LINE__]);
     global $query;
     $solId=$_POST["solId"]??"";
@@ -1897,8 +1900,7 @@ function isVerifyInv4PaymReq() {
     return "verifyInvoiceForPaymReq"===($_POST["action"]??"");
 }
 function doVerifyInv4PaymReq() {
-    sessionInit();
-    if (!hasUser()) echoJsNDie("refresh","No User");
+    if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__,"usuario"=>getUser()->nombre]+$_POST;
     global $query;
     $solId=$_POST["solId"]??"0";
@@ -1979,8 +1981,7 @@ function isShowAutoUploadService() {
     return "showAutoUpload"===($_POST["action"]??"");
 }
 function doShowAutoUploadService() {
-    sessionInit();
-    if (!hasUser()) echoJsNDie("refresh","No User");
+    if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__]+$_POST;
     doclog("SERVICE: BEGINS", "autoupload", ["line"=>__LINE__]+$baseData);
     // Mostrar filtros: rango de fecha, empresa, folio de cfdi, uuid, tipos de error (tipo, metodo, descripcion y/o datos), status (en proceso, ingresado, ya existe archivo, proveedor no registrado, ya existe confirmado en bd, otro, eliminado)
@@ -1990,8 +1991,7 @@ function isAutoUploadService() {
     return "startAutoUpload"===($_POST["action"]??"");
 }
 function doAutoUploadService() {
-    sessionInit();
-    if (!hasUser()) echoJsNDie("refresh","No User");
+    if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__]+$_POST;
     doclog("SERVICE: BEGINS", "autoupload", ["line"=>__LINE__]+$baseData);
     global $auiObj;
@@ -2026,8 +2026,7 @@ function isAppendInvoiceService() {
     return "findInvoiceForRequest"===($_POST["action"]??"");
 }
 function getAppendInvoiceService() {
-    sessionInit();
-    if (!hasUser()) echoJsNDie("refresh","No User");
+    if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__,"usuario"=>getUser()->nombre]+$_POST;
     //"folio":"000","uuid":"3789D010D1","gpoId":"5","prvId":"2296"
     global $query;
@@ -2169,8 +2168,7 @@ function isSaveFilesService() {
     return "saveFiles"===($_POST["action"]??"");
 }
 function getSaveFilesService() {
-    sessionInit();
-    if (!hasUser()) echoJsNDie("refresh","No User");
+    if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     $files=getFixedFileArray($_FILES["files"]??null);
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__,"usuario"=>getUser()->nombre,"files"=>array_column($files, "name")];
     if (isset($files[2])) errNDie("Demasiados archivos",$baseData+["line"=>__LINE__]);
@@ -2272,8 +2270,7 @@ function isReqPaymAuth() {
 }
 function doReqPaymAuth() {
     global $query;
-    sessionInit();
-    if (!hasUser()) echoJsNDie("refresh","No User");
+    if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     $userId=getUser()->id;
     $userName=getUser()->nombre;
     $esDesarrollo = in_array($userName, ["admin","sistemas","test","test1","test2","test3"]);
@@ -2741,12 +2738,7 @@ function doRespPaymAuth() {
         $token=$_GET["token"];
         $beInteractive=true;
     } else {
-        sessionInit();
-        if (!hasUser()) {
-            echo json_encode(["action"=>"redirect","mensaje"=>"Su sesión ha caducado, ingrese con su usuario nuevamente","errorMessage"=>"Su sesión ha caducado, ingrese con su usuario nuevamente"]);
-            doclog("Autorización de Solicitud de Pago sin sesión","solpago",$baseData+["line"=>__LINE__]);
-            die();
-        }
+        if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
         $esAdmin=validaPerfil("Administrador");
         $esSistemas=validaPerfil("Sistemas")||$esAdmin;
         $esAuthPago=validaPerfil("Autoriza Pagos")||$esSistemas;
@@ -3340,12 +3332,7 @@ function isResetBeforeAuth() {
 }
 function doResetBeforeAuth() {
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__,"categoria"=>"SOLICITUD"];
-    sessionInit();
-    if (!hasUser()) {
-        echo json_encode(["action"=>"redirect","mensaje"=>"Su sesión ha caducado, ingrese con su usuario nuevamente","errorMessage"=>"Su sesión ha caducado, ingrese con su usuario nuevamente"]);
-        //doclog("Restauración de Solicitud de Pago sin sesión","solpago",$baseData+["line"=>__LINE__]);
-        die();
-    }
+    if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     // ToDo: a solicitudpago.status restarle 128 y en tokens.status cambiarlo a activo para modulo in (autorizaPago o rechazaPago) (necesario para reenviar correo) y en facturas.statusn restarle 128 y ajustar facturas.status al que corresponda
     //json_encode(value);
     
@@ -3468,12 +3455,7 @@ function doTransferPaymAuth() {
         $token=$_GET["token"];
         $beInteractive=true;
     } else {
-        sessionInit();
-        if (!hasUser()) {
-            echo json_encode(["action"=>"redirect","mensaje"=>"Su sesión ha caducado, ingrese con su usuario nuevamente","errorMessage"=>"Su sesión ha caducado, ingrese con su usuario nuevamente"]);
-            doclog("Transferencia de archivos sin sesión","solpago",$baseData+["line"=>__LINE__]);
-            die();
-        }
+        if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
         $esAdmin=validaPerfil("Administrador");
         $esSistemas=validaPerfil("Sistemas")||$esAdmin;
         $esAvance=validaPerfil("Avance")||$esSistemas;
@@ -3876,12 +3858,7 @@ function doProcessPaymReq() {
         $token=$_GET["token"];
         $beInteractive=true;
     } else {
-        sessionInit();
-        if (!hasUser()) {
-            echo json_encode(["action"=>"redirect","mensaje"=>"Su sesión ha caducado, ingrese con su usuario nuevamente","errorMessage"=>"Su sesión ha caducado, ingrese con su usuario nuevamente"]);
-            doclog("Proceso Compras sin sesión","solpago",$baseData+["line"=>__LINE__]);
-            die();
-        }
+        if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
         $esAdmin=validaPerfil("Administrador");
         $esSistemas=validaPerfil("Sistemas")||$esAdmin;
         $esCompras=validaPerfil("Compras")||$esSistemas;
@@ -4178,12 +4155,7 @@ function doRdy2Pay() {
         $token=$_GET["token"];
         $beInteractive=true;
     } else {
-        sessionInit();
-        if (!hasUser()) {
-            echo json_encode(["action"=>"redirect","mensaje"=>"Su sesión ha caducado, ingrese con su usuario nuevamente","errorMessage"=>"Su sesión ha caducado, ingrese con su usuario nuevamente"]);
-            doclog("Proceso Contable sin sesión","solpago",$baseData+["line"=>__LINE__]);
-            die();
-        }
+        if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
         $esAdmin=validaPerfil("Administrador");
         $esSistemas=validaPerfil("Sistemas")||$esAdmin;
         $esGestion=validaPerfil("Gestiona Pagos")||$esSistemas;
@@ -4489,12 +4461,7 @@ function doAttachPaymProof() {
         $token=$_GET["token"];
         $beInteractive=true;
     } else {
-        sessionInit();
-        if (!hasUser()) {
-            doclog("Error al Anexar Comprobante: Sin sesión","solpago",$baseData+["line"=>__LINE__]);
-            echo json_encode(["action"=>"redirect","mensaje"=>"Su sesión ha caducado, ingrese con su usuario nuevamente","errorMessage"=>"Su sesión ha caducado, ingrese con su usuario nuevamente"]);
-            die();
-        }
+        if (!sessionCheck() || !hasUser()) reloadNDie("La sesión ha expirado. Por favor, recargue la página e inicie sesión nuevamente.");
         $esAdmin=validaPerfil("Administrador");
         $esSistemas=validaPerfil("Sistemas")||$esAdmin;
         $esFinanzas=validaPerfil("Realiza Pagos")||$esSistemas;
@@ -4787,7 +4754,7 @@ function isAttachProofDoc() {
 }
 function doAttachProofDoc() {
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__];
-    sessionInit();
+    if (!sessionCheck()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     if(!isset($_FILES["attach"])) {
         doclog("AttachProofDoc: Sin archivo","solpago",$baseData+["line"=>__LINE__]+$_POST+$_FILES);
         header('HTTP/1.1 500 Internal Server Error');
@@ -4930,12 +4897,7 @@ function doPayingRequest() {
         $token=$_GET["token"];
         $beInteractive=true;
     } else {
-        sessionInit();
-        if (!hasUser()) {
-            doclog("PAYINGREQUEST Error: Sesión caducada","solpago",$baseData+["line"=>__LINE__]);
-            echo json_encode(["action"=>"redirect","mensaje"=>"Su sesión ha caducado, ingrese con su usuario nuevamente","errorMessage"=>"Su sesión ha caducado, ingrese con su usuario nuevamente"]);
-            die();
-        }
+        if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
         $esAdmin=validaPerfil("Administrador");
         $esSistemas=validaPerfil("Sistemas")||$esAdmin;
         $esFinanzas=validaPerfil("Realiza Pagos")||$esSistemas;
@@ -5325,8 +5287,7 @@ function isResendEmail() {
     return "resendEmail"===($_REQUEST["action"]??"");
 }
 function doResendEmail() {
-    sessionInit();
-    if (!hasUser()) reloadNDie("Su sesión ha caducado, ingrese con su usuario nuevamente");
+    if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     if (!validaPerfil(["Administrador","Sistemas","Gestor"])) reloadNDie("No tiene permiso para reenviar correos");
     $solId=$_POST["solId"]??"";
     if (!isset($solId[0])) {
@@ -5454,11 +5415,7 @@ function isPayingMultiple() {
 function doPayingMultiple() {
     global $query;
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__];
-    sessionInit();
-    if (!hasUser()) {
-        echo json_encode(["action"=>"redirect","mensaje"=>"Su sesión ha caducado, ingrese con su usuario nuevamente"]);
-        die();
-    }
+    if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     $ids=$_POST["ids"]??[]; // solId, [folId,] proc, stt, tipoFO
     $files=getFixedFileArray($_FILES["file"]??null);
     $info=[];
@@ -5696,8 +5653,12 @@ function doPayingMultiple() {
             continue;
         }
         require_once "clases/Tokens.php";
-        $tokenResultA = Tokens::eligeUsuario($solId,"anexaComprobante");
-        $tokenResultP = Tokens::eligeUsuario($solId,"procesaPago");
+        try {
+            $tokenResultA = Tokens::eligeUsuario($solId,"anexaComprobante");
+            $tokenResultP = Tokens::eligeUsuario($solId,"procesaPago");
+        } catch (SessionException $se) {
+            reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
+        }
         if (isset($file)) {
             $fullName=$cpPath.$cpName.".pdf";
             $absName=$document_root.$fullName;
@@ -5762,11 +5723,7 @@ function isCancelInvoiceInRequest() {
 }
 function doCancelInvoiceInRequest() {
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__];
-    sessionInit();
-    if (!hasUser()) {
-        echo json_encode(["action"=>"redirect","mensaje"=>"Su sesión ha caducado, ingrese con su usuario nuevamente"]);
-        die();
-    }
+    if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     $accion=$_POST["accion"]??"Cancela";
     $accionlw=strtolower($accion);
     $invId=$_POST["invId"]??"";
@@ -5972,11 +5929,7 @@ function isCancelPaymentRequest() {
     return "cancelPaymRequest"===($_REQUEST["action"]??"");
 }
 function doCancelPaymentRequest() {
-    sessionInit();
-    if (!hasUser()) {
-        echo json_encode(["action"=>"redirect","mensaje"=>"Su sesión ha caducado, ingrese con su usuario nuevamente"]);
-        die();
-    }
+    if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     $solId=$_POST["solId"]??"";
     if (!isset($solId[0])) {
         errNDie("No se especifica id de solicitud",$_POST);
@@ -6077,10 +6030,7 @@ function isSaveReferral() {
 }
 function doSaveReferral() {
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__]+$_POST;
-    sessionInit();
-    if (!hasUser()) {
-        errNDie("Error al Guardar Remision: Usuario desconocido",$baseData+["line"=>__LINE__]);
-    }
+    if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     $invId=$_POST["invId"];
     if (!isset($invId[0])) {
         errNDie("Error al Guardar Remision: Factura no identificada",$baseData+["line"=>__LINE__]);
@@ -6105,10 +6055,7 @@ function isSaveRequestObservations() {
 }
 function doSaveRequestObservations() {
     $baseData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__];
-    sessionInit();
-    if (!hasUser()) {
-        errNDie("Error al guardar Observaciones: Usuario desconocido",$baseData+["line"=>__LINE__]+$_POST);
-    }
+    if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     $solId=$_POST["solid"]??"";
     if (!isset($solId[0])) {
         errNDie("Error al Guardar Observaciones: Solicitud no identificada",$baseData+["line"=>__LINE__]+$_POST);
@@ -6541,7 +6488,7 @@ function getAdminFacturaService() {
             $result["currPage"]=$invObj->pageno;
             $result["lastPage"]=$invObj->lastpage;
             $result["preview"]=[];
-            sessionInit();
+            if (!sessionCheck()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
             foreach ($facData as $facItem) {
                 $previewItem=[];
                 foreach(["id","rfcGrupo","codigoProveedor","folio","fechaFactura","total"] as $facReg) {
@@ -6643,7 +6590,7 @@ function getVerifyCFDI() {
     $invId=$_POST["id"];
     $fieldArray = ["id"=>$invId, "solicitaCFDI"=>new DBExpression("current_timestamp()"), "cancelableCFDI"=>NULL];
     if (dao('inv')->saveRecord($fieldArray)) {
-        sessionInit();
+        if (!sessionCheck()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
         dao("prc")->cambioFactura($invId, "SATCheck", hasUser()?getUser()->nombre:"nouser", false, "VerificaSAT");
         echo json_encode(["result"=>"success","affectedRows"=>DBi::$affected_rows??0,"info"=>DBi::$query_info??"","warnings"=>DBi::$warnings??"","errno"=>DBi::$errno??0,"error"=>DBi::$error??""]);
     } else echo json_encode(["result"=>"error","message"=>"No se actualizó factura $invId","affectedRows"=>DBi::$affected_rows??0,"info"=>DBi::$query_info??"","warnings"=>DBi::$warnings??"","errno"=>DBi::$errno??0,"error"=>DBi::$error??""]);
@@ -6652,8 +6599,7 @@ function isAddWarehouseEntry() {
     return ($_POST["accion"]??"")==="addWHEntry";
 }
 function doAddWarehouseEntry() {
-    sessionInit();
-    if (!hasUser()) reloadNDie("Su sesión ha caducado, ingrese con su usuario nuevamente");
+    if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     $invId=$_POST["id"]??"";
     if (!isset($invId[0])) errNDie("No se identifica la factura a modificar");
     $invObj=dao("inv");
@@ -6706,8 +6652,7 @@ function isDelWarehouseEntry() {
     return ($_POST["accion"]??"")==="delWHEntry";
 }
 function doDelWarehouseEntry() {
-    sessionInit();
-    if (!hasUser()) reloadNDie("Su sesión ha caducado, ingrese con su usuario nuevamente");
+    if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     if (!validaPerfil(["Administrador","Sistemas","Elimina Documentos"])) reloadNDie("No tiene permiso para eliminar documentos");
     $invId=$_POST["id"]??"";
     if (!isset($invId[0])) errNDie("No se recibió factura a modificar");
@@ -6740,8 +6685,7 @@ function isDisableWarehouseEntry() {
     return ($_POST["accion"]??"")==="disWHEntry";
 }
 function doDisableWarehouseEntry() {
-    sessionInit();
-    if (!hasUser()) reloadNDie("Su sesión ha caducado, ingrese con su usuario nuevamente");
+    if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     if (!validaPerfil(["Administrador","Sistemas","Bloquea Entrada Almacen"])) reloadNDie("No tiene permiso para deshabilitar entrada de almacén");
     $invId=$_POST["id"]??"";
     if (!isset($invId[0])) errNDie("No se recibió factura a modificar");
@@ -6771,10 +6715,7 @@ function isAcceptInvoice() {
     return ($_POST["accion"]??"")==="acceptInvoice";
 }
 function doAcceptInvoice() {
-    sessionInit();
-    if (!hasUser()) {
-        echoJsNDie("refresh","Sin sesion");
-    }
+    if (!sessionCheck() || !hasUser()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     $fId=$_POST["id"]??"";
     if (!isset($fId[0])) errNDie("No se recibió identificador de factura");
     $logData=["id"=>$fId];
@@ -6915,7 +6856,7 @@ function isFixEmptyCPagos() {
 }
 function doFixEmptyCPagos() {
     $cpyObj=dao("cpy");
-    sessionInit();
+    if (!sessionCheck()) reloadNDie("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
     $beginTime=microtime(true);
     $cpyObj->fixEmptyCPagos();
     $endTime=microtime(true)-$beginTime;

@@ -1233,9 +1233,7 @@ function echoError($message, $data=null) {
 }
 /*
 function getProveedores() {
-    require_once "clases/Proveedores.php";
-    $prvObj=new Proveedores();
-    $data=$prvObj->getData(false,"codigo,rfc");
+    $data=dao("prv")->getData(false,"codigo,rfc");
     $retval=[];
     foreach ($data as $vals) {
         $retval[$vals["codigo"]]=$vals["rfc"];

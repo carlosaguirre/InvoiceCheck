@@ -7,7 +7,7 @@ function isActionService() {
     return isset($_POST["action"]);
 }
 function doActionService() {
-    sessionInit();
+    if (!sessionCheck()) throw new Exception("No se ha iniciado sesión");
     if (!hasUser()) {
         echo json_encode(["result"=>"refresh"]);
         die();

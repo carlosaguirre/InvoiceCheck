@@ -1,21 +1,21 @@
 <?php
 require_once dirname(__DIR__)."/bootstrap.php";
 require_once "clases/QueryService.php";
-require_once "clases/Proceso.php";
 
-$obj = new Proceso();
-if (isValueService()) getValueService($obj);
-else if (isTestService()) getTestService($obj);
-else if (isCatalogService()) getCatalogService($obj);
-else if (isRecordService()) getRecordService($obj);
-else if (isListService()) getListService($obj);
+$prcObj = dao("prc");
+if (isValueService()) getValueService($prcObj);
+else if (isTestService()) getTestService($prcObj);
+else if (isCatalogService()) getCatalogService($prcObj);
+else if (isRecordService()) getRecordService();
+else if (isListService()) getListService();
 else echo "<!-- NO PROCESO -->";
 
 function isRecordService() {
     return isset($_POST["action"])&&$_POST["action"]==="record";
 } // action=record,module=covid,case=infected,zone=MEXICO
-function getRecordService($prcObj) {
+function getRecordService() {
     global $query;
+    $prcObj = dao("prc");
     if (isset($_POST["module"])) switch($_POST["module"]) {
         case "covid": $result=$prcObj->insertRecord(["modulo"=>"COVID","identif"=>"0","status"=>"Vista","detalle"=>($_POST["case"]??"DESCONOCIDO")." ".($_POST["zone"]??"DESCONOCIDO"),"fecha"=>date("Y-m-d H:i:s"),"usuario"=>hasUser()?getUser()->nombre:"no user", "region"=>getIP()]);
             echo json_encode(["result"=>($result?"success":"failure"),"query"=>$query,"error"=>($prcObj->errors??[])]);
@@ -26,7 +26,7 @@ function getRecordService($prcObj) {
 function isListService() {
     return isset($_POST["action"])&&$_POST["action"]==="list";
 }
-function getListService($prcObj) {
+function getListService() {
     global $query;
     if (isset($_POST["module"])) switch($_POST["module"]) {
         case "covid":

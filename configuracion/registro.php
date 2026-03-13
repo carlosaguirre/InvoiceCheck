@@ -608,7 +608,6 @@ if (isset($_POST["prov_return"][0])) {
             if ($savedUsr) {
                 if ($esNuevoPrv) {
                     $upArr = ["idUsuario"=>$usrObj->lastId, "idPerfil"=>"3"]; // Perfil de Proveedor
-                    require_once "clases/Usuarios_Perfiles.php";
                     $upObj = dao('up');
                     if (!$upObj->exists("idUsuario='$upArr[idUsuario]' AND idPerfil='$upArr[idPerfil]'")) {
                         if (!$upObj->saveRecord($upArr)) {

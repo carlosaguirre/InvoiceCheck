@@ -1,14 +1,13 @@
 <?php
 require_once dirname(__DIR__)."/bootstrap.php";
 require_once "clases/QueryService.php";
-require_once "clases/Grupo.php";
 
-$obj = new Grupo();
-if (isValueService()) getValueService($obj);
-else if (isTestService()) getTestService($obj);
-else if (isCatalogService()) getCatalogService($obj);
-else if (isSelectorHTML()) getSelectorHTML($obj);
-else if (isCreateAliasCmd()) getCreateAliasCmd($obj);
+$gpoObj = dao("gpo");
+if (isValueService()) getValueService($gpoObj);
+else if (isTestService()) getTestService($gpoObj);
+else if (isCatalogService()) getCatalogService($gpoObj);
+else if (isSelectorHTML()) getSelectorHTML($gpoObj);
+else if (isCreateAliasCmd()) getCreateAliasCmd($gpoObj);
 //    else header("Location: /".$_project_name."/index.php");
 
 

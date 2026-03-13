@@ -12,9 +12,9 @@ class Pagos extends DBObject {
     }
     function insertIntoProceso($maxId,$user) {
         //$data = $this->getData ("id>$maxId", 0, "idFactura,referencia,total,fechaPago");
-        //require_once "clases/Proceso.php";
         $ip = (empty($_SERVER['HTTP_CLIENT_IP'])?(empty($_SERVER['HTTP_X_FORWARDED_FOR'])?$_SERVER['REMOTE_ADDR']:$_SERVER['HTTP_X_FORWARDED_FOR']):$_SERVER['HTTP_CLIENT_IP']);
-        // ToDo: Mover este codigo en una funcion dentro del objeto PROCESO
+        // ToDo: Mover este codigo dentro del objeto PROCESO en la funcion pagoFactura($user, $maxId, $ip) y llamar a esa funcion desde aqui.
+        // ToDo: Reemplazar las siguientes líneas con: dao("prc")->pagoFactura($user, $maxId, $ip);
         $query="INSERT INTO proceso (modulo,identif,status,detalle,fecha,usuario,region) (SELECT 'Factura',idFactura,'Pagado',concat(referencia,' x $',format(total,2)),fechaPago,'$user->nombre','$ip' from pagos where id>$maxId and valido=1)";
         DBi::query($query); // proceso no entra para replicar insert, no hace falta pasar el objeto
     }

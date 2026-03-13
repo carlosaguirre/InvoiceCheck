@@ -3,7 +3,6 @@ $preBoot=array_key_exists("_pryNm",$GLOBALS);
 if (!$preBoot) 
     require_once dirname(__DIR__)."/bootstrap.php";
 require_once "clases/QueryService.php";
-require_once "clases/Contrarrecibos.php";
 $isAdmin=validaPerfil("Administrador");
 $isSystem=$isAdmin||validaPerfil("Sistemas");
 $isManager=validaPerfil("Gestor")||validaPerfil("Origen Contra Recibos");
@@ -14,7 +13,7 @@ $uname=hasUser()?getUser()->nombre:"nouser";
 $isDeveloper = in_array($uname, ["admin"]);
 $isAuthorizer=validaPerfil("Autoriza Contra Recibos");
 $seekAuth=true; //$isDeveloper||$isAuthorizer||validaPerfil("Requiere Contra Autorizado");
-$ctrObj = new Contrarrecibos();
+$ctrObj = dao("ctr");
 global $query;
 if (isValueService()) getValueService($ctrObj);
 //else if (isTestService()) getTestService($ctrObj);
@@ -43,6 +42,12 @@ else if (isset($_REQUEST["nextFolio"])) {
     $formato = str_replace("%BASE%", "{$_SERVER['HTTP_ORIGIN']}{$_SERVER['WEB_MD_PATH']}", $formato);
     $contenido = "";
     $iniciaVencimiento=strtotime("4 October 2020"); // A partir de esta fecha los contra recibos muestran fecha de vencimiento
+    $prvObj = dao("prv");
+    $ctfObj = dao("ctf", ["rows_per_page"=>0, "orderlist"=>["fechaFactura"=>"asc"]]);
+    $invObj = dao("inv");
+    $solObj = dao("sol");
+    $prcObj = dao("prc");
+    $firObj = dao("fir", ["rows_per_page"=>0]);
     foreach ($ctrData as $ctrIdx => $ctrRow) {
         $aliasGrupo=urldecode($ctrRow["aliasGrupo"]);
         $seekAuthByCompany=$seekAuth; //&&!in_array($aliasGrupo, [/*"MELO","DANIEL",*/"FOAMYMEX"]);
@@ -50,13 +55,6 @@ else if (isset($_REQUEST["nextFolio"])) {
         $razonSocial=urldecode(str_replace("%D1","&Ntilde;",$ctrRow["razonGrupo"]));
         $codigoProveedor=urldecode($ctrRow["codigoProveedor"]);
         $proveedor=urldecode(str_replace("%D1","&Ntilde;",$ctrRow["razonProveedor"]));
-        if (!isset($prvObj)) {
-            global $prvObj;
-            if (!isset($prvObj)) {
-                require_once "clases/Proveedores.php";
-                $prvObj=new Proveedores();
-            }
-        }
         $prvData=$prvObj->getData("codigo='$codigoProveedor'", 1, "banco,cuenta");
         if (isset($prvData[0])) {
             $banco=urldecode($prvData[0]["banco"]??"");
@@ -79,16 +77,6 @@ else if (isset($_REQUEST["nextFolio"])) {
         $metpago0="";
         $metpago="";
         $htmlFacturas="";
-        if (!isset($ctfObj)) {
-            global $ctfObj;
-            if (!isset($ctfObj)) {
-                require_once "clases/Contrafacturas.php";
-                $ctf=new Contrafacturas();
-            }
-            $ctfObj->rows_per_page=0;
-            $ctfObj->clearOrder();
-            $ctfObj->addOrder("fechaFactura");
-        }
         $ctfData=$ctfObj->getData("idContrarrecibo=$ctrRow[id]");
         $realSum=0;
         $hasStrikeout=false;
@@ -99,22 +87,8 @@ else if (isset($_REQUEST["nextFolio"])) {
         $hasAuth=false;
         $creator="";
         foreach($ctfData as $ctfIdx=>$ctfRow) {
-            if (!isset($invObj)) {
-                global $invObj;
-                if (!isset($invObj)) {
-                    require_once "clases/Facturas.php";
-                    $invObj=new Facturas();
-                }
-            }
             $invData=$invObj->getData("id=$ctfRow[idFactura]", 1, "statusn");
             $statusn=$invData[0]["statusn"]??null;
-            if (!isset($solObj)) {
-                global $solObj;
-                if (!isset($solObj)) {
-                    require_once "clases/SolicitudPago.php";
-                    $solObj=new SolicitudPago();
-                }
-            }
             $solData=$solObj->getData("idFactura=$ctfRow[idFactura]", 1, "id,folio,proceso");
             $isPaymReq=isset($solData[0]["id"]);
             $isPaid=$isPaymReq&&$solData[0]["proceso"]>=4;
@@ -146,11 +120,6 @@ else if (isset($_REQUEST["nextFolio"])) {
                 $metpago="&nbsp; &nbsp; F&nbsp;A&nbsp;C&nbsp;T&nbsp;U&nbsp;R&nbsp;A &nbsp; P&nbsp;U&nbsp;E";
             }
             if ($ctfIdx===0) {
-                global $prcObj;
-                if (!isset($prcObj)) {
-                    require_once "clases/Proceso.php";
-                    $prcObj = new Proceso();
-                }
                 $prcData=$prcObj->getData("modulo='Factura' and identif=$ctfRow[idFactura] and detalle like 'generacontra%'", 0, "usuario");
                 if (!$isProvider)
                     $creator=$prcData[0]["usuario"]??"";
@@ -162,14 +131,6 @@ else if (isset($_REQUEST["nextFolio"])) {
             $htmlFacturas="<table class=\"contrarrecibo centered transparent\"><thead><tr>{$preRow}<th class=\"centered\">F.Emisión</th><th class=\"centered\">F.Captura</th><th class=\"centered\">Folio</th><th class=\"centered\">Pedido</th><th class=\"centered\">Total</th>{$posRow}</tr></thead><tbody>$htmlFacturas</tbody></table>";
         }
         if ($isPaymReq&&!$isProvider) { // Los contra-recibos por solicitud solo tienen una factura
-            if (!isset($firObj)) {
-                global $firObj;
-                if (!isset($firObj)) {
-                    require_once "clases/Firmas.php";
-                    $firObj=new Firmas();
-                }
-                $firObj->rows_per_page = 0;
-            }
             $firmas=$firObj->getData("f.idReferencia=".$solData[0]["id"]." and f.accion in ('solicita','autoriza','contable','paga')", 0, "upper(f.accion) accion, u.persona nombre, date(f.fecha) fecha","f inner join usuarios u on f.idUsuario=u.id");
             $firQry=$query;
             $firCode="<p class='hg26 nomarblkend'><B>SOLICITUD</B>: ".$solData[0]["folio"]."</p><table class='lefted noApply bpad0 collapse all_space'>";
@@ -235,7 +196,6 @@ else if (isset($_REQUEST["nextFolio"])) {
     $trace="\n/* REQ[FOLIO]=$crFolio */";
     if(!$isAdmin) doclog("Requerimiento de Contra recibo ".($asJson?"JSON":"HTML").($isInteractive?" interactivo":"")." $crFolio","read");
     if (!empty($crInput) && count($crInput)==2) {
-        require_once "clases/Contrafacturas.php";
         $ctrData = $ctrObj->getData("aliasGrupo='".$crInput[0]."' and folio='".$crInput[1]."'"); // .($isAdmin?"":" and status=1")
         $trace.="\n/* CTR-QUERY: $query */";
     }
@@ -254,12 +214,7 @@ else if (isset($_REQUEST["nextFolio"])) {
         $razonSocial = urldecode(str_replace("%D1","&Ntilde;",$ctrData["razonGrupo"]));
         $codigoProveedor = urldecode($ctrData["codigoProveedor"]);
         $proveedor = urldecode(str_replace("%D1","&Ntilde;",$ctrData["razonProveedor"]));
-        global $prvObj;
-        if (!isset($prvObj)) {
-            require_once "clases/Proveedores.php";
-            $prvObj=new Proveedores();
-        }
-        $prvData=$prvObj->getData("codigo='$codigoProveedor'", 1, "banco,cuenta");
+        $prvData=dao("prv")->getData("codigo='$codigoProveedor'", 1, "banco,cuenta");
         if (isset($prvData[0])) {
             $banco = urldecode($prvData[0]["banco"]??"");
             $clabe = urldecode($prvData[0]["cuenta"]??"");
@@ -278,10 +233,7 @@ else if (isset($_REQUEST["nextFolio"])) {
         $metpago="";
         $eraseCol = $canErase?"<th id=\"eraseHeader\">Eliminar</th>":"";
         $htmlFacturas = "";
-        $ctfObj = new Contrafacturas();
-        $ctfObj->rows_per_page = 0;
-        $ctfObj->clearOrder();
-        $ctfObj->addOrder("fechaFactura");
+        $ctfObj = dao("ctf", ["rows_per_page"=>0, "orderlist"=>["fechaFactura"=>"asc"]]);
         $ctfData = $ctfObj->getData("idContrarrecibo='{$ctrId}'");
         $retSum=+$ctfObj->getValue("idContrarrecibo", $ctrId, "sum(retencion)"); // select sum(retencion) from contrafacturas where idContrarrecibo=69008;
         if(!$isAdmin) doclog("Información obtenida de contra recibo $ctrId","read");
@@ -290,16 +242,10 @@ else if (isset($_REQUEST["nextFolio"])) {
         $firQry="";
         $hasStrikeout=false;
         $invIdLst=[];
+        $solObj = dao("sol");
+        $prcObj = dao("prc");
         if (!empty($ctfData)) {
             $htmlFacturas .= "<tbody>";
-            if (!isset($solObj)) {
-                require_once "clases/SolicitudPago.php";
-                $solObj = new SolicitudPago();
-            }
-            if (!isset($invObj)) {
-                require_once "clases/Facturas.php";
-                $invObj = new Facturas();
-            }
             $realSum=0;
             $authData=[];
             $hasAuth=false;
@@ -308,6 +254,7 @@ else if (isset($_REQUEST["nextFolio"])) {
             $invInfo=[];
             $facturasAutorizables=0;
             $solId=null;
+            $invObj = dao("inv");
             foreach($ctfData as $cfIdx=>$cfRow) {
                 $cfId=$cfRow["id"];
                 $tc=$cfRow["tipoComprobante"];
@@ -393,11 +340,6 @@ else if (isset($_REQUEST["nextFolio"])) {
                     $metpago="&nbsp; &nbsp; F&nbsp;A&nbsp;C&nbsp;T&nbsp;U&nbsp;R&nbsp;A &nbsp; P&nbsp;U&nbsp;E";
                 }
                 if ($cfIdx===0) {
-                    global $prcObj;
-                    if (!isset($prcObj)) {
-                        require_once "clases/Proceso.php";
-                        $prcObj = new Proceso();
-                    }
                     $prcData=$prcObj->getData("modulo='Factura' and identif=$cfRow[idFactura] and detalle like 'generacontra%'", 0, "usuario");
                     if (!$isProvider)
                         $creator=$prcData[0]["usuario"]??"";
@@ -405,27 +347,15 @@ else if (isset($_REQUEST["nextFolio"])) {
             }
             $htmlFacturas .= "</tbody>";
             if ($isPaymReq) {
-                global $firObj;
-                if (!isset($firObj)) {
-                    require_once "clases/Firmas.php";
-                    $firObj=new Firmas();
-                }
-                $firObj->addOrder("f.fecha");
-                $firmas=$firObj->getData(
+                $firmas=dao("fir", ["rows_per_page"=>0, "orderlist"=>["f.fecha"=>"asc"]])->getData(
                     "f.modulo='solpago' and f.idReferencia=$solId and f.accion in ('solicita','autoriza','contable','paga')",
                     1,
                     "upper(f.accion) accion,u.persona nombre,date(f.fecha) fecha",
                     "f inner join usuarios u on f.idUsuario=u.id");
                 $firQry=$query;
             } else if ($seekAuthByCompany && isset($invIdLst[0])) {
-                global $firObj;
-                if (!isset($firObj)) {
-                    require_once "clases/Firmas.php";
-                    $firObj=new Firmas();
-                }
                 $qry="f.modulo='contrarrecibo' and f.idReferencia={$ctrId} and f.accion in ('cancela','paga','autoriza','original')";
-                $firObj->addOrder("f.fecha");
-                $firmas=$firObj->getData($qry, 0,
+                $firmas=dao("fir", ["rows_per_page"=>0, "orderlist"=>["f.fecha"=>"asc"]])->getData($qry, 0,
                     "upper(f.accion) accion,u.persona nombre,date(f.fecha) fecha,f.motivo texto",
                     "f inner join usuarios u on f.idUsuario=u.id");
                 $firQry=$query;
@@ -486,11 +416,6 @@ else if (isset($_REQUEST["nextFolio"])) {
         
         $total = number_format((float)urldecode($ctrData["total"]), 2, '.', ',');
         if ($asJson) {
-            global $prcObj;
-            if (!isset($prcObj)) {
-                require_once "clases/Proceso.php";
-                $prcObj = new Proceso();
-            }
             $prcQry="modulo='Contrarrecibo' and identif=$ctrId";
             if (isset($invIdLst[0])) {
                 $invIdLstStr=implode(",", $invIdLst);
@@ -498,13 +423,8 @@ else if (isset($_REQUEST["nextFolio"])) {
             }
             $prcObj->addOrder("p.id");
             $prcData=$prcObj->getData($prcQry, 0, "f.folio,f.uuid,p.status,p.detalle,date(p.fecha) fecha,u.persona nombre", "p inner join usuarios u on p.usuario=u.nombre left join facturas f on p.modulo='Factura' and p.identif=f.id");
-            global $firObj;
-            if (!isset($firObj)) {
-                require_once "clases/Firmas.php";
-                $firObj=new Firmas();
-            }
             $qry="f.modulo='contrarrecibo' and f.idReferencia={$ctrId}";
-            $firData=$firObj->getData($qry, 0,
+            $firData=dao("fir")->getData($qry, 0,
                 "upper(f.accion) accion,u.persona nombre,date(f.fecha) fecha,f.motivo texto",
                 "f inner join usuarios u on f.idUsuario=u.id");
             $jsonArr["result"] = "success";
@@ -531,8 +451,7 @@ else if (isset($_REQUEST["nextFolio"])) {
                     $ctrData["esCopia"]="1";
                     $trace.="\n/* NO TOKEN REQUEST => esCopia=1 */";
                 } else {
-                    global $tokObj; if(!isset($tokObj)){ require_once "clases/Tokens.php"; $tokObj=new Tokens(); }
-                    $tokData=$tokObj->getData("refId=$ctrId and modulo='contra_original' and status='activo'", 0, "id, token");
+                    $tokData=dao("tok")->getData("refId=$ctrId and modulo='contra_original' and status='activo'", 0, "id, token");
                     if (!isset($tokData[0])) {
                         $ctrData["esCopia"]="1";
                         $trace.="\n/* NO TOKEN DB => esCopia=1 */";
@@ -652,22 +571,12 @@ else if (isset($_REQUEST["nextFolio"])) {
                 if (isset($payStamp[0])) $fieldarray["selloImpreso"]="1";
                 $fieldkeys=array_keys($fieldarray);
                 if (isset($fieldkeys[1]) && $ctrObj->saveRecord($fieldarray)) {
-                    global $prcObj;
-                    if (!isset($prcObj)) {
-                        require_once "clases/Proceso.php";
-                        $prcObj = new Proceso();
-                    }
                     $prcMsg="$watermarkClass";
                     if (isset($fieldarray["selloImpreso"])) $prcMsg.=" CON SELLO";
-                    $prcObj->cambioContrarrecibo($ctrId, "Consulta", $uname, $prcMsg);
+                    dao("prc")->cambioContrarrecibo($ctrId, "Consulta", $uname, $prcMsg);
                 }
             }
-            global $firObj;
-            if (!isset($firObj)) {
-                require_once "clases/Firmas.php";
-                $firObj=new Firmas();
-            }
-            $firObj->saveRecord(["idUsuario"=>$uid,"modulo"=>"contrarrecibo","idReferencia"=>$ctrId,"accion"=>strtolower($watermarkClass),"motivo"=>"consulta ".substr($timestamp,16)]);
+            dao("fir")->saveRecord(["idUsuario"=>$uid,"modulo"=>"contrarrecibo","idReferencia"=>$ctrId,"accion"=>strtolower($watermarkClass),"motivo"=>"consulta ".substr($timestamp,16)]);
 //                $formato = str_replace(["&aacute;","&Aacute;","&eacute;","&Eacute;","&iacute;","&Iacute;","&oacute;","&Oacute;","&uacute;","&Uacute;","&ntilde;","&Ntilde;"],["a","A","e","E","i","I","o","O","u","U","n","N"],$formato);
             $formato = array_filter($formato, function($val) {
                 return preg_match("/%\w+%/", $val)?false:true;
@@ -710,11 +619,6 @@ function getActionService($ctrObj) {
             $cid=$_POST["id"]??"";
             $wmk=$_POST["wmk"]??"";
             $mdp=$_POST["mdp"]??"";
-            global $prcObj;
-            if (!isset($prcObj)) {
-                require_once "clases/Proceso.php";
-                $prcObj = new Proceso();
-            }
             if(empty($cid)) {
                 echo "UNSPECIFIED ID";
                 doclog("Contra recibo ID no especificado","print",["post"=>$_POST, "user"=>["id"=>$guid,"nombre"=>$uname], "ip"=>getIP()]);
@@ -730,15 +634,10 @@ function getActionService($ctrObj) {
                 if ($ctrObj->saveRecord($fieldarray)) {
                     $qrys["ctr"]=$query;
                     $det="Impresión $wmk";
-                    $prcObj->cambioContrarrecibo($cid, "Accion", $uname, $det);
+                    dao("prc")->cambioContrarrecibo($cid, "Accion", $uname, $det);
                     $qrys["prc"]=$query;
                     if ($esOriginal) {
-                        global $firObj;
-                        if (!isset($firObj)) {
-                            require_once "clases/Firmas.php";
-                            $firObj=new Firmas();
-                        }
-                        $firObj->saveRecord(["idUsuario"=>$guid,"modulo"=>"contrarrecibo","idReferencia"=>$cid,"accion"=>"original","motivo"=>"impresión"]);
+                        dao("fir")->saveRecord(["idUsuario"=>$guid,"modulo"=>"contrarrecibo","idReferencia"=>$cid,"accion"=>"original","motivo"=>"impresión"]);
                         $qrys["fir"]=$query;
                     }
                     doclog("Contra recibo Impreso","print",["post"=>$_POST, "user"=>["id"=>$guid,"nombre"=>$uname], "detalle"=>$det, "queries"=>$qrys, "ip"=>getIP()]);
@@ -769,13 +668,8 @@ function getActionService($ctrObj) {
                 }
                 if (isset($fieldarray)) {
                     if ($ctrObj->saveRecord($fieldarray)) {
-                        global $prcObj;
-                        if (!isset($prcObj)) {
-                            require_once "clases/Proceso.php";
-                            $prcObj = new Proceso();
-                        }
                         $det="Cambia a $val";
-                        $prcObj->cambioContrarrecibo($id, "FIXCOPY", $uname, $det);
+                        dao("prc")->cambioContrarrecibo($id, "FIXCOPY", $uname, $det);
                         echo "SUCCESSFUL $val";
                     } else echo "ERROR";
                 } else echo "WRONG DATA";

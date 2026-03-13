@@ -3,7 +3,6 @@ $preBoot=array_key_exists("_pryNm",$GLOBALS);
 if (!$preBoot) 
     require_once dirname(__DIR__)."/bootstrap.php";
 require_once "clases/QueryService.php";
-require_once "clases/Bancos.php";
 
 $bnkObj = dao('bnk');
 if (isValueService()) getValueService($bnkObj);
@@ -56,8 +55,7 @@ function isActionService() {
     return isset($_POST["action"]);
 }
 function doActionService() {
-    //$bnkObj = dao('bnk');
-    sessionInit();
+    if (!sessionCheck()) throw new Exception("No se ha iniciado sesión");
     if (!hasUser()) {
         echo "REFRESH";
         return;

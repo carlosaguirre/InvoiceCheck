@@ -173,15 +173,19 @@ function fixResult(respText,params,state,status) {
     }
     try {
         let response=JSON.parse(respText);
-        if (response.result==="success") {
-            let tgt=ebyid(params.target);
-            tgt.classList.remove("wrong1BG");
-            tgt.classList.add("right1BG");
-            tgt.title="";
-            ekfil(tgt.firstElementChild);
-            let lnk=ecrea({eName:"A",href:params.filePath+params.newName+"."+params.extension,target:"archivo",eChilds:{eName:"IMG",src:"imagenes/icons/"+params.extension+"200.png",width : "32",height: "32"}});
-            tgt.firstElementChild.appendChild(lnk);
-        } else console.log(params,respText,ebyid(params.target));
+        if (response.result) {
+            const lowResponse=response.result.toLowerCase();
+            if (lowResponse==="refresh" || lowResponse==="reload") doReload(true);
+            else if (lowResponse==="success") {
+                let tgt=ebyid(params.target);
+                tgt.classList.remove("wrong1BG");
+                tgt.classList.add("right1BG");
+                tgt.title="";
+                ekfil(tgt.firstElementChild);
+                let lnk=ecrea({eName:"A",href:params.filePath+params.newName+"."+params.extension,target:"archivo",eChilds:{eName:"IMG",src:"imagenes/icons/"+params.extension+"200.png",width : "32",height: "32"}});
+                tgt.firstElementChild.appendChild(lnk);
+            } else console.log(params,respText,ebyid(params.target));
+        } else console.log("No result in response: ",params,respText,ebyid(params.target));
     } catch (ex) { console.log("fixResult Exception: ",ex,", Text:"+respText); }
 }
 <?php } ?>

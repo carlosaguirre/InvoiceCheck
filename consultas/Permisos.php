@@ -1,9 +1,8 @@
 <?php
 require_once dirname(__DIR__)."/bootstrap.php";
 require_once "clases/QueryService.php";
-require_once "clases/Permisos.php";
 
-$prmObj = new Permisos();
+$prmObj = dao("prm");
 if (isValueService()) getValueService($prmObj);
 else if (isDataService()) getDataService();
 else if (isTestService()) getTestServicePRM();
@@ -14,7 +13,6 @@ function isActionServicePRM() {
     return isset($_POST["action"]);
 }
 function doActionServicePRM() {
-    global $prmObj, $prcObj;
     sessionInit();
     if (!hasUser()) {
         echo "REFRESH";
@@ -47,6 +45,7 @@ function doActionServicePRM() {
                 $writeId=$hasWriteList&&in_array($actConId,$writeList)?"1":"0";
                 $permissionList[]=[$prfId,$actConId,$readId,$writeId];
             }
+            $prmObj = dao("prm");
             $prmObj->deleteRecord(["idPerfil"=>$prfId]);
             $queries=["delete"=>$query];
             if (isset($permissionList[0])) {
@@ -59,13 +58,10 @@ function doActionServicePRM() {
     }
 }
 function getTestServicePRM() {
-    global $prmObj;
     switch($_GET["test"]) {
         case "acciones": {
             echo "Acciones:\n";
-            require_once "clases/Acciones.php";
-            $actObj = new Acciones();
-            echo $actObj->getList(false,false,"id,nombre");
+            echo dao("act")->getList(false,false,"id,nombre");
         }
         break;
         case "usuario":
@@ -77,6 +73,7 @@ function getTestServicePRM() {
         case "validar":
             sessionInit();
             $usr = getUser();
+            $prmObj = dao("prm");
             echo "Validar Servicio: ".get_class($prmObj);
             if (empty($usr)) echo "<br>USUARIO DESCONOCIDO";
             else if (isset($_GET["accion"])) {
@@ -88,7 +85,7 @@ function getTestServicePRM() {
             } else echo "<br>SIN ACCION";
             break;
         default:
-            getTestService($prmObj);
+            getTestService(dao("prm"));
     }
 }
 
@@ -96,9 +93,8 @@ function isDataService() {
     return isset($_GET["clase"]) && $_GET["clase"]=="Permisos" && isset($_GET["perfil"]);
 }
 function getDataService() {
-    global $prmObj;
+    $prmObj = dao("prm", ["rows_per_page"=>0]);
     DBi::connect();
-    $prmObj->rows_per_page=0;
     $perfilData = $prmObj->getData("idPerfil=".$_GET["perfil"]);
     if (isset($_GET["modo"])) $modo = $_GET["modo"];
     if (!isset($modo) || empty($modo) || $modo=="JSON") {

@@ -167,7 +167,7 @@ function isErrorMessage($result, $defaultMessage=null) {
     }
 }
 function doComExtBrowse() {
-    global $ceeObj, $cedObj, $gpoObj, $prvObj, $query;
+    global $query;
     getObj([CEE,CED,GPO,PRV]);
     $retData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__,"usuario"=>getUser()->nombre]+$_POST;
     $where="";//$fieldArray=[];
@@ -177,10 +177,10 @@ function doComExtBrowse() {
         //$where.="{$key}='$value'";
         $value=json_decode($value,true);
         if (isset($value["op"])&&isset($value["value"])) $value=new DBExpression($value["value"],$value["op"]);
-        $where.=$ceeObj->getWhereCondition($key,$value);
+        $where.=dao("cee")->getWhereCondition($key,$value);
     }
     if (isset($where[0])) $where=rtrim($where," AND ");
-    //$ceeData = $ceeObj->getDataByFieldArray($fieldArray);
+    //$ceeData = dao("cee")->getDataByFieldArray($fieldArray);
     $ceeData = getMemData(CEE,"browseAlways",["forceDB"=>"1","forceWhere"=>$where,"numRec"=>-1]);
     $browseQuery=$query;
     $preData=$retData+["forceDB"=>($_POST["forceDB"]??false)];
@@ -207,7 +207,7 @@ function doComExtBrowse() {
     else echoJSDoc("error", "Ocurrió un error al obtener datos",null, $retData+["line"=>__LINE__,"errors"=>DBi::$errors/*,"list"=>$fieldArray*/]+$reviewData, "error");
 }
 function doComExtView() {
-    global $detLog, $prvObj, $query;
+    global $detLog, $query;
     getObj(PRV);
     $retData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__,"usuario"=>getUser()->nombre]+$_POST;
     $type=$_POST["type"];
@@ -372,7 +372,7 @@ function doComExtView() {
     else echoJSDoc("success", "Datos encontrados", null, $retData);
 }
 function doComExtSave() {
-    global $ceeObj, $cedObj, $cecObj, $prvObj, $query, $query_b;
+    global $query, $query_b;
     getObj([CEE,CED,CEC,PRV]);
     $retData=["file"=>getShortPath(__FILE__),"function"=>__FUNCTION__,"usuario"=>getUser()->nombre];
     $type=$_POST["type"];
@@ -429,6 +429,7 @@ function doComExtSave() {
             }
             if (!empty($fieldArray)) {
                 $retData["data"]=$fieldArray;
+                $prvObj=dao("prv");
                 if ($prvObj->saveRecord($fieldArray)) {
                     if (!isset($id[0]))
                         $retData["{$type}Id"]=$prvObj->lastId;
@@ -490,6 +491,7 @@ function doComExtSave() {
             }
             if (!empty($fieldArray)) {
                 $retData["data"]=$fieldArray;
+                $prvObj=dao("prv");
                 if ($prvObj->saveRecord($fieldArray)) {
                     if (!isset($id[0]))
                         $retData["{$type}Id"]=$prvObj->lastId;
@@ -503,7 +505,7 @@ function doComExtSave() {
                     $retData["optdata"]=$agtOptList;
                 } else { $retData["line"]=__LINE__;
                     $retData["dataError"]="No se pudieron guardar los datos del agente aduanal";
-                    doclog("COMEXT SAVE AGENTE ADUANAL: saveRecord","error",$retdata+["query"=>$query,"dberror"=>["code"=>DBi::getErrno(),"message"=>DBi::getError(),"errors"=>DBi::$errors,"oerrors"=>$prvObj->errors]]); // +$_POST
+                    doclog("COMEXT SAVE AGENTE ADUANAL: saveRecord","error",$retData+["query"=>$query,"dberror"=>["code"=>DBi::getErrno(),"message"=>DBi::getError(),"errors"=>DBi::$errors,"oerrors"=>$prvObj->errors]]); // +$_POST
                 }
             }
             break;
@@ -681,7 +683,7 @@ function doComExtSave() {
                     $cecIdList=[ComExtCatalogo::ID_ORDEN,ComExtCatalogo::ID_CFDIXML,ComExtCatalogo::ID_CFDIPDF];
                     $cecMap=[];
                     foreach ($cecIdList as $cecId) {
-                        $cecMap[$cecId]=$cecObj->getData("id=$cecId");
+                        $cecMap[$cecId]=dao("cec")->getData("id=$cecId");
                     }
                 }
                 if (isset($gpoAlias[0]) && isset($cexpath[0])) {
@@ -713,7 +715,7 @@ function doComExtSave() {
                                 if (empty($ordId)&&$isOldExt) $docFld["descripcion"]=$ceeData["orden"];
                                 else $docFld["descripcion"]=$ordId??"";
                                 $docFldArr[]=$docFld;
-                                //"idExpediente"=>$ceeObj->lastId,
+                                //"idExpediente"=>dao("cee")->lastId,
                                 //"titulo"=>$cecData["titulo"],
 
                                 //"idCatalogo"=>ComExtCatalogo::ID_ORDEN,
@@ -735,6 +737,7 @@ function doComExtSave() {
                     $deletedFiles=0;
                     if (isset($delDocIds[0])) {
                         doclog("BORRAR DOCUMENTOS","comext",["ids"=>$delDocIds]);
+                        $cedObj=dao("ced");
                         if ($cedObj->deleteRecord(["id"=>$delDocIds])) {
                             $numRemoved=$cedObj->affectedrows;
                             doclog("DOCUMENTOS BORRADOS","comext",["affectedrows"=>$numRemoved]);
@@ -919,6 +922,7 @@ function doComExtSave() {
                 // status (int 1)
                 //0=En Proceso, 1=Con Anticipo, 2=Importada, 4=Exportada, 8=Pagada, 16=Cerrada, 32=Auditada, 64=No usado, 128=Cancelada
                 if (!$isOldExt) $fieldArray["status"]="0";
+                $ceeObj=dao("cee");
                 $ceeObj->lastId=null;
                 //$fpath
                 $fieldKeys=array_keys($fieldArray);
@@ -959,10 +963,10 @@ function doComExtSave() {
                             $cecData=getMemData(CEC,$docFldRow["idCatalogo"], $preData+["line"=>__LINE__]);
                             $docFldRow["idExpediente"]=$id;
                             if(!isset($docFldRow["titulo"])) $docFldRow["titulo"]=$cecData["titulo"]??"";
-                            if (!$cedObj->saveRecord($docFldRow)) { 
+                            if (!dao("ced")->saveRecord($docFldRow)) { 
                                 $retData["line"]=__LINE__;
                                 $retData["dataError"]="No se pudo guardar el documento '$fldArr[titulo]'";
-                                doclog("COMEXT ON SAVE {$tipo}DOC ORDEN","error",$retData+["query"=>$query,"query_b"=>$query_b,"dberror"=>["code"=>DBi::getErrno(),"message"=>DBi::getError(),"errors"=>DBi::$errors,"oerrors"=>$cedObj->errors],"fld"=>$fldArr]+$_POST);
+                                doclog("COMEXT ON SAVE {$tipo}DOC ORDEN","error",$retData+["query"=>$query,"query_b"=>$query_b,"dberror"=>["code"=>DBi::getErrno(),"message"=>DBi::getError(),"errors"=>DBi::$errors,"oerrors"=>dao("ced")->errors],"fld"=>$fldArr]+$_POST);
                             }
                         }
                     }
@@ -1165,7 +1169,7 @@ function prepareViewData($tabName, &$data, $extra, $pfx="") {
                     $docRefKey=$docKey.".href";
                     $docRefOld=$data[$docRefKey]??false;
                     if (is_string($docRefOld)) $data[$docRefKey]=[$docRefOld,$docRef];
-                    else if (is_array($docRefOld)) $data[$docRefKey].push($docRef);
+                    else if (is_array($docRefOld)) array_push($data[$docRefKey], $docRef);
                     else $data[$docRefKey]=$docRef;
                 }
             }
@@ -1270,16 +1274,17 @@ function prepareViewData($tabName, &$data, $extra, $pfx="") {
     return true;
 }
 function doComExtDel() {
-    global $prvObj, $query;
+    global $query;
     getObj(PRV);
     $type=$_POST["type"];
-    $line;
+    //$line;
     $id=$_POST["{$type}Id"]??"";
     switch($type) {
         case "foreign":
         case "customs":
             $isExt=($type==="foreign");
             if (isset($id[0])) {
+                $prvObj=dao("prv");
                 if ($prvObj->exists("id=$id")) {
                     if ($prvObj->saveRecord(["id"=>$id,"status"=>"eliminado"])) {
                         global $defOpt,$defOptAll;

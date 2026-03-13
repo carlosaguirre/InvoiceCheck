@@ -485,21 +485,14 @@ function errorHandler ($errno, $errstr, $errfile, $errline, $errcontext=null) {
         case E_PARSE:
         case E_CORE_ERROR:
         case E_COMPILE_ERROR:
-            
             global $query;
-            
-            // sessionInit();
-            
-            // if (eregi('^(sql)$', $errstr)) { // deprecated
-            //if (preg_match("/^(sql)/i", $errstr)) { // removed strict "SQL" string, keeps start with condition
-            if (stripos($errstr, "sql") === 0) { // stripos is faster than preg_match
-                $MYSQL_ERRNO = DBi::getErrno(); // mysqli_errno();
-                $MYSQL_ERROR = DBi::getError(); // mysqli_error();
-
+            if (stripos($errstr, "sql") === 0) {
+                $MYSQL_ERRNO = DBi::getErrno();
+                $MYSQL_ERROR = DBi::getError();
                 $errstr .= " Error: $MYSQL_ERRNO : $MYSQL_ERROR";
             } else {
                 $query = NULL;
-            } // if
+            }
             
             require_once dirname(__DIR__)."/bootstrap.php";
             $systemTitle = "Gesti&oacute;n de Facturas Electr&oacute;nicas del Corporativo";

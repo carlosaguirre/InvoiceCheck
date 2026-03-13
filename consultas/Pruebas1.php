@@ -57,12 +57,7 @@ function doActionService() {
             $subject="Acumulado de Facturas del dia $dayValue";
             $from=null; // ToDo: Obtener correo de usrId, validar que usrId tenga perfil ReporteFCRD
             if (isset($usrId[0])) {
-                global $usrObj;
-                if (!$usrObj) {
-                    require_once "clases/Usuarios.php";
-                    $usrObj=new Usuarios();
-                }
-                $to=$usrObj->getData("id=$usrId",0,"email address,persona name");
+                $to=dao("usr")->getData("id=$usrId",0,"email address,persona name");
                 if (!isset($to[0])) $to=getMailAddressesByProfile("Reporte FCRD");
             } else $to=getMailAddressesByProfile("Reporte FCRD");
             $base = file_get_contents(getBasePath()."templates/respGralSolPago.html");

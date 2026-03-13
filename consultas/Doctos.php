@@ -1,7 +1,6 @@
 <?php
 require_once dirname(__DIR__)."/bootstrap.php";
 require_once "clases/QueryService.php";
-require_once "clases/Doctos.php";
 
 $docObj = new Doctos();
 if (isValueService()) getValueService($docObj);
@@ -13,8 +12,7 @@ function isActionService() {
     return isset($_POST["action"]);
 }
 function doActionService() {
-    global $docObj;
-    sessionInit();
+    if (!sessionCheck()) throw new Exception("No se ha iniciado sesión");
     if (!hasUser()) {
         echo json_encode(["result"=>"refresh","action"=>"refresh"]);
         die();
@@ -26,12 +24,7 @@ function doActionService() {
     }
 }
 function sendPaymList() {
-    global $invObj;
-    if (!isset($invObj)) {
-        require_once "clases/Facturas.php";
-        $invObj=new Facturas();
-    }
-    $invObj->rows_per_page=100;
+    $invObj=dao("inv", ["rows_per_page"=>100]);
     if (isset($_POST["pageno"])) $invObj->pageno=+$_POST["pageno"];
     $proveedor=$_POST["codprov"]??"";
     do {

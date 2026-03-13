@@ -1,12 +1,11 @@
 <?php
 require_once dirname(__DIR__)."/bootstrap.php";
 require_once "clases/QueryService.php";
-require_once "clases/InfoLocal.php";
 
-$obj = new InfoLocal();
-if (isValueService()) getValueService($obj);
-else if (isTestService()) getTestService($obj);
-else if (isCatalogService()) getCatalogService($obj);
+$infObj = dao("inf");
+if (isValueService()) getValueService($infObj);
+else if (isTestService()) getTestService($infObj);
+else if (isCatalogService()) getCatalogService($infObj);
 else if (isset($_POST["accion"])) {
     sessionInit();
     switch($_POST["accion"]) {
@@ -21,19 +20,17 @@ else if (isset($_POST["accion"])) {
                 }
                 $usrData=[];
                 if ($nombre==="CFDI_ALLOW01x4_"||$nombre==="CFDI_ALLOW33_"||$nombre==="CFDI_ALLOWP01_"||$nombre==="CFDI_ALLOWPRTV_") {
-                    require_once "clases/Usuarios.php";
-                    $usrObj=new Usuarios();
-                    $usrData=$usrObj->getData("id='$valor' or nombre='$valor'",0,"id,nombre,persona,email");
+                    $usrData=dao("usr")->getData("id='$valor' or nombre='$valor'",0,"id,nombre,persona,email");
                     if (!isset($usrData[0]["nombre"][0]))
                         errNDie(["eName"=>"P","className"=>"boldValue","eChilds"=>[["eText"=>"Usuario '"],["eName"=>"U","className"=>"cancelLabel","eText"=>$valor],["eText"=>"' no encontrado"]]],["file"=>getShortPath(__FILE__),"line"=>__LINE__,"HTTP_CLIENT_IP"=>$_SERVER['HTTP_CLIENT_IP']??"","HTTP_X_FORWARDED_FOR"=>$_SERVER['HTTP_X_FORWARDED_FOR']??"","REMOTE_ADDR"=>$_SERVER['REMOTE_ADDR']??""]+$_POST,"config");
                     $usrData=$usrData[0];
                     $nombre.=$usrData["id"];
                     $valor="1";
                 }
-                $oldId = $obj->getValue("nombre",$nombre,"id");
+                $oldId = $infObj->getValue("nombre",$nombre,"id");
                 $fieldarray = ["nombre"=>$nombre, "valor"=>$valor];
                 if (!empty($oldId)) $fieldarray["id"]=$oldId;
-                if (!$obj->saveRecord($fieldarray)) {
+                if (!$infObj->saveRecord($fieldarray)) {
                     global $query;
                     errNDie(["eName"=>"P","className"=>"boldValue","eText"=>"La configuracion no pudo guardarse"],["file"=>getShortPath(__FILE__),"line"=>__LINE__,"HTTP_CLIENT_IP"=>$_SERVER['HTTP_CLIENT_IP']??"","HTTP_X_FORWARDED_FOR"=>$_SERVER['HTTP_X_FORWARDED_FOR']??"","REMOTE_ADDR"=>$_SERVER['REMOTE_ADDR']??"","query"=>$query,"errors"=>DBi::$errors]+$_POST,"error");
                 }
@@ -44,8 +41,8 @@ else if (isset($_POST["accion"])) {
         case "reloadHourMailCount":
         // if(length(nombre)>15, right(nombre,length(nombre)-16), right(nombre,length(nombre)-10)) k, valor v
         // nombre like 'mail_hour%';
-            $obj->rows_per_page  = 100;
-            $data=$obj->getData("nombre like 'mail_hour%'",0,"if(length(nombre)>15, right(nombre,length(nombre)-16), right(nombre,length(nombre)-10)) k, valor v");
+            $infObj->rows_per_page  = 100;
+            $data=$infObj->getData("nombre like 'mail_hour%'",0,"if(length(nombre)>15, right(nombre,length(nombre)-16), right(nombre,length(nombre)-10)) k, valor v");
             $fixdata=[];
             foreach ($data as $idx => $row) {
                 $rowk=$row["k"]; $rowv=$row["v"];
@@ -71,7 +68,7 @@ else if (isset($_POST["accion"])) {
             break;
     }
 } else if (isset($_GET["accion"])) {
-    if (!$obj->available()) {
+    if (!$infObj->available()) {
         echo "Error: Servicio Validador de Metodo de Pago no disponible.";
         exit(1);
     }
@@ -83,7 +80,7 @@ else if (isset($_POST["accion"])) {
             $valor = $_GET["valor"];
             if(empty($nombre)||empty($valor)) {
                 echo "Error: Debe indicar nombre y valor.";
-            } else if($obj->definir($nombre,$valor)) {
+            } else if($infObj->definir($nombre,$valor)) {
                 echo "Exito: Variable $nombre = $valor";
             } else {
                 echo "Error: No se pudo guardar $nombre => $valor";
@@ -93,7 +90,7 @@ else if (isset($_POST["accion"])) {
             if(empty($nombre)) {
                 echo "Error: Debe indicar el nombre.";
             } else {
-                $result = $obj->quitar($nombre);
+                $result = $infObj->quitar($nombre);
                 if($result===false)
                     echo "Error: No se pudo quitar variable $nombre ";
                 else echo "Exito: Borrado $nombre => $result";
@@ -103,7 +100,7 @@ else if (isset($_POST["accion"])) {
             if(empty($nombre)) {
                 echo "Error: Debe indicar el nombre.";
             } else {
-                $result = $obj->obtener($nombre);
+                $result = $infObj->obtener($nombre);
                 if(!isset($result) || $result===false)
                     echo "Error: No se pudo obtener variable $nombre ";
                 else if(empty($result)) echo "Error: Vacio(".gettype($result).")";
@@ -114,7 +111,7 @@ else if (isset($_POST["accion"])) {
             if(empty($nombre)) {
                 echo "Error: Debe indicar el nombre.";
             } else {
-                $result = $obj->recuperar($nombre);
+                $result = $infObj->recuperar($nombre);
                 if($result===false)
                     echo "Error: No se pudo recuperar variable $nombre ";
                 else echo "Exito: $result";
@@ -126,7 +123,7 @@ else if (isset($_POST["accion"])) {
     if (!empty($opcion)) {
         switch(strtolower($opcion)) {
             case "showlog":
-                echo "<br>\n<xmp>".$obj->log."</xmp>";
+                echo "<br>\n<xmp>".$infObj->log."</xmp>";
                 break;
         }
     }

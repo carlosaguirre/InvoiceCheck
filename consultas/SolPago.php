@@ -1,9 +1,8 @@
 <?php
 require_once dirname(__DIR__)."/bootstrap.php";
 require_once "clases/QueryService.php";
-require_once "clases/SolicitudPago.php";
 
-$solObj = new SolicitudPago();
+$solObj = dao("sol");
 if (isValueService()) getValueService($solObj);
 else if (isTestService()) getTestService($solObj);
 else if (isCatalogService()) getCatalogService($solObj);
@@ -13,7 +12,6 @@ function isActionService() {
     return isset($_POST["action"]);
 }
 function doActionService() {
-    global $actObj,$prcObj,$solObj;
     sessionInit();
     if (!hasUser()) {
         echoJsNDie("refresh","No User");
@@ -27,9 +25,7 @@ function doActionService() {
             $folio=$_POST["folio"]??"";
             $gpoId=$_POST["gpoId"]??0;
             if ($gpoId>0) {
-                require_once "clases/Grupo.php";
-                $gpoObj=new Grupo();
-                $gpoData=$gpoObj->getData("id=$gpoId",0,"alias");
+                $gpoData=dao("gpo")->getData("id=$gpoId",0,"alias");
                 if (isset($gpoData[0]["alias"][0])) $alias=$gpoData[0]["alias"];
             }
             if (isset($folio[0])) {

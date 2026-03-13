@@ -8,11 +8,9 @@ $preBoot=array_key_exists("_pryNm",$GLOBALS);
 if (!$preBoot) 
     require_once dirname(__DIR__)."/bootstrap.php";
 require_once "clases/QueryService.php";
-if (!isset($ctfObj)) {
-    require_once "clases/Contrafacturas.php";
-    $ctfObj = new Contrafacturas();
-}
-$ctfObj->rows_per_page=0;
+$ctfObj = dao("ctf",["rows_per_page"=>0]);
+$ctrObj = dao("ctr",["rows_per_page"=>0]);
+$invObj = dao("inv",["rows_per_page"=>0]);
 if (isValueService()) getValueService($ctfObj);
 else if (isTestService()) getTestService($ctfObj);
 else if (isCatalogService()) getCatalogService($ctfObj);
@@ -24,8 +22,6 @@ else if (isset($_GET["eraseList"]) && isset($_GET["counterId"]) && isset($_GET["
     $newTotal = $_GET["newTotal"];
     $ids = explode(",",$idList);
     if(!empty($ids)) {
-        if (!isset($ctrObj)) { require_once "clases/Contrarrecibos.php"; $ctrObj=new Contrarrecibos(); }
-        $ctrObj->rows_per_page=0;
         $ctrData=$ctrObj->getData("id=$counterId", 1); //"id", "folio", "codigoProveedor", "razonProveedor", "rfcGrupo", "razonGrupo", "aliasGrupo", "fechaRevision", "fechaPago", "total", "modifiedTime"
         if (isset($ctrData[0])) {
             $ctrData=$ctrData[0];
@@ -42,7 +38,6 @@ else if (isset($_GET["eraseList"]) && isset($_GET["counterId"]) && isset($_GET["
         if (isset($invIdList[0])) {
             $invIds = explode("|",$invIdList);
             foreach($invIds as $iid) {
-                if (!isset($invObj)) { require_once "clases/Facturas.php"; $invObj = new Facturas(); }
                 list($status,$statusn) = explode("|",$invObj->getValue("id",$iid,"status,statusn"));
                 //$prevStatus = $invObj->prevStatus($status,"Contrarrecibo");
                 $actionStatusN = Facturas::actionToStatusN("Contrarrecibo");
@@ -54,21 +49,11 @@ else if (isset($_GET["eraseList"]) && isset($_GET["counterId"]) && isset($_GET["
                     $fieldarray = ["id"=>$iid, "statusn"=>$prevStatusN];
                     if ($status!==$prevStatusN) $fieldarray["status"]=$prevStatus;
                     if ($invObj->saveRecord($fieldarray)) {
-                        if (!isset($solObj)) {
-                            require_once "clases/SolicitudPago.php";
-                            $solObj = new SolicitudPago();
-                        }
-                        if (!isset($prcObj)) {
-                            require_once "clases/Proceso.php";
-                            $prcObj = new Proceso();
-                        }
-                        $solObj->updateStatus($iid, -Facturas::STATUS_CONTRA_RECIBO);
-                        $prcObj->cambioFactura($iid, $prevStatus, getUser()->nombre, null, "Contrafacturas.eraseList:$status($statusn-$actionStatusN=$prevStatusN)");
+                        dao("sol")->updateStatus($iid, -Facturas::STATUS_CONTRA_RECIBO);
+                        dao("prc")->cambioFactura($iid, $prevStatus, getUser()->nombre, null, "Contrafacturas.eraseList:$status($statusn-$actionStatusN=$prevStatusN)");
                     }
                 }
             }
-            if (!isset($invObj)) { require_once "clases/Facturas.php"; $invObj=new Facturas(); }
-            $invObj->rows_per_page=0;
             $folFacs = array_column($invObj->getData("id in (".implode(",",$invIds).")", 0, "folio"), "folio");
             if (isset($folFacs[0])) $det.=(isset($folFacs[1])?" con ".count($folFacs)." facturas":" con factura ".$folFacs[0]);
             else {
@@ -88,10 +73,6 @@ else if (isset($_GET["eraseList"]) && isset($_GET["counterId"]) && isset($_GET["
             doclog("Verificacion de nuevo total de contra recibo","contrarecibo",["idContrarrecibo"=>$counterId,"folioCR"=>$counterCode??"","newTotal"=>$newTotal,"calcNewTotal"=>$calcNewTotal]);
             $fieldarray = ["id"=>$counterId, "total"=>$newTotal];
             if ($ctrObj->saveRecord($fieldarray)) {
-                if (!isset($prcObj)) {
-                    require_once "clases/Proceso.php";
-                    $prcObj = new Proceso();
-                }
                 $detalle = ""; // facturas que contenia, total original, folio de contrarrecibo
                 if (isset($counterCode)) $detalle .= $counterCode;
                 if (isset($prvCode)) {
@@ -108,7 +89,7 @@ else if (isset($_GET["eraseList"]) && isset($_GET["counterId"]) && isset($_GET["
                 }
                 $detalle .= " => TOT=$ {$newTotal}";
                 if ($newTotal!=$calcNewTotal) $detalle.=" / CALC=$ {$calcNewTotal}";
-                $prcObj->cambioContrarrecibo($counterId, "Borrado", getUser()->nombre, $detalle);
+                dao("prc")->cambioContrarrecibo($counterId, "Borrado", getUser()->nombre, $detalle);
                 echo "OK";
             } else clog2($ctrObj->log);
         } else clog2($ctfObj->log);
@@ -119,10 +100,6 @@ else if (isset($_GET["eraseList"]) && isset($_GET["counterId"]) && isset($_GET["
     if (isset($invIdList[0])) {
         $invIds = explode("|",$invIdList);
         foreach($invIds as $iid) {
-            if (!isset($invObj)) {
-                require_once "clases/Facturas.php";
-                $invObj = new Facturas();
-            }
             list($status,$statusn) = explode("|",$invObj->getValue("id",$iid,"status,statusn"));
             //$prevStatus = $invObj->prevStatus($status,"Contrarrecibo");
             $actionStatusN = Facturas::actionToStatusN("Contrarrecibo");
@@ -134,16 +111,8 @@ else if (isset($_GET["eraseList"]) && isset($_GET["counterId"]) && isset($_GET["
                 $fieldarray = ["id"=>$iid, "statusn"=>$prevStatusN];
                 if ($status!==$prevStatusN) $fieldarray["status"]=$prevStatus;
                 if ($invObj->saveRecord($fieldarray)) {
-                    if (!isset($solObj)) {
-                        require_once "clases/SolicitudPago.php";
-                        $solObj = new SolicitudPago();
-                    }
-                    if (!isset($prcObj)) {
-                        require_once "clases/Proceso.php";
-                        $prcObj = new Proceso();
-                    }
-                    $solObj->updateStatus($iid, -Facturas::STATUS_CONTRA_RECIBO);
-                    $prcObj->cambioFactura($iid, $prevStatus, getUser()->nombre, null, "Contrafacturas.eraseCounter:$status($statusn-$actionStatusN=$prevStatusN)");
+                    dao("sol")->updateStatus($iid, -Facturas::STATUS_CONTRA_RECIBO);
+                    dao("prc")->cambioFactura($iid, $prevStatus, getUser()->nombre, null, "Contrafacturas.eraseCounter:$status($statusn-$actionStatusN=$prevStatusN)");
                 }
             }
         }
@@ -152,10 +121,6 @@ else if (isset($_GET["eraseList"]) && isset($_GET["counterId"]) && isset($_GET["
     $fieldarray = ["idContrarrecibo"=>$counterId];
     $res=$ctfObj->deleteRecord($fieldarray);
     if (!$res) clog2($ctfObj->log);
-    if (!isset($ctrObj)) {
-        require_once "clases/Contrarrecibos.php";
-        $ctrObj = new Contrarrecibos();
-    }
     $data = $ctrObj->getData("id=$counterId", 1);
     if (!empty($data) && !empty($data[0])) {
         //"id", "folio", "codigoProveedor", "razonProveedor", "rfcGrupo", "razonGrupo", "aliasGrupo", "fechaRevision", "fechaPago", "total", "modifiedTime"
@@ -165,10 +130,6 @@ else if (isset($_GET["eraseList"]) && isset($_GET["counterId"]) && isset($_GET["
     }
     $fieldarray = ["id"=>$counterId];
     if ($ctrObj->deleteRecord($fieldarray)) {
-        if (!isset($prcObj)) {
-            require_once "clases/Proceso.php";
-            $prcObj = new Proceso();
-        }
         $detalle = ""; // parcial, id facturas eliminadas, total original, folio de contrarrecibo
         if (isset($counterCode)) $detalle .= $counterCode;
         if (isset($prvCode)) {
@@ -183,7 +144,7 @@ else if (isset($_GET["eraseList"]) && isset($_GET["counterId"]) && isset($_GET["
         if (isset($invIds)) {
             $detalle .= " (".implode(",",$invIds).")";
         }
-        $prcObj->cambioContrarrecibo($counterId, "Borrado", getUser()->nombre, $detalle);
+        dao("prc")->cambioContrarrecibo($counterId, "Borrado", getUser()->nombre, $detalle);
         echo "OK";
     } else clog2($ctrObj->log);
 }
@@ -207,12 +168,8 @@ function doActionService() {
             if (!$esAutorizaContraRecibos) { echoJSDoc("refresh", "No autorizado", null, $baseData+["line"=>__LINE__], "access"); return; }
             if (!isset($_POST["list"][0])) { echoJSDoc("error", "No se registraron facturas para autorizar", null, $baseData+["line"=>__LINE__], "authorized"); return; }
             $list=$_POST["list"];
-            global $ctrObj, $ctfObj;
-            if (!isset($ctrObj)) {
-                require_once "clases/Contrarrecibos.php";
-                $ctrObj = new Contrarrecibos();
-            }
-            $ctrObj->rows_per_page=0;
+            $ctfObj = dao("ctf",["rows_per_page"=>0]);
+            $ctrObj=dao("ctr",["rows_per_page"=>0]);
             $ctfData=$ctfObj->getData("id in (".implode(",", $list).")", 0, "id,idContrarrecibo,folioFactura,autorizadaPor");
             $validList=[];
             $numAuth=[];
@@ -247,14 +204,6 @@ function doActionService() {
                 return;
             }
             $qrs=[$query];
-            if (!isset($prcObj)) {
-                require_once "clases/Proceso.php";
-                $prcObj = new Proceso();
-            }
-            if (!isset($firObj)) {
-                require_once "clases/Firmas.php";
-                $firObj = new Firmas();
-            }
             $usrName=getUser()->nombre;
             foreach ($numAuth as $idCr=>$sumAuth) {
                 if(!$ctrObj->saveRecord(["id"=>$idCr,"numAutorizadas"=>new DBExpression("numAutorizadas+{$sumAuth}")])) {
@@ -269,12 +218,12 @@ function doActionService() {
                 } else {
                     $det="$sumAuth autorizadas: ".implode(",", $fLst[$idCr]);
                 }
-                if (!$prcObj->cambioContrarrecibo($idCr, "Autorizado", $usrName, $det)) {
+                if (!dao("prc")->cambioContrarrecibo($idCr, "Autorizado", $usrName, $det)) {
                     doclog("Error al guardar proceso de autorización en contra recibo","error",$baseData+["line"=>__LINE__,"query"=>$query,"errors"=>DBi::$errors]);
                 }
                 $qrs[]=$query;
                 $firDataArray=["idUsuario"=>getUser()->id,"modulo"=>"contrarrecibo","idReferencia"=>$idCr,"accion"=>"autoriza","motivo"=>$det];
-                if (!$firObj->saveRecord($firDataArray)) {
+                if (!dao("fir")->saveRecord($firDataArray)) {
                     doclog("Error al guardar Firma de autorización en contra recibo","error",$baseData+["line"=>__LINE__,"query"=>$query,"errors"=>DBi::$errors]);
                 } else $qrs[]=$query;
             }

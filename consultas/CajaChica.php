@@ -6,7 +6,7 @@ if ($hasUser) {
     if (isset($_POST["accion"])) switch($_POST["accion"]) {
         case "temporales": doTemporales(); break;                    // VT
         case "addFiles": doAddFiles(); break;                        // CC
-        case "delFiles": doDelFiles(); break;
+        //case "delFiles": doDelFiles(); break;
         case "transferFiles": doTransferFiles(); break;
         case "newPettyCashReq": doNewPettyCash(); break;             // CC
         case "getPettyCashReq": doGetPettyCash(); break;             // CC
@@ -308,7 +308,7 @@ function doTransferFiles() {
                                 $process_time=$block_time-$lastBlock_time;
                                 $lastLapse_time=$block_time;
                                 $lastBlock_time=$block_time;
-                                doclog("IGNORE TRANSFER BLOCK|Unable to save file data: $abrv {$rNum}[$arcIdx|$alias|$arcRow[archivoxml]|$archRow[archivopdf]] with ERROR '$errno': '$error' AFTER {$process_time}s","ftp");
+                                doclog("IGNORE TRANSFER BLOCK|Unable to save file data: $abrv {$rNum}[$arcIdx|$alias|$arcRow[archivoxml]|$arcRow[archivopdf]] with ERROR '$errno': '$error' AFTER {$process_time}s","ftp");
                                 continue 2;
                             } // else // El archivo ya estaba respaldado
                         }
@@ -815,7 +815,7 @@ function doSavePettyCash() {
     global $query;
     array_walk($_POST, 'trim_value');
     $regId=$_POST["regId"]??"";
-    if (!isset($regId[0])) { echoJSDoc("error", "No se recibió registro a guardar", null, _POST+["action"=>"SavePettyCash"], false); return; }
+    if (!isset($regId[0])) { echoJSDoc("error", "No se recibió registro a guardar", null, $_POST+["action"=>"SavePettyCash"], false); return; }
     $fieldarr=["id"=>$regId];
     if (isset($_POST["beneficiario"])) {
         $beneficiario=$_POST["beneficiario"];
@@ -1469,10 +1469,6 @@ function doGetRecord($additionalData=null) {
         $where.=(isset($where[0])?" AND ":"")."lower(replace(beneficiario,' ','')) like '%{$lowName}%'";
     }
     $ccId=dao("per")->getIdByName("Viaticos"); // Viaticos
-    if (!isset($ugObj)) {
-        require_once "clases/Usuarios_grupo.php";
-        $ugObj=new Usuarios_Grupo();
-    }
     $refundGroupId=dao("ug", ["rows_per_page"=>0])->getRefundGroupId(getUser()->id, $ccId, "vista");
     if (isset($firmId[0])) $where.=(isset($where[0])?" AND ":"")."empresaId=$firmId";
     else if (isset($refundGroupId[1])) $where.=" and empresaId in (".implode(",",$refundGroupId).")";
@@ -1480,11 +1476,9 @@ function doGetRecord($additionalData=null) {
     $rviData = dao("rvi")->getData($where);
     if (!isset($rviData[0])) { echoJSDoc("error", "No se encontró el registro solicitado", null, $_POST+["action"=>"getRecord", "query"=>$query], "error"); return; }
     // armar datos
+    $rvcObj = dao("rvc", ["orderlist"=>["fecha"=>"asc", "concepto"=>"asc"]]);
     for ($i=0; isset($rviData[$i]); $i++) {
-        $rvcObj->clearOrder();
-        $rvcObj->addOrder("fecha");
-        $rvcObj->addOrder("concepto");
-        $rvcData = dao("rvc", ["orderlist"=>["fecha"=>"asc", "concepto"=>"asc"]])->getData("vid='".$rviData[$i]["id"]."'");
+        $rvcData = $rvcObj->getData("vid='".$rviData[$i]["id"]."'");
         $rviData[$i]["conceptos"] = [];
         foreach ($rvcData as $val) {
             $cfecha=$val["fecha"];

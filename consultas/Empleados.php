@@ -2,7 +2,6 @@
 require_once dirname(__DIR__)."/bootstrap.php";
 require_once "clases/QueryService.php";
 require_once "clases/Empleados.php";
-
 $obj = new Empleados();
 if (isEditService()) doEditService($obj);
 else if (isBrowseService()) doBrowseService($obj);

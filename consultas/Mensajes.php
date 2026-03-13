@@ -15,11 +15,9 @@ if (isset($_REQUEST["msgkey"])) {
     }
 } else if (isset($_REQUEST["dbkey"])) {
     require_once dirname(__DIR__)."/bootstrap.php";
-    require_once "clases/InfoLocal.php";
-    $infObj=new InfoLocal();
     $dk=strtoupper($_REQUEST["dbkey"]);
     if ($dk==="INI") {
-        $msg=$infObj->getMsgIni();
+        $msg=dao("inf")->getMsgIni();
         foreach ($msg as $line) {
             // agregar cada linea dentro de div o p
             // generar json_encode

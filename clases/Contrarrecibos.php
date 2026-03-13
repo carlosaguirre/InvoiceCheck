@@ -11,22 +11,21 @@ class Contrarrecibos extends DBObject {
         $this->log = "\n// xxxxxxxxxxxxxx Contrarrecibos xxxxxxxxxxxxxx //\n";
     }
     function getNextFolio($aliasGrupo) {
-        require_once "clases/InfoLocal.php";
-        $info = new InfoLocal();
+        $infObj = dao("inf");
         // TODO: Alternativa cuando no hay APCU.
         //       getValue de InfoLocal _CR_$aliasGrupo
         //        - Si lo encuentra incrementar valor en InfoLocal
         //        - Si no lo encuentra obtener max(folio) de Contrarrecibos
         //          - Incrementar en uno y guardar en InfoLocal
-        if ($info->available()) {
-            $ultimoFolio = $info->obtener("_CR_$aliasGrupo");
+        if ($infObj->available()) {
+            $ultimoFolio = $infObj->obtener("_CR_$aliasGrupo");
             $retVal = $this->getValue("aliasGrupo",$aliasGrupo,"max(folio)+1", false, "group by aliasGrupo");
             
             if (empty($ultimoFolio)) $ultimoFolio=1;
             else $ultimoFolio = +$ultimoFolio+1;
             
             if (empty($retVal) || $retVal==="NULL" || $ultimoFolio>$retVal) $retVal = $ultimoFolio;
-            $info->definir("_CR_$aliasGrupo",$retVal);
+            $infObj->definir("_CR_$aliasGrupo",$retVal);
             return $retVal;
         } else {
             global $query;

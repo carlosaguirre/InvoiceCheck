@@ -1,9 +1,8 @@
 <?php
 require_once dirname(__DIR__)."/bootstrap.php";
 require_once "clases/QueryService.php";
-require_once "clases/Perfiles.php";
 
-$prfObj = new Perfiles();
+$prfObj = dao("prf");
 if (isValueService()) getValueService($prfObj);
 else if (isTestService()) getTestService($prfObj);
 else if (isCatalogService()) getCatalogService($prfObj);
@@ -13,7 +12,6 @@ function isActionService() {
     return isset($_POST["action"]);
 }
 function doActionService() {
-    global $prfObj, $prcObj;
     sessionInit();
     if (!hasUser()) {
         echo "REFRESH";
@@ -21,6 +19,7 @@ function doActionService() {
     }
     global $query;
     $queries=[];
+    $prfObj=dao("prf");
     switch($_POST["action"]??"") {
         case "adminDelete":
             $prfId=$_POST["id"]??"";
@@ -42,11 +41,7 @@ function doActionService() {
             }
             $queries["delete"]=$query;
             echo $prfId;
-            if (!isset(($prcObj))) {
-                require_once "clases/Proceso.php";
-                $prcObj=new Proceso();
-            }
-            $prcObj->cambioAdmin($prfId,"BorrarPerfil","",http_build_query($prfData[0],'',';'));
+            dao("prc")->cambioAdmin($prfId,"BorrarPerfil","",http_build_query($prfData[0],'',';'));
             $queries["proceso"]=$query;
             doclog("DATA","usuarios",["queries"=>$queries,"post"=>$_POST]);
             break;
@@ -82,11 +77,7 @@ function doActionService() {
                 }
                 $_POST["id"]=$prfId;
             }
-            if (!isset($prcObj)) {
-                require_once "clases/Proceso.php";
-                $prcObj=new Proceso();
-            }
-            $prcObj->cambioAdmin($prfId,"GuardarPerfil","",http_build_query($prfFields, '', ','));
+            dao("prc")->cambioAdmin($prfId,"GuardarPerfil","",http_build_query($prfFields, '', ','));
             $queries["proceso"]=$query;
             doclog("DATA","usuarios",["queries"=>$queries,"post"=>$_POST]);
             if (isset($_POST["readList"])||isset($_POST["writeList"])) {

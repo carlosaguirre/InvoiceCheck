@@ -3,7 +3,7 @@ global $generalJsVersion;
 global $calendarConfJsVersion;
 global $datePickerJsVersion;
 global $polyfillVersion;
-$generalJsVersion = "25.4y";
+$generalJsVersion = "25.4z";
 $calendarStyleCssVersion = "1.6";
 $calendarConfJsVersion = "1.6";
 $datePickerJsVersion = "1.6";

@@ -431,9 +431,8 @@ class Facturas extends DBObject {
         else if (file_exists("../$ubicacion$oldName.$ext") && !file_exists("../$ubicacion$newName.$ext")) {
             if (!rename("../$ubicacion$oldName.$ext","../$ubicacion$newName.$ext")) $errMsg="No se pudo renombrar archivo $oldName.$ext a $newName.$ext";
         } else if (!file_exists("../$ubicacion$oldName.$ext") && !file_exists("../$ubicacion$newName.$ext")) $errMsg="No existen archivos $oldName.$ext ni $newName.$ext";
-        //sessionInit();
         $fieldarray = ["id"=>$factId, $fieldName=>$newName];
-        sessionInit();
+        if (!sessionCheck()) return "Su sesión ha expirado. Por favor, vuelva a iniciar sesión e intente de nuevo.";
         if (isset($errMsg[0])) {
             doclog("Ocurrió un error al auto renombrar facturas (id:{$factId}, {$ext}:{$oldName}->{$newName}): $errMsg","error");
             return $errMsg;

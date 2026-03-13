@@ -678,8 +678,13 @@ function getSessionName() {
     if (isset($_COOKIE["TokenName"])) return $_COOKIE["TokenName"];
     return "invoiceSVRW12SessID";
 }
+class SessionException extends Exception {
+}
+function sessionCheck() {
+    return session_status() !== PHP_SESSION_NONE;
+}
 function sessionInit() { // $sessionId=null
-    if (session_status() == PHP_SESSION_NONE) {
+    if (!sessionCheck()) {
         try {
             session_name(getSessionName());
             session_start();
@@ -2460,14 +2465,3 @@ function normalize_to_utf8_chars($string,$otherReplacement='') {     // Nr. | Un
   //$retVal = preg_replace('/[\x00-\x1F\x7F-\xFF]/', $otherReplacement/*''*/, $retVal);
   return $retVal;
 }
-
-//if ($isSeason) {
-//    global $hasUser, $username;
-//    //sessionInit();
-//    if ($username==="admin") {
-//        $ waitImgName="icons/seasons/tamal-dance2";//snowman//tamal-dance2";//(rand()&1)?"roscar":"reyesr";//"roscareyes";
-//        //$waitClass="waitExpanded allWidBut4"; // pc95
-//    } else if ($hasUser && !in_array($username, ["mlobatonapsa","comprasapsa1","comprasapsa2","esmeraldac","gabyf","jesusa","magob","margaritab","marisols","factjyl","oliviag","ccmty","comprascorepack","jcalderon","logcorepack","rhcorepack","atorres","cmorysan2","cmorysan3","jrangel"])) {
-//        $ waitImgName="icons/seasons/tamal-dance2"; // reindeer // tamal-dance2";//".(rand()&1)?"roscar":"reyesr";//"roscareyes"; // "santasleigh" // "snowman" // "xmastree"
-//    }
-//}

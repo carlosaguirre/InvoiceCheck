@@ -2,7 +2,6 @@
 $preBoot=array_key_exists("_pryNm",$GLOBALS);
 if (!$preBoot) 
     require_once dirname(__DIR__)."/bootstrap.php";
-require_once "clases/Archivos.php";
 define("FDATC", ["CSF"=>"CONSTANCIA DE SITUACI","OCOF"=>"n del cumplimiento de obligaciones fiscales","CO"=>"Cadena Original", "CST"=>"Estatus en el padr"]);
 define("SENTIDOP", ["P"=>"POSITIVO", "N"=>"NEGATIVO"]);
 

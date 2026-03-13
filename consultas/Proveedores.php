@@ -1,22 +1,21 @@
 <?php
 require_once dirname(__DIR__)."/bootstrap.php";
 require_once "clases/QueryService.php";
-require_once "clases/Proveedores.php";
 
-$obj = new Proveedores();
-if (isValueService()) getValueService($obj);
-else if (isTestService()) getTestService($obj);
-else if (isCatalogService()) getCatalogService($obj);
-else if (isSelectorHTML()) getSelectorHTML($obj);
-else if (!empty($_GET["nextCode"])) echo $obj->getNextCode($_GET["nextCode"]);
-else if (isRegistryData()) getRegistryData($obj);
-elseif (isAccountCheck()) doAccountCheck($obj);
-elseif (isVerifyProvider()) doVerifyProvider($obj);
-else if (isEvaluateProvider()) doEvaluateProvider($obj);
-elseif (isFixStatus()) doFixStatus($obj);
-elseif (isLoadFile()) doLoadFile($obj);
-elseif (isSavePrv()) doSavePrv($obj);
-elseif (isSetNumPg()) doSetNumPg($obj);
+$prvObj = dao("prv");
+if (isValueService()) getValueService($prvObj);
+else if (isTestService()) getTestService($prvObj);
+else if (isCatalogService()) getCatalogService($prvObj);
+else if (isSelectorHTML()) getSelectorHTML();
+else if (!empty($_GET["nextCode"])) echo $prvObj->getNextCode($_GET["nextCode"]);
+else if (isRegistryData()) getRegistryData();
+elseif (isAccountCheck()) doAccountCheck();
+elseif (isVerifyProvider()) doVerifyProvider();
+else if (isEvaluateProvider()) doEvaluateProvider();
+elseif (isFixStatus()) doFixStatus();
+elseif (isLoadFile()) doLoadFile();
+elseif (isSavePrv()) doSavePrv();
+elseif (isSetNumPg()) doSetNumPg();
 
 function setError($message) {
     //echo "<!-- INI setError $message -->";
@@ -63,7 +62,7 @@ function isValidFileP($file) {
 function isSetNumPg() {
     return isset($_POST["command"])&&$_POST["command"]==="setnumpg";
 }
-function doSetNumPg($prvObj) {
+function doSetNumPg() {
     if (!hasUser()) {
         setError("Operaci&oacute;n no Autorizada");
         die();
@@ -77,6 +76,7 @@ function doSetNumPg($prvObj) {
         setError("Proveedor no identificado");
         die();
     }
+    $prvObj = dao("prv");
     if (!$prvObj->exists("id=$_POST[id]")) {
         setError("El proveedor no existe");
         die();
@@ -115,7 +115,7 @@ function doSetNumPg($prvObj) {
 function isSavePrv() {
     return isset($_POST["command"])&&$_POST["command"]==="saveProvider";
 }
-function doSavePrv($prvObj) {
+function doSavePrv() {
     if (!hasUser()) {
         setError("Operaci&oacute;n no Autorizada");
         die();
@@ -140,6 +140,7 @@ function doSavePrv($prvObj) {
         setError("Proveedor no identificado");
         die();
     }
+    $prvObj = dao("prv");
     if (!$prvObj->exists("id=$_POST[id]")) {
         setError("El proveedor no existe");
         die();
@@ -176,12 +177,7 @@ function doSavePrv($prvObj) {
         $fldarr["edocta"]=$filename;
     }
     if ($prvObj->saveRecord($fldarr)) {
-        global $prcObj;
-        if (!isset($prcObj)) {
-            require_once "clases/Proceso.php";
-            $prcObj=new Proceso();
-        }
-        $prcObj->cambioProveedor($_POST["id"],$_POST["status"],getUser()->nombre,"doSavePrv");
+        dao("prc")->cambioProveedor($_POST["id"],$_POST["status"],getUser()->nombre,"doSavePrv");
         setSuccess("Actualizaci&oacute;n de cuenta exitosa",isset($fldarr["edocta"])?["filename"=>$fldarr["edocta"]]:[]);
     } else {
         doclog("DBERROR Proveedores SavePrv","error",["POST"=>$_POST,"errno"=>DBi::getErrno(),"error"=>DBi::getError()]);
@@ -189,7 +185,7 @@ function doSavePrv($prvObj) {
     }
 }
 function isLoadFile() { return isset($_POST["command"])&&$_POST["command"]==="loadFile"; }
-function doLoadFile($prvObj) {
+function doLoadFile() {
     if (!hasUser()||(!validaPerfil("Administrador")&&!validaPerfil("Sistemas")&&!modificacionValida("Proveedor"))) setError("No tiene permiso para cargar un archivo");
     else if (!isset($_POST["fileKey"])||!isset($_POST["fileKey"][0])) setError("No se recibi&oacute; identificador de archivo");
     else if (!isset($_FILES[$_POST["fileKey"]])) setError("No se recibi&oacute; archivo");
@@ -217,20 +213,15 @@ function doLoadFile($prvObj) {
 function isFixStatus() {
     return isset($_POST["command"])&&$_POST["command"]==="fixStatus";
 }
-function doFixStatus($prvObj) {
+function doFixStatus() {
     global $query;
     if (!isset($_POST["id"])) setError("Proveedor no identificado");
     elseif (!isset($_POST["status"])) setError("Status no especificado");
-    elseif ($prvObj->saveRecord(["id"=>$_POST["id"],"status"=>$_POST["status"]])) {
+    elseif (dao("prv")->saveRecord(["id"=>$_POST["id"],"status"=>$_POST["status"]])) {
         if (!hasUser()) {
             setError("Operaci&oacute;n no Autorizada");
         } else {
-            global $prcObj;
-            if (!isset($prcObj)) {
-                require_once "clases/Proceso.php";
-                $prcObj=new Proceso();
-            }
-            $prcObj->cambioProveedor($_POST["id"],$_POST["status"],getUser()->nombre,"FixStatus");
+            dao("prc")->cambioProveedor($_POST["id"],$_POST["status"],getUser()->nombre,"FixStatus");
             echo json_encode(["result"=>"success","message"=>"Actualizaci&oacute;n de status exitosa"]);
         }
     }
@@ -239,14 +230,14 @@ function doFixStatus($prvObj) {
 function isVerifyProvider() {
     return isset($_POST["command"])&&$_POST["command"]==="verificarProveedor";
 }
-function doVerifyProvider($prvObj) {
+function doVerifyProvider() {
     global $query;
     doclog("INI FUNCTION doVerifyProvider","action",$_POST);
     if (!isset($_POST["id"]))
         echo json_encode(["result"=>"error","message"=>"Proveedor no identificado"]);
     elseif (!isset($_POST["verificado"]))
         echo json_encode(["result"=>"error","message"=>"Variable no incluida"]);
-    elseif ($prvObj->saveRecord(["id"=>$_POST["id"],"verificado"=>$_POST["verificado"]]))
+    elseif (dao("prv")->saveRecord(["id"=>$_POST["id"],"verificado"=>$_POST["verificado"]]))
         echo json_encode(["result"=>"success","message"=>"Verificaci&oacute;n Exitosa"]);
     else {
         doclog("DBERROR Proveedores VerifyProvider","error",["POST"=>$_POST,"errno"=>DBi::getErrno(),"error"=>DBi::getError()]);
@@ -256,7 +247,7 @@ function doVerifyProvider($prvObj) {
 function isEvaluateProvider() {
     return isset($_POST["command"])&&$_POST["command"]==="opinionProveedor";
 }
-function doEvaluateProvider($prvObj) {
+function doEvaluateProvider() {
     global $query;
     doclog("INI FUNCTION doEvaluateProvider","action",$_POST);
     if (!isset($_POST["id"]))
@@ -269,7 +260,7 @@ function doEvaluateProvider($prvObj) {
         if (is_bool($genDate)||is_bool($expDate)) {
             doclog("DTERROR doEvaluateProvider","error",$_POST);
             echo json_encode(["result"=>"error","message"=>"Fecha de opinion incompleta"]);
-        } else if ($prvObj->saveRecord(["id"=>$_POST["id"],"cumplido"=>$_POST["cumplido"],"generaopinion"=>$genDate->format("Y-m-d"),"venceopinion"=>$expDate->format("Y-m-d")]))
+        } else if (dao("prv")->saveRecord(["id"=>$_POST["id"],"cumplido"=>$_POST["cumplido"],"generaopinion"=>$genDate->format("Y-m-d"),"venceopinion"=>$expDate->format("Y-m-d")]))
             echo json_encode(["result"=>"success","message"=>"Cumplimiento Exitoso"]);
         else {
             doclog("DBERROR doEvaluateProvider","error",["POST"=>$_POST,"errno"=>DBi::getErrno(),"error"=>DBi::getError()]);
@@ -280,7 +271,7 @@ function doEvaluateProvider($prvObj) {
 function isAccountCheck() {
     return isset($_POST["command"])&&$_POST["command"]==="verificarCuentas";
 }
-function doAccountCheck($prvObj) {
+function doAccountCheck() {
     global $query;
     if (!hasUser()) {
         echoJsNDie("refresh", "Sin sesion");
@@ -322,9 +313,9 @@ function doAccountCheck($prvObj) {
                 doclog(" - datChk ERR: Cuenta en blanco en archivo TXT","cuentas");
             } else {
                 if (isset($pst["codigo"][0]))
-                    $prvData=$prvObj->getData("codigo='$pst[codigo]'",0,"*, date(venceopinion)<date(now()) vencido");
+                    $prvData=dao("prv")->getData("codigo='$pst[codigo]'",0,"*, date(venceopinion)<date(now()) vencido");
                 if(!isset($prvData[0]) && isset($pst["rfc"][0]))
-                    $prvData=$prvObj->getData("rfc='$pst[rfc]'",0,"*, date(venceopinion)<date(now()) vencido");
+                    $prvData=dao("prv")->getData("rfc='$pst[rfc]'",0,"*, date(venceopinion)<date(now()) vencido");
                 if (!isset($prvData[0])) {
                     $msjErr.="<p class='marblk2'>Proveedor desconocido</p>";
                     global $query;
@@ -344,9 +335,7 @@ function doAccountCheck($prvObj) {
                 $msjErr.="<p class='marblk2 bgred'>No coincide c&oacute;digo de proveedor '$pst[codigo]'(txt) con '$dbA[codigo]'(reg)</p>";
                 doclog(" - dbChk ERR: No coincide codigo de proveedor","cuentas",["codArch"=>$pst["codigo"],"codDB"=>$dbA["codigo"]]);
             }
-            require_once "clases/Usuarios.php";
-            $usrObj=new Usuarios();
-            $usrData=$usrObj->getData("nombre='$dbA[codigo]'",0,"id,email");
+            $usrData=dao("usr")->getData("nombre='$dbA[codigo]'",0,"id,email");
             if (isset($usrData[0]))
                 $usArr = $usrData[0];
             // ToDo: cuenta tiene que tener 10 o 18 digitos...
@@ -501,13 +490,14 @@ function isRegistryData() {
     sessionInit();
     return isset($_SESSION['user'])&&!empty($_POST["accion"])&&$_POST["accion"]==="regdata"&&isset($_POST["code"]);
 }
-function getRegistryData($obj) {
+function getRegistryData() {
+    $prvObj = dao("prv");
     if (isset($_POST["code"])) {
         $code=$_POST["code"];
-        $arrData = $obj->getRegistryArrData($code);
+        $arrData = $prvObj->getRegistryArrData($code);
     } else if (isset($_POST["id"])) {
         $id=$_POST["id"];
-        $arrData = $obj->getRegistryArrData($id);
+        $arrData = $prvObj->getRegistryArrData($id);
     }
     if (!empty($arrData)) {
         if (isset($arrData["error"]) && isset($arrData["errno"])) {
@@ -515,13 +505,13 @@ function getRegistryData($obj) {
         } else if (isset($_POST["nacional"]) && $arrData["nacional"]!==$_POST["nacional"]) {
             echo json_encode(["error"=>"Sólo puede consultar proveedores ".($_POST["nacional"]?"nacionales":"for&aacute;neos"), "errno"=>Proveedores::PROVEEDORES_ERRCODE_BADNATION,"data"=>$arrData]);
         } else echo json_encode($arrData);
-    } else echo json_encode(["error"=>"Registro vacío", "errno"=>Proveedores::PROVEEDORES_ERRCODE_NOTFOUND, "log"=>$obj->log]);
+    } else echo json_encode(["error"=>"Registro vacío", "errno"=>Proveedores::PROVEEDORES_ERRCODE_NOTFOUND, "log"=>$prvObj->log]);
 }
 function isSelectorHTML() {
     sessionInit();
     return isset($_SESSION['user']) && !empty($_REQUEST["selectorhtml"]);
 }
-function getSelectorHTML($obj) {
+function getSelectorHTML() {
     if (isset($_REQUEST["tipolista"])) {
         $tipoLista = $_REQUEST["tipolista"];
         $esCodigo = $tipoLista==="tcodigo";
@@ -537,7 +527,7 @@ function getSelectorHTML($obj) {
         $defaultText = "Todos";
     }
     
-    $prvFullMapWhere=$obj->setOptSessions(true);
+    $prvFullMapWhere=dao("prv")->setOptSessions(true);
     $pCod=$_SESSION['prvCodigoOpt'];
     $pRFC=$_SESSION['prvRFCOpt'];
     $pRzS=$_SESSION['prvRazSocOpt'];

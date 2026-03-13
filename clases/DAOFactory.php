@@ -501,7 +501,7 @@ up Usuarios_Perfiles
  *     $solObj = dao('sol', ["rows_per_page"=>0]);
  *     $ugObj = dao('ug');
  *     $upObj = dao('up');
- *     $usrObj = dao('usr');
+ *     $usrObj = dao('usr', ["rows_per_page"=>0]);
  */
 function dao($abbreviation, $initValues = null) {
     $dao = DAOFactory::get($abbreviation);

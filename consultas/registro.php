@@ -1,11 +1,8 @@
 <?php
 require_once dirname(__DIR__)."/bootstrap.php";
 
-require_once "clases/Proveedores.php";
-require_once "clases/Usuarios.php";
-
-$prvObj = new Proveedores();
-$usrObj = new Usuarios();
+$prvObj = dao("prv");
+$usrObj = dao("usr");
 
 $result = $usrObj->getList("password",null,"id,nombre,persona,email");
 if (!empty($result)) {

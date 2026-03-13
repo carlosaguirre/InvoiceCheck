@@ -88,7 +88,7 @@ class Tokens extends DBObject {
         return false;
     }
     public static function eligeUsuario($refId,$modulo) {
-        sessionInit();
+        if (!sessionCheck()) throw new SessionException("No se ha iniciado sesión");
         if (!hasUser()) return false;
         $usrId=getUser()->id;
         // encuentra tokens con refId y modulo indicados y con usos en null o mayor a cero
@@ -151,6 +151,12 @@ class Tokens extends DBObject {
                     dao('prc')->cambiaToken($tokData["id"], $detalle);
                 }
             }
+        } catch (SessionException $se) {
+            doclog("eligeToken SessionException","token",["exception"=>$se->getMessage()]);
+            $msg="Sesion expirada";
+            $this->errorMessage="Su sesión ha expirado. Por favor inicia sesión nuevamente para continuar.";
+            $this->errors[]=$msg;
+            $hasResult=false;
         } catch (Exception $ex) {
             doclog("eligeToken Exception","token",["exception"=>$ex->getMessage()]);
             switch($ex->getMessage()) {
@@ -283,7 +289,7 @@ class Tokens extends DBObject {
         if (isset($usrData[0]) && !isset($usrData["nombre"])) $usrData=$usrData[0];
         doclog("validaUsuario 2","token",["data"=>$usrData]);
         if (Tokens::$userUsage===self::USAGE_VALIDATE) {
-            sessionInit();
+            if (!sessionCheck()) throw new SessionException("No se ha iniciado sesión");
             if (hasUser()) {
                 doclog("validaUsuario 3","token",["user"=>getUser()]);
                 if (!isset(getUser()->id)) {

@@ -41,7 +41,7 @@ class Proveedores extends DBObject {
     }
     function getRegistryArrData($codeOrId) {
         $this->log .= "// INI function getRegistryArrData ( $codeOrId ) //\n";
-        sessionInit();
+        if (!sessionCheck()) throw new SessionException("No se ha iniciado sesión");
         //$esSistemas=validaPerfil(["Administrador","Sistemas"]);
         //$bloqueaProv = validaPerfil("BloquearPrv")||$esSistemas;
         $where="id='$codeOrId' OR codigo='$codeOrId'";

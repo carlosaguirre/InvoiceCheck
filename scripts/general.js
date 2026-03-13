@@ -801,7 +801,8 @@ function getPostRetFunc(rdyFunc,errFunc,extra) {
                 funclog("END","RETFUNC: THIS IS NOT THE READY FUNC "+statusInfo);
                 return false;
             }
-            if (responseText==="REFRESH") {
+            const lowResponse=responseText.toLowerCase();
+            if (lowResponse==="refresh" || lowResponse==="reload") {
                 doReload(true);
                 return false;
             }
@@ -879,8 +880,11 @@ function getPostRetFunc(rdyFunc,errFunc,extra) {
                                     const jobj=JSON.parse(limpio);
                                     if (readyState==3) xobj.lastJObj=jobj;
                                     if (jobj.action) {
-                                        if (jobj.action==="refresh"||jobj.action==="reload") doReload(true);
-                                        else if (jobj.action==="delay") {
+                                        const lowAction = jobj.action.toLowerCase();
+                                        if (lowAction==="refresh" || lowAction==="reload") {
+                                            doReload(true);
+                                            return false;
+                                        } else if (lowAction==="delay") {
                                             const clockElem=ebyid("pie_clock");
                                             if (clockElem) {
                                                 const currTime=clockElem.value;
@@ -902,10 +906,9 @@ function getPostRetFunc(rdyFunc,errFunc,extra) {
                                         };
                                     }
                                     if (jobj.result) {
-                                        const result=jobj.result.toLowerCase();
+                                        const lowResult=jobj.result.toLowerCase();
                                         funclog("RESULT='"+result+"'");
-                                        //console.log("RESULT="+result);
-                                        if (result==="refresh"||result==="reload") {
+                                        if (lowResult==="refresh" || lowResult==="reload") {
                                             console.log(result.toUpperCase()+". JOBJ:",jobj,". EXTRA:",extra);
                                             /**/ doReload(true); // Se rehabilita linea, estaba comentada. No recuerdo el motivo.
                                             //delayTimeout=setTimeout(function(){doReload(true);},5*60*1000);
@@ -4754,9 +4757,10 @@ function viewChartOptions(chartId) {
                 try {
                     const jobj=JSON.parse(msg);
                     if (jobj.result) {
-                        if (jobj.result==="refresh") {
+                        const lowResult = jobj.result.toLowerCase();
+                        if (lowResult==="refresh" || lowResult==="reload") {
                             doReload(true);
-                        } else if (jobj.result==="success") {
+                        } else if (lowResult==="success") {
                             //conlog("Proceso->list(COVID) => SUCCESS");
                             const chartList=ebyid("chartSelectElement");
                             if (jobj.list&&chartList&&chartList.chartId==3) {
@@ -4823,11 +4827,12 @@ function viewChart(optionCode,zoneCode) {
                 try {
                     const jobj=JSON.parse(msg);
                     if (jobj.result) {
-                        if (jobj.result==="refresh") {
+                        const lowResult=jobj.result.toLowerCase();
+                        if (lowResult==="refresh" || lowResult==="reload") {
                             doReload(true);
-                        } else if (jobj.result==="success") {
+                        } else if (lowResult==="success") {
                             conlog("Proceso->record(COVID) => SUCCESS");
-                        } else if (jobj.result==="failure") {
+                        } else if (lowResult==="failure") {
                             conlog("Proceso->record(COVID) => FAILURE\nQUERY="+jobj.query+"\nERRORS="+JSON.stringify(jobj.error,jsonCircularReplacer()));
                         } else conlog("Proceso->record(COVID) => UNKNOWN RESULT IS "+jobj.result);
                     } else conlog("Proceso->record(COVID) => NO RESULT");

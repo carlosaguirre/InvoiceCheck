@@ -1,28 +1,27 @@
 <?php
 require_once dirname(__DIR__)."/bootstrap.php";
 require_once "clases/QueryService.php";
-require_once "clases/Logs.php";
 
-$obj = new Logs();
+$logObj = dao("log");
 sessionInit();
 if (!hasUser()) echoJsNDie("refresh","Sin sesion");
 global $docRoot;
 $docRoot = $_SERVER["DOCUMENT_ROOT"];
-if (isValueService()) getValueService($obj);
-else if (isTestService()) getTestService($obj);
-else if (isCatalogService()) getCatalogService($obj);
-else if (isCommandService()) doCommandService($obj);
+if (isValueService()) getValueService($logObj);
+else if (isTestService()) getTestService($logObj);
+else if (isCatalogService()) getCatalogService($logObj);
+else if (isCommandService()) doCommandService();
 else if (isLogService()) doLogService();
 else if (isReadRequest()) doReadRequest();
 else if (isset($_GET["userid"]) && isset($_GET["section"]) && isset($_GET["text"])) {
-    if ($obj->agrega($_GET["userid"], $_GET["section"], $_GET["text"])) {
-        echo $obj->lastId . " : " . $_GET["userid"] . " (" . $_GET["section"] . ") " . $_GET["text"];
+    if ($logObj->agrega($_GET["userid"], $_GET["section"], $_GET["text"])) {
+        echo $logObj->lastId . " : " . $_GET["userid"] . " (" . $_GET["section"] . ") " . $_GET["text"];
     } else {
-        echo $obj->lastError;
+        echo $logObj->lastError;
     }
 }
 else if (isset($_GET["trace"])) {
-    thirdFunction($obj, $_GET["trace"]);
+    thirdFunction($_GET["trace"]);
     echo "<br><xmp>";
     print_r($_SERVER);
     echo "</xmp>";
@@ -117,7 +116,7 @@ function doReadRequest() {
 function isCommandService() {
     return isset($_POST["command"][0]);
 }
-function doCommandService($obj) {
+function doCommandService() {
     switch ($_POST["command"]) {
         case "eliminar":
             deleteLogByKey($_POST["key"]??"");
@@ -127,8 +126,8 @@ function doCommandService($obj) {
             break;
     }
 }
-function thirdFunction($obj, $traceStr) {
-    echo $obj->trace_test($traceStr);
+function thirdFunction($traceStr) {
+    echo dao("log")->trace_test($traceStr);
 }
 function readLogByKey($key) {
     $path="C:\\InvoiceCheckShare\\";

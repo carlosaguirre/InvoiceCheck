@@ -351,7 +351,6 @@ if (count($files)>0) {
             $doctIds=[];
             $folioFacturaFaltanteEnRecibo=[];
             $monedas=[];
-            //require_once "clases/PagoSoloUUID.php";
             foreach ($pdoctos as $pago) {
                 $pagoMon=strtoupper($pago["@monedadr"]);
                 if (isset($monedas[$pagoMon])) $monedas[$pagoMon]++;

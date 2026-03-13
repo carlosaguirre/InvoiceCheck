@@ -200,7 +200,7 @@ class SolicitudPago extends DBObject {
     }
     function getParaPagoF($filtros,$empresas) {
         self::$lastFunc=__FUNCTION__;
-        sessionInit();
+        if (!sessionCheck()) throw new SessionException("No se ha iniciado sesión");
         //if (hasUser() && getUser()->nombre==="admin")
         self::$hasSolByCr=(hasUser() && in_array(getUser()->nombre, ["admin","sistemas","arturo","jlobaton","solpagos","sistemas1","sistemas2","sistemas3"]));
 
@@ -210,7 +210,7 @@ class SolicitudPago extends DBObject {
         //return $this->getListaF("{$this->tableSuffix}status&".SolicitudPago::STATUS_AUTORIZADA." and {$this->tableSuffix}status<".SolicitudPago::STATUS_PAGADA." and ({$this->tableSuffix}proceso=".SolicitudPago::PROCESO_CONTABLE." or {$this->tableSuffix}proceso=".SolicitudPago::PROCESO_ANEXADA." or ({$this->tableSuffix}idFactura is null and {$this->tableSuffix}idOrden is not null))",$filtros,$empresas);
     }
     function getNumParaPagoF($filtros,$empresas) {
-        sessionInit();
+        if (!sessionCheck()) throw new SessionException("No se ha iniciado sesión");
         self::$hasSolByCr=(hasUser() && in_array(getUser()->nombre, ["admin","sistemas","arturo","jlobaton","solpagos","sistemas1","sistemas2","sistemas3"]));
         return $this->getNumListaF("{$this->tableSuffix}status<".SolicitudPago::STATUS_PAGADA." and ({$this->tableSuffix}proceso=".SolicitudPago::PROCESO_CONTABLE." or {$this->tableSuffix}proceso=".SolicitudPago::PROCESO_ANEXADA." or ({$this->tableSuffix}idFactura is null and ".(self::$hasSolByCr?"({$this->tableSuffix}idContrarrecibo is not null or (":"")."{$this->tableSuffix}idOrden is not null and {$this->tableSuffix}status&".SolicitudPago::STATUS_AUTORIZADA.(self::$hasSolByCr?"))":"")."))",$filtros,$empresas);
     }
@@ -511,9 +511,7 @@ class SolicitudPago extends DBObject {
         }
         $fDocType=$filtros["filter13"]??null;
         $docType="";
-        //sessionInit();
-        //$esDesarrollo=hasUser() && getUser()->nombre==="admin";
-        sessionInit();
+        if (!sessionCheck()) throw new SessionException("No se ha iniciado sesión");
         self::$hasSolByCr=(hasUser() && in_array(getUser()->nombre, ["admin","sistemas","arturo","jlobaton","solpagos","sistemas1","sistemas2","sistemas3"]));
         if (isset($fDocType[0])) {
             switch($fDocType) {
@@ -526,8 +524,6 @@ class SolicitudPago extends DBObject {
                 $where.="{$this->tableSuffix}$docType is not null";
             }
         }
-        //sessionInit();
-        //$esDesarrollo=hasUser() && getUser()->nombre==="admin";
         if ($reqFolio&&!$hasFolioSol&&!$hasFolioFac&&!$hasFolioOrd&&!isset($docType[0])) {
             if (isset($where[0])) $where.=" and ";
             $extraAdmin=self::$hasSolByCr?" or {$this->tableSuffix}idContrarrecibo is not null":"";
@@ -664,9 +660,7 @@ class SolicitudPago extends DBObject {
         }
         $fDocType=$filtros["filter13"]??null;
         $docType="";
-        //sessionInit();
-        //$esDesarrollo=hasUser() && getUser()->nombre==="admin";
-        sessionInit();
+        if (!sessionCheck()) throw new SessionException("No se ha iniciado sesión");
         self::$hasSolByCr=(hasUser() && in_array(getUser()->nombre, ["admin","sistemas","arturo","jlobaton","solpagos","sistemas1","sistemas2","sistemas3"]));
         if (isset($fDocType[0])) {
             switch($fDocType) {
@@ -732,7 +726,7 @@ class SolicitudPago extends DBObject {
     }
     function getEmpresasQuery($empresas,$prefix="",$notNegative=true) {
         if (empty($empresas)) {
-            sessionInit();
+            if (!sessionCheck()) throw new SessionException("No se ha iniciado sesión");
             if (hasUser()) {
                 $esDesarrollo=hasUser() && getUser()->nombre==="admin";
                 $esPrueba=substr(getUser()->nombre,0,4)==="test";
@@ -790,7 +784,7 @@ class SolicitudPago extends DBObject {
         return $this->saveRecord(["id"=>$solId,"status"=>new DBExpression("status".$bitOp.$newStatusSolPago)]);
     }
     function firma($solId,$accion,$motivo=null) {
-        sessionInit();
+        if (!sessionCheck()) throw new SessionException("No se ha iniciado sesión");
         if (hasUser()) {
             $userId=getUser()->id;
             if (getUser()->nombre==="admin") {

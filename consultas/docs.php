@@ -156,9 +156,7 @@ if (isset($_GET["daydoc"])) {
     $filename=$_POST["name"]??"";
 
     if (!empty($fileId) && $postPath==="temporal") {
-        require_once "clases/Temporales.php";
-        $tmpObj=new Temporales();
-        $postPath.="/".$tmpObj->obtenerNombre($fileId);
+        $postPath.="/".dao("tmp")->obtenerNombre($fileId);
         $_SESSION["docpath"]=$postPath;
         if (isset($filetype[0])) $_SESSION["doctype"]=$filetype;
         if (isset($filename[0])) $_SESSION["docname"]=$filename;
