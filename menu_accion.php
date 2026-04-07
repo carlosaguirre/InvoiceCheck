@@ -1,4 +1,28 @@
 <?php
+
+// Evita acceso directo vía URL a este archivo de inicialización
+if (PHP_SAPI !== 'cli') {
+    $_entryScript = $_SERVER['SCRIPT_FILENAME'] ?? '';
+    if (!empty($_entryScript) && realpath($_entryScript) === __FILE__) {
+        http_response_code(404);
+
+        // Muestra la página 404 de IIS configurada en el servidor
+        $_iis404File = 'C:\\inetpub\\custerr\\es-ES\\404.htm';
+        if (is_file($_iis404File) && is_readable($_iis404File)) {
+            if (!headers_sent()) {
+                header('Content-Type: text/html; charset=UTF-8');
+                header_remove('Content-Length');
+            }
+            readfile($_iis404File);
+            exit;
+        }
+
+        // Sin cuerpo: permite que el servidor web aplique su manejo de 404
+        if (!headers_sent()) header('Content-Length: 0');
+        exit;
+    }
+}
+
 //    echo "<!-- INI MENU ACCION ".($esPruebas?"IS":"NOT")." TESTING -->\n";
     $ciclo = date('Y');
     $clearForm = true;

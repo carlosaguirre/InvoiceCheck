@@ -28,7 +28,7 @@ if (empty($rfc)) {
 }
 
 // Buscar en la base de datos usando los campos proporcionados
-$stmt = DBi::query("SELECT alias, rfc, conSitFis FROM grupo WHERE rfc = '$rfc' LIMIT 1", DBObject::getByTable("grupo"), $dbKey);
+$stmt = DBi::query("SELECT alias, rfc, conSitFis, conSitFisTimes FROM grupo WHERE rfc = '$rfc' LIMIT 1", DBObject::getByTable("grupo"), $dbKey);
 $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$resultado) {
@@ -38,17 +38,22 @@ if (!$resultado) {
 
 $alias = $resultado['alias'];
 $conSitFis = $resultado['conSitFis'];
+if (!empty($resultado['conSitFisTimes']) && $resultado['conSitFisTimes'] > 0) {
+    $suffix = "_" . $resultado['conSitFisTimes'];
+}
+
 
 // Dominio base donde se alojan las constancias
 $dominio = 'http://globaltycloud.com.mx/docs/csf/';
 
 // Normalizar el nombre de archivo: convertir el nombre (sin extensión) a mayúsculas
-$name = pathinfo($alias, PATHINFO_FILENAME);
-$ext = pathinfo($alias, PATHINFO_EXTENSION);
-$aliasNormalized = $name !== '' ? strtoupper($name) . ($ext ? '.' . $ext : '') : $alias;
+//$name = pathinfo($alias, PATHINFO_FILENAME);
+//$ext = pathinfo($alias, PATHINFO_EXTENSION);
+//$aliasNormalized = $name !== '' ? strtoupper($name) . ($ext ? '.' . $ext : '') : $alias;
+$aliasNormalized = strtoupper($alias) . $suffix . '.pdf';
 
 // Construir la URL final asegurando barras correctas
-$finalUrl = rtrim($dominio, '/') . '/' . trim($conSitFis, '/') . '/' . ltrim($aliasNormalized, '/');
+$finalUrl = rtrim($dominio, '/') . '/' . trim($conSitFis, '/') . '/' . trim($aliasNormalized, '/');
 if (!preg_match('/\.pdf$/i', $finalUrl)) { $finalUrl .= '.pdf'; }
 
 // Intentar obtener el archivo remoto (timeout corto)

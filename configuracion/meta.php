@@ -640,6 +640,33 @@ function unlockFile($filename,$lockFile) {
         fprintf($lockFile,"%s\n", getmypid());
     }
 }*/
+
+    /**
+     * Bloquea acceso directo por URL al archivo indicado.
+     *
+     * Uso sugerido en cualquier archivo PHP:
+     * blockDirectUrlAccess(__FILE__);
+     */
+function blockDirectUrlAccess(string $targetFile, ?string $iis404File = 'C:\\inetpub\\custerr\\es-ES\\404.htm'): void {
+    if (PHP_SAPI === 'cli') return;
+    $_entryScript = $_SERVER['SCRIPT_FILENAME'] ?? '';
+    if (empty($_entryScript)) return;
+    if (realpath($_entryScript) !== realpath($targetFile)) return;
+    http_response_code(404);
+    // Muestra la página 404 de IIS configurada en el servidor
+    if (!empty($iis404File) && is_file($iis404File) && is_readable($iis404File)) {
+        if (!headers_sent()) {
+            header('Content-Type: text/html; charset=UTF-8');
+            header_remove('Content-Length');
+        }
+        readfile($iis404File);
+        exit;
+    }
+    // Sin cuerpo: permite que el servidor web aplique su manejo de 404
+    if (!headers_sent()) header('Content-Length: 0');
+    exit;
+}
+
 function lapse($startTime=null) {
     static $startLapse=null;
     $currentTime=microtime(true);
